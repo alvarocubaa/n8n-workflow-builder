@@ -957,6 +957,23 @@ FROM `guesty-data.zendesk_analytics.incoming_predictions` p
 WHERE p.partition_date = (SELECT MAX(partition_date) FROM `guesty-data.zendesk_analytics.incoming_predictions`)
   AND p.time_series_date >= CURRENT_DATE()
 ORDER BY p.domain, p.time_series_date;
+
+-- Open/pending tickets older than 7 days, grouped by account (aging report)
+-- IMPORTANT: Use IFNULL(deleted, FALSE) — the deleted column is often NULL, not FALSE.
+SELECT
+  account_name,
+  account_segment,
+  COUNT(ticket_id) AS ticket_count,
+  MIN(created_at) AS oldest_ticket_date,
+  STRING_AGG(DISTINCT assignee_name ORDER BY assignee_name LIMIT 3) AS assignees
+FROM `guesty-data.zendesk_analytics.tickets_clean`
+WHERE ticket_status IN ('open', 'pending')
+  AND created_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+  AND IFNULL(deleted, FALSE) = FALSE
+  AND account_name IS NOT NULL
+GROUP BY account_name, account_segment
+ORDER BY ticket_count DESC
+LIMIT 100;
 ```
 
 ### Filters & limits
@@ -967,3 +984,4 @@ ORDER BY p.domain, p.time_series_date;
 - qa_data.ticket_id is INT64; tickets_clean.ticket_id is STRING — cast when joining
 - feedback_dash has ARRAY columns (from Airtable) — use `UNNEST()` to flatten when needed
 - domain_friction_spikes: filter `alert = TRUE` for confirmed spikes only
+- Boolean columns (deleted, friction_related, etc.) may be NULL, not FALSE — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`
