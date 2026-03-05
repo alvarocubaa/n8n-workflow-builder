@@ -32,6 +32,7 @@ For BigQuery queries:
 - Call get_company_spec(system) — it has exact column names, table paths, join conditions, and verified SQL examples.
 - Each spec contains verified SQL examples for common use cases. Start from those examples — adapt them to the user's request rather than writing queries from scratch. The examples use the correct tables and columns.
 - Use ONLY table names and column names that appear in the spec. Never guess a table or column name.
+- n8n BQ node limitation: EXISTS subqueries are NOT supported inside JOIN ON predicates. Use a CTE with UNNEST to pre-flatten arrays/CSV fields, then do a simple equality JOIN.
 - Show the SQL to the user. Ask: "Does this query look right before I build the workflow?"
 
 For HTTP API calls:

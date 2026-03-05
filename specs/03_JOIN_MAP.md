@@ -100,8 +100,17 @@ CROSS JOIN UNNEST(j.account_ids) AS jira_account_id
 WHERE jira_account_id = <guesty_account_id>
 
 -- Zendesk ↔ Jira by Jira issue key (jira_ids is a comma-separated string)
-WHERE tickets_clean.jira_ids LIKE CONCAT('%', jira_hierarchy.subtask, '%')
-   OR tickets_clean.jira_ids LIKE CONCAT('%', jira_hierarchy.story, '%')
+-- IMPORTANT: Use CTE+UNNEST pattern (NOT EXISTS in JOIN ON — n8n BQ node doesn't support it)
+-- Also avoid naive LIKE (ENG-1 matches ENG-12). Use SPLIT for exact matching:
+WITH zendesk_jira_links AS (
+  SELECT t.*, TRIM(jid) AS linked_jira_key
+  FROM `guesty-data.zendesk_analytics.tickets_clean` t,
+  UNNEST(SPLIT(t.jira_ids, ',')) AS jid
+  WHERE t.jira_ids IS NOT NULL AND t.jira_ids != ''
+)
+SELECT ...
+FROM `guesty-data.jira.jira_hierarchy` j
+JOIN zendesk_jira_links t ON t.linked_jira_key = j.story
 ```
 
 ---
