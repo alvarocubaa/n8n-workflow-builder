@@ -7,12 +7,13 @@
 
 cases:
   - name: uc1_finance
-    description: "UC1: Zuora vs Admin payment gateway fee comparison (Finance dept)"
+    description: "UC1: Zuora configured vs invoiced payment gateway fee reconciliation (Finance dept)"
     department: finance
     prompt: >
-      I need a daily workflow that compares payment gateway fees between Zuora invoices
-      and our admin data. Query BigQuery for both sources, compare the totals, and if
-      there's a mismatch post an alert to Slack with the details. Run daily at 9am UTC.
+      I need a daily workflow that reconciles payment gateway fees in Zuora. Compare the
+      configured fees in product_catalog against the actually invoiced amounts in invoice_items.
+      Flag any accounts where the configured fee doesn't match what was invoiced. Post a
+      summary alert to Slack with the mismatched accounts. Run daily at 9am UTC.
     confirm_message: "Looks good, build it"
     expected_nodes:
       - googleBigQuery

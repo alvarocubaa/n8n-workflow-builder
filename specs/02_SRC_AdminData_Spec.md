@@ -234,7 +234,9 @@ The primary join key is **`_id`** in this table, which equals **`account_id`** i
 
 ### Payment Gateway Fees (cross-source note)
 
-The `accounts` table contains high-level payment plan fields (`payment_processing_plan_type`, `payment_processing_plan_value`, `payment_platform_fee_plan_type`, `payment_platform_fee_plan_value`), but **detailed payment gateway fee line items** are stored in Zuora's `product_catalog` table.
+The `accounts` table contains high-level payment plan fields (`payment_processing_plan_type`, `payment_processing_plan_value`, `payment_platform_fee_plan_type`, `payment_platform_fee_plan_value`), but **these fields are often NULL in production** and are not reliable for comparisons. **Detailed payment gateway fee line items** are stored in Zuora's `product_catalog` table.
+
+**For fee reconciliation workflows**: Compare Zuora `product_catalog.plan_value` (configured fee) against `invoice_items.amount` (actually invoiced fee) using `subscription_name` as the join key. Do NOT rely on `accounts.payment_processing_plan_value` — it is frequently unpopulated.
 
 To retrieve payment gateway fees for an account:
 

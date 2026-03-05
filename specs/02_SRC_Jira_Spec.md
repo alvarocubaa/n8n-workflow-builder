@@ -186,15 +186,22 @@ Use when linking Jira initiatives/epics/phases to records in another source by c
 |------------------|-----------|-----------|--------|
 | **Zendesk** tickets_clean | jira_hierarchy | Parse tickets_clean.**jira_ids** (comma-separated issue keys) and match to jira_hierarchy.**subtask** OR **story** OR **bug** | Use for ticket-to-issue linkage. See safe join pattern below. |
 
-> **jira_ids join precision caveat:** The `jira_ids` field is a comma-separated string (e.g. `"ENG-123,ENG-456"`). A naive `LIKE CONCAT('%', key, '%')` can produce false positives (`ENG-1` matches `ENG-12`). Prefer this safer pattern using SPLIT:
+> **jira_ids join precision caveat:** The `jira_ids` field is a comma-separated string (e.g. `"ENG-123,ENG-456"`). A naive `LIKE CONCAT('%', key, '%')` can produce false positives (`ENG-1` matches `ENG-12`). Use this CTE+UNNEST pattern (EXISTS in JOIN ON is not supported by n8n's BigQuery node):
 > ```sql
-> JOIN `guesty-data.zendesk_analytics.tickets_clean` t
->   ON EXISTS (
->     SELECT 1 FROM UNNEST(SPLIT(t.jira_ids, ',')) AS jid
->     WHERE TRIM(jid) = j.story
->   )
+> -- Step 1: Pre-explode jira_ids into individual rows via CTE
+> WITH zendesk_jira_links AS (
+>   SELECT t.*, TRIM(jid) AS linked_jira_key
+>   FROM `guesty-data.zendesk_analytics.tickets_clean` t,
+>   UNNEST(SPLIT(t.jira_ids, ',')) AS jid
+>   WHERE t.jira_ids IS NOT NULL AND t.jira_ids != ''
+> )
+> -- Step 2: Simple equality JOIN
+> SELECT ...
+> FROM `guesty-data.jira.jira_hierarchy` j
+> JOIN zendesk_jira_links t ON t.linked_jira_key = j.story
+> WHERE ...
 > ```
-> Falls back to LIKE only if the SPLIT approach is too complex for the workflow.
+> **Important:** Do NOT use EXISTS inside a JOIN ON clause — n8n's BigQuery node returns "EXISTS subquery is not supported inside join predicate." Always use the CTE approach above instead.
 >
 > **In n8n Code nodes (JavaScript)**, use the same principle — split before matching:
 > ```js

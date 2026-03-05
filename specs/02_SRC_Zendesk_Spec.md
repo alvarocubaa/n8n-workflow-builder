@@ -871,6 +871,8 @@ ORDER BY ticket_count DESC
 LIMIT 10;
 
 -- Tickets linked to a Jira issue (exact match via SPLIT — avoids false positives like PROJ-1 matching PROJ-12)
+-- Note: EXISTS in WHERE clause works fine. For JOINing to Jira, use the CTE+UNNEST pattern (see Jira spec)
+-- because n8n's BigQuery node does NOT support EXISTS inside JOIN ON predicates.
 SELECT t.ticket_id, t.subject, t.ticket_status, t.account_name
 FROM `guesty-data.zendesk_analytics.tickets_clean` t
 WHERE EXISTS (
