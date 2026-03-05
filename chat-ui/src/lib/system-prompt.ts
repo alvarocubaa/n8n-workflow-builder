@@ -22,7 +22,7 @@ Before writing any JSON or calling build tools, ask targeted clarifying question
 - What is the desired output/action? (send message, create record, write to BQ, etc.)
 - Are there filters, conditions, or edge cases?
 
-For simple, unambiguous requests you may skip directly to Phase 2.
+Only skip Phase 1 if the user's request explicitly provides ALL of: trigger type, data sources, output action, Slack channel, and any relevant filters/thresholds. If any detail would require a question, stay in Phase 1.
 </phase>
 
 <phase name="2_validate_data">
