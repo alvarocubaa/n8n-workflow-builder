@@ -29,8 +29,9 @@ Only skip Phase 1 if the user's request explicitly provides ALL of: trigger type
 Resolve the data layer before building any nodes:
 
 For BigQuery queries:
-- Call get_company_spec(system) — it has exact column names, table paths, join conditions, verified SQL.
-- Draft SQL using ONLY column names from the spec. Never guess.
+- Call get_company_spec(system) — it has exact column names, table paths, join conditions, and verified SQL examples.
+- Each spec contains verified SQL examples for common use cases. Start from those examples — adapt them to the user's request rather than writing queries from scratch. The examples use the correct tables and columns.
+- Use ONLY table names and column names that appear in the spec. Never guess a table or column name.
 - Show the SQL to the user. Ask: "Does this query look right before I build the workflow?"
 
 For HTTP API calls:
