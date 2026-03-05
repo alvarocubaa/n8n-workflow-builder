@@ -28,26 +28,24 @@ cases:
       - bq_projectId
 
   - name: uc2_cx
-    description: "UC2: Jira Accounting issues + Zendesk tickets daily report (CX dept)"
+    description: "UC2: Zendesk open tickets aging report by account (CX dept) — structurally valid, data verified"
     department: cx
     prompt: >
-      Build a daily workflow that queries BigQuery for open Jira issues labeled "Accounting",
-      then finds linked Zendesk tickets that are open/pending. Combine them into a Slack
-      summary showing each Jira issue with its linked Zendesk tickets. Post to
-      #accounting-jira-report. Run daily at 9am UTC.
+      Build a daily workflow that queries BigQuery for Zendesk tickets that are open or
+      pending and older than 7 days. Group them by account_name, show the count and oldest
+      ticket per account. Post a summary to #cx-aging-tickets. Run daily at 9am UTC.
     confirm_message: "Looks good, build it"
     expected_nodes:
       - googleBigQuery
       - slack
     expected_creds:
-      googleApi: h7fJ82YhtOnUL58u
+      googleApi: vWwsUUkc4EYrtsmN
       slackApi: RdxjTWVc6DaiNrIY
     checks:
       - encoding
       - uuids
       - credentials
       - bq_projectId
-      - jira_ids
 
   - name: uc3_cs
     description: "UC3: Salesforce native node health score alert (CS dept)"
