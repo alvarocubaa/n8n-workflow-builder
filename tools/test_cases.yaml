@@ -28,7 +28,7 @@ cases:
       - bq_projectId
 
   - name: uc2_cx
-    description: "UC2: Zendesk open tickets aging report by account (CX dept) — structurally valid, data verified"
+    description: "UC2: Zendesk open tickets aging report by account (CX dept) — tests boolean IFNULL pattern, verified SQL example"
     department: cx
     prompt: >
       Build a daily workflow that queries BigQuery for Zendesk tickets that are open or

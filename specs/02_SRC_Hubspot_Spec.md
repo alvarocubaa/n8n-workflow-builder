@@ -44,6 +44,7 @@ This document gives **exact** connection, schema, and query details so the AI do
 - **Status filters**: Use list membership or property filters (e.g. only contacts in "Customer" list; only deals in "Closed Won").
 - **Limits**: Use pagination (after/limit); set a max per run (e.g. 100 contacts, 50 deals per run) to avoid timeouts and rate limits.
 - **Properties**: Request only needed properties to reduce payload size.
+- **BigQuery boolean columns** may be NULL — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`.
 
 ---
 

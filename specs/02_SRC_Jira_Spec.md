@@ -392,3 +392,4 @@ ORDER BY ga_date;
 - `ARRAY_LENGTH(account_ids) > 0` — only issues linked to accounts
 - `story_status NOT IN ('Done', 'Closed')` — active work only
 - Use `LIMIT` + `OFFSET` for pagination — table can be large
+- Boolean columns may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`

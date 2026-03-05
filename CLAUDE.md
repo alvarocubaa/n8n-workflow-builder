@@ -34,6 +34,11 @@ These override Claude's pre-training AND get_node output:
   2. `claude.ts` -> ALL_SPEC_KEYS
   3. `system-prompt.ts` -> `<tools_guidance>` spec list
 
+## BigQuery gotchas (applies to specs and system prompt)
+- **Boolean NULL**: Boolean columns are often NULL, not FALSE. Use `IFNULL(col, FALSE) = FALSE` not `col = FALSE`.
+- **EXISTS in JOIN ON**: n8n's BQ node doesn't support EXISTS inside JOIN ON predicates. Use CTE+UNNEST to pre-flatten, then simple equality JOIN.
+- **Verified SQL > text rules**: Concrete SQL examples in specs are the strongest guardrail (~95%). Text rules like "use spec column names" only work ~70%. Always add verified SQL examples when adding new query patterns to specs.
+
 ## When doing BigQuery work
 1. Read `bigquery/CLAUDE.md` for setup context
 2. Read `bigquery/JOIN_MAP.md` for cross-source join conditions
@@ -43,13 +48,13 @@ These override Claude's pre-training AND get_node output:
 ## Testing
 ```bash
 # Audit a workflow JSON
-python tools/audit_workflow.py /tmp/workflow.json --expected-creds '{"slackApi":"abc123"}'
+python3 tools/audit_workflow.py /tmp/workflow.json --expected-creds '{"slackApi":"abc123"}'
 
 # End-to-end test (requires chat UI running on localhost:3004)
-python tools/test_workflow.py --department cs --prompt "Create a daily workflow..."
+python3 tools/test_workflow.py --department cs --prompt "Create a daily workflow..."
 
 # Run all regression tests
-python tools/run_regression.py
+python3 tools/run_regression.py
 ```
 
 ## Local dev
@@ -57,6 +62,9 @@ python tools/run_regression.py
 docker-compose up -d          # Ports 3003 (mcp), 3004 (ui)
 docker-compose build chat-ui  # Rebuild after chat-ui changes
 ```
+- Vertex AI auth expires periodically: `gcloud auth application-default login` to refresh
+- macOS uses `python3` not `python`
+- `MOCK_USER_EMAIL` env var in docker-compose.yml for local auth bypass
 
 ## Deployment
 - GCP project: `agentic-workflows-485210` (europe-west1)

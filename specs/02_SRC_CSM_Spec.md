@@ -565,3 +565,4 @@ LIMIT 20;
 - Health score: use latest `partition_date` for current state, historical for trends
 - NPS: 0-6 = Detractor, 7-8 = Passive, 9-10 = Promoter
 - Max 50-100 rows when fetching transcript/summary/comment fields
+- Boolean columns (account_active, is_churn, etc.) may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`

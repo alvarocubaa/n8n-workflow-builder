@@ -761,3 +761,4 @@ WHERE u.IsActive = TRUE;
 - sf_account has 736 columns — always SELECT specific fields, never SELECT *
 - Join sf_account to dim_accounts via `Guesty_Admin_ID__c = account_id` or `Id = sf_account_id`
 - Resolve OwnerId fields via sf_users.Id for human-readable names
+- Boolean columns (IsClosed, IsWon, IsActive, account_active, is_churn) may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`

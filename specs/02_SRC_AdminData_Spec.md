@@ -350,3 +350,4 @@ WHERE LOWER(pc.plan_name) LIKE '%payment gateway%'
 - Exclude cancelled: `WHERE canceledat IS NULL`
 - Use `LIMIT` for exploration — full table has ~100K+ rows (including historical)
 - UNNEST REPEATED fields when filtering or selecting nested values
+- Boolean columns (active, rufeeactivation, billingv2enabled, etc.) may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`

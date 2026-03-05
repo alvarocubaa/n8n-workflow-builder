@@ -75,10 +75,12 @@ Adding a department = adding a config entry in `departments.ts`. No code changes
 
 | Test Case | Department | Description | Status | Date |
 |-----------|-----------|-------------|--------|------|
-| UC1 | Finance | Zuora vs Admin payment gateway fee comparison | PASS | Mar 4, 2026 |
-| UC2 | CX | Jira Accounting issues + Zendesk tickets digest | PASS (jira_ids soft gap) | Mar 4, 2026 |
+| UC1 | Finance | Zuora product_catalog vs invoice_items fee reconciliation | REDESIGNED (untested) | Mar 5, 2026 |
+| UC2 | CX | Zendesk open tickets aging report by account | REDESIGNED (boolean IFNULL fix applied) | Mar 5, 2026 |
 | UC3 | CS | Salesforce native node health score alert | PASS | Mar 4, 2026 |
 | Marketing dept | Marketing | Spec loading, credential scoping, phase gates | PASS | Mar 2026 |
+
+UC1 and UC2 were redesigned after discovering original prompts targeted data that didn't exist in production (admin `payment_processing_plan_value` was NULL; Jira "Accounting" labels and Zendesk `jira_ids` were unpopulated).
 
 ### Node Config Overrides (verified across all UCs)
 
@@ -91,22 +93,43 @@ These override both Claude's pre-training AND get_node output:
 | Salesforce | credential key = `"salesforceOAuth2Api"` | Pre-training varies |
 | Salesforce | SOQL via resource=`"search"`, operation=`"query"` | Not obvious from docs |
 | Slack v2.4 | `"select": "channel"`, channelId with mode/name | New in v2.4 |
+| Merge v3 | `"combineBy": "combineByPosition"` (NOT `"combinationMode"`) | v2→v3 rename |
+
+### BigQuery Query Gotchas (verified across UCs)
+
+| Gotcha | Impact | Fix |
+|--------|--------|-----|
+| Boolean columns NULL not FALSE | `col = FALSE` returns 0 rows | `IFNULL(col, FALSE) = FALSE` |
+| EXISTS in JOIN ON | n8n BQ node error | CTE+UNNEST to pre-flatten, then equality JOIN |
+| Column name hallucination | Wrong table/column for query | Verified SQL examples in specs (95% effective) |
+
+### Guardrail Effectiveness Ranking
+
+| Guardrail Type | Effectiveness | Example |
+|---------------|--------------|---------|
+| Verified SQL examples in specs | ~95% | AI adapts working SQL rather than constructing from scratch |
+| Correct/wrong JSON examples | ~90% | BigQuery projectId, Merge v3 combineBy |
+| Text rules in system prompt | ~70% | "Use spec column names", "never invent credentials" |
+| Pre-training knowledge | ~60% (often wrong for node configs) | Gets credential keys, param names wrong |
 
 ## Known Weaknesses
 
 1. **jira_ids substring matching** -- Spec guidance exists (SQL SPLIT, JS split+includes) but Claude doesn't always follow it. Uses LIKE or indexOf ~30% of the time. Documented as soft gap.
-2. **No automated regression testing** -- Manual UC testing via Python scripts. `tools/` directory has test harness but requires running chat UI.
-3. **No chat-ui unit/integration tests** -- Auth, MCP bridge, deploy logic untested programmatically.
-4. **bigquery/ and specs/ partially overlap** -- bigquery/ is for manual SQL exploration, specs/ is for AI workflow building. Deprecation note needed in bigquery/.
-5. **Two folder versions coexist** -- Original (Gemini/Claude dual) and optimized (Claude-only) at root. Only optimized is used. Needs flattening.
+2. **Phase 1 skip soft gap** -- Even with strict escape clause ("must have ALL details explicit"), AI occasionally embeds questions inside Phase 2 SQL. ~80% compliance.
+3. **No automated regression testing** -- Manual UC testing via Python scripts. `tools/` directory has test harness but requires running chat UI.
+4. **No chat-ui unit/integration tests** -- Auth, MCP bridge, deploy logic untested programmatically.
+5. **bigquery/ and specs/ partially overlap** -- bigquery/ is for manual SQL exploration, specs/ is for AI workflow building.
 6. **Cloud Run IAP toggle is manual** -- Not yet automated in deploy scripts.
+7. **UC1 and UC2 need re-verification** -- Both redesigned (Mar 5) but not yet fully tested end-to-end with new prompts.
 
 ## Immediate Next Actions
 
-1. **Flatten folder structure** -- Move optimized/chat-ui and optimized/n8n-mcp to root, archive original
-2. **Testing automation** -- tools/ directory with test_workflow.py, audit_workflow.py, run_regression.py (done)
-3. **CLAUDE.md rewrite** -- Update for optimized-only architecture, departments, node config overrides
-4. **Deploy updated version** to Cloud Run
+1. ~~Flatten folder structure~~ -- DONE (Mar 2026). Monorepo at root, `_archive/` for old versions.
+2. ~~Testing automation~~ -- DONE. tools/ directory with test_workflow.py, audit_workflow.py, run_regression.py.
+3. ~~CLAUDE.md rewrite~~ -- DONE. Updated for departments, node config overrides, BigQuery gotchas.
+4. ~~Deploy to Cloud Run~~ -- DONE (Mar 5, 2026). GitHub repo: `alvarocubaa/n8n-workflow-builder`.
+5. **Re-verify UC1 and UC2** -- Both redesigned, need end-to-end testing with new prompts.
+6. **Automated regression** -- Wire `run_regression.py` into CI/CD pipeline.
 
 ## Future Improvements
 
