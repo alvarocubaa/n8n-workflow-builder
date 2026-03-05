@@ -1,0 +1,127 @@
+{
+  "name": "Daily Accounting Jira + Zendesk Report",
+  "nodes": [
+    {
+      "id": "a1f3c2e4-7b8d-4e9f-b0c1-2d3e4f5a6b7c",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2e4d6f8-9c0a-4b1d-c2e3-4f5a6b7c8d9e",
+      "name": "Get Accounting Jira Issues",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [480, 300],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT DISTINCT\n  story,\n  story_summary,\n  story_status,\n  story_url,\n  initiative,\n  initiative_summary,\n  all_labels,\n  team,\n  PM\nFROM `guesty-data.jira.jira_hierarchy`\nWHERE LOWER(all_labels) LIKE '%accounting%'\n  AND story_status NOT IN ('Done', 'Closed', 'Cancelled')\n  AND story IS NOT NULL\nORDER BY story\nLIMIT 100"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "c3f5e7a9-0d1b-4c2e-d3f4-5a6b7c8d9e0f",
+      "name": "Build ZD Query Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n\nif (!items || items.length === 0) {\n  return [{ json: { storyKeys: [], filterClause: '1=0' } }];\n}\n\nconst storyKeys = items\n  .map(item => item.json.story)\n  .filter(k => k && k.trim() !== '');\n\nif (storyKeys.length === 0) {\n  return [{ json: { storyKeys: [], filterClause: '1=0' } }];\n}\n\nconst filterClause = storyKeys\n  .map(k => `t.jira_ids LIKE '%${k}%'`)\n  .join(' OR ');\n\nreturn [{ json: { storyKeys, filterClause } }];"
+      }
+    },
+    {
+      "id": "d4a6f8b0-1e2c-4d3f-e4a5-6b7c8d9e0f1a",
+      "name": "Get Linked Zendesk Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [960, 300],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "={{ 'SELECT t.ticket_id, t.subject, t.ticket_status, t.account_name, t.jira_ids, t.assignee_name, t.priority, t.created_at FROM `guesty-data.zendesk_analytics.tickets_clean` t WHERE t.ticket_status IN (\\'open\\', \\'pending\\') AND t.jira_ids IS NOT NULL AND (' + $json.filterClause + ') ORDER BY t.created_at DESC LIMIT 200' }}"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "e5b7a9c1-2f3d-4e5a-f6b7-8c9d0e1f2a3b",
+      "name": "Build Slack Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const allJiraRows = $('Get Accounting Jira Issues').all().map(i => i.json);\nconst allZdRows = $('Get Linked Zendesk Tickets').all().map(i => i.json);\n\nconst today = DateTime.now().setZone('UTC').toFormat('yyyy-MM-dd');\n\nconst uniqueStories = {};\nfor (const row of allJiraRows) {\n  if (!row.story) continue;\n  if (!uniqueStories[row.story]) {\n    uniqueStories[row.story] = {\n      story: row.story,\n      story_summary: row.story_summary || '(no summary)',\n      story_status: row.story_status || 'Unknown',\n      story_url: row.story_url || '',\n      team: row.team || 'N/A',\n      PM: row.PM || 'N/A',\n      tickets: []\n    };\n  }\n}\n\nfor (const zd of allZdRows) {\n  if (!zd.jira_ids) continue;\n  for (const storyKey of Object.keys(uniqueStories)) {\n    if (zd.jira_ids.includes(storyKey)) {\n      uniqueStories[storyKey].tickets.push(zd);\n      break;\n    }\n  }\n}\n\nconst storyList = Object.values(uniqueStories);\nconst lines = [];\nlines.push('*:clipboard: Daily Accounting Jira Report -- ' + today + '*');\nlines.push('_Open Jira stories labeled Accounting with linked Zendesk tickets_');\nlines.push('');\n\nfor (const s of storyList) {\n  const urlPart = s.story_url ? '<' + s.story_url + '|' + s.story + '>' : s.story;\n  lines.push('*' + urlPart + ' -- ' + s.story_summary + '*');\n  lines.push('Status: ' + s.story_status + ' | Team: ' + s.team + ' | PM: ' + s.PM);\n  if (s.tickets.length === 0) {\n    lines.push('  - No linked open/pending Zendesk tickets');\n  } else {\n    for (const t of s.tickets) {\n      lines.push('  - ZD #' + t.ticket_id + ' -- \"' + (t.subject || 'No subject') + '\" | ' + t.ticket_status + ' | ' + (t.account_name || 'Unknown account') + ' | Assignee: ' + (t.assignee_name || 'Unassigned'));\n    }\n  }\n  lines.push('');\n}\n\nconst totalZd = storyList.reduce((sum, s) => sum + s.tickets.length, 0);\nlines.push('*Total: ' + storyList.length + ' Jira stories | ' + totalZd + ' linked open/pending Zendesk tickets*');\n\nreturn [{ json: { slackMessage: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "f6c8b0d2-3a4e-4f6b-a7c8-9d0e1f2a3b4c",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [1440, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#accounting-jira-report"
+        },
+        "text": "={{ $json.slackMessage }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [[{"node": "Get Accounting Jira Issues", "type": "main", "index": 0}]]
+    },
+    "Get Accounting Jira Issues": {
+      "main": [[{"node": "Build ZD Query Filter", "type": "main", "index": 0}]]
+    },
+    "Build ZD Query Filter": {
+      "main": [[{"node": "Get Linked Zendesk Tickets", "type": "main", "index": 0}]]
+    },
+    "Get Linked Zendesk Tickets": {
+      "main": [[{"node": "Build Slack Summary", "type": "main", "index": 0}]]
+    },
+    "Build Slack Summary": {
+      "main": [[{"node": "Post to Slack", "type": "main", "index": 0}]]
+    }
+  }
+}

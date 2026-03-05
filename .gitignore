@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Next.js build
+.next/
+out/
+
+# Build artifacts
+dist/
+
+# Environment & credentials
+.env
+.env.local
+.env.*.local
+credentials.json
+chat-ui/credentials.json
+*.pem
+*.key
+*adc_credentials*
+
+# Archive (old versions, frozen — too large for git)
+_archive/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Logs & Docker
+*.log
+logs/
+docker-compose.override.yml

@@ -1,0 +1,71 @@
+# Regression test cases for the n8n workflow builder.
+# Each case defines a 2-turn conversation: prompt (Phase 1/2) → confirm → extract JSON → audit.
+#
+# Usage:
+#   python tools/run_regression.py                         # runs all cases
+#   python tools/run_regression.py --case uc1_finance      # runs one case
+
+cases:
+  - name: uc1_finance
+    description: "UC1: Zuora vs Admin payment gateway fee comparison (Finance dept)"
+    department: finance
+    prompt: >
+      I need a daily workflow that compares payment gateway fees between Zuora invoices
+      and our admin data. Query BigQuery for both sources, compare the totals, and if
+      there's a mismatch post an alert to Slack with the details. Run daily at 9am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      slackApi: g3NQlNzyjFofD87l
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: uc2_cx
+    description: "UC2: Jira Accounting issues + Zendesk tickets daily report (CX dept)"
+    department: cx
+    prompt: >
+      Build a daily workflow that queries BigQuery for open Jira issues labeled "Accounting",
+      then finds linked Zendesk tickets that are open/pending. Combine them into a Slack
+      summary showing each Jira issue with its linked Zendesk tickets. Post to
+      #accounting-jira-report. Run daily at 9am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      slackApi: RdxjTWVc6DaiNrIY
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - jira_ids
+
+  - name: uc3_cs
+    description: "UC3: Salesforce native node health score alert (CS dept)"
+    department: cs
+    prompt: >
+      Create a daily workflow that queries Salesforce for accounts where
+      Recent_Health_Score__c is below 50. Use the native Salesforce node, not BigQuery.
+      Aggregate the results, format a Slack message with account name, score, MRR, and
+      owner sentiment, then post to #cs-health-alerts. Run daily at 9am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: aBjJNGRAjYF66z5F
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - sf_config
+      - slack_config

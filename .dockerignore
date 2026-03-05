@@ -1,0 +1,18 @@
+# Node module directories — never include in any Docker build
+chat-ui/node_modules
+chat-ui/.next
+n8n-mcp/node_modules
+
+# Git history
+.git
+.gitignore
+
+# Local env files with secrets
+.env.local
+.env.development
+chat-ui/.env.local
+chat-ui/credentials.json
+
+# macOS noise
+.DS_Store
+**/.DS_Store

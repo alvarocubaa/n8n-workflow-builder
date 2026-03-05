@@ -1,0 +1,171 @@
+{
+  "name": "Payment Gateway Fee Mismatch - Weekly Report",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Every Monday 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "BQ - Payment Gateway Mismatch",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [460, 300],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  a._id                              AS account_id,\n  a.name                             AS account_name,\n  pc.plan_name                       AS zuora_plan_name,\n  pc.plan_value                      AS zuora_gateway_fee,\n  a.payment_processing_plan_value    AS admin_payment_processing_value,\n  a.payment_processing_plan_type     AS admin_payment_processing_type,\n  pc.charge_model                    AS zuora_charge_model,\n  pc.effective_end_date              AS zuora_effective_end_date\nFROM `guesty-data.datalake_glue.accounts` a\nJOIN `guesty-data.zuora_analytics.product_catalog` pc\n  ON a._id = pc.account_id\nWHERE LOWER(pc.plan_name) LIKE '%payment gateway%'\n  AND a.active = TRUE\n  AND pc.effective_end_date > CURRENT_DATE()\n  AND a.payment_processing_plan_value IS NOT NULL\n  AND ROUND(CAST(a.payment_processing_plan_value AS FLOAT64), 4)\n      != ROUND(pc.plan_value, 4)\nORDER BY a.name ASC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Any Mismatches Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [680, 300],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "Slack - Post Mismatches",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [900, 160],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-alerts"
+        },
+        "text": "={{ \":rotating_light: *Payment Gateway Fee Mismatch Report* -- \" + $now.toFormat('cccc dd MMM yyyy') + \"\\nFound *\" + $input.all().length + \" account(s)* where Zuora product_catalog fee != Admin payment_processing_plan_value\\n\\n\" + $input.all().map(item => \"- *\" + item.json.account_name + \"* | Zuora: \" + item.json.zuora_gateway_fee + \" (\" + item.json.zuora_plan_name + \") | Admin: \" + item.json.admin_payment_processing_value + \" (\" + item.json.admin_payment_processing_type + \")\").join(\"\\n\") }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
+        }
+      }
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Slack - All Clear",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [900, 440],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-alerts"
+        },
+        "text": "={{ \":white_check_mark: *Payment Gateway Fee Check -- \" + $now.toFormat('cccc dd MMM yyyy') + \"*\\nAll active accounts match between Zuora product_catalog and Admin payment_processing_plan_value. No action required.\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "BQ - Payment Gateway Mismatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ - Payment Gateway Mismatch": {
+      "main": [
+        [
+          {
+            "node": "Any Mismatches Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Mismatches Found?": {
+      "main": [
+        [
+          {
+            "node": "Slack - Post Mismatches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - All Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

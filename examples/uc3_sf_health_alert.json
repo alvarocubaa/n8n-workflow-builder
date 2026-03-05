@@ -1,0 +1,113 @@
+{
+  "name": "Daily CS Health Score Alert",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "SF -- At-Risk Accounts",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [480, 300],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "SELECT Id, Name, Recent_Health_Score__c, Average_MRR__c, Account_Owner_Sentiment__c FROM Account WHERE Recent_Health_Score__c < 50 ORDER BY Recent_Health_Score__c ASC LIMIT 25"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "aBjJNGRAjYF66z5F",
+          "name": "Salesforce Partial Sandbox"
+        }
+      }
+    },
+    {
+      "id": "3d594a2e-1f8b-4c6d-9e3a-b72f05c8a1d4",
+      "name": "Aggregate All Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [720, 300],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "a1e8c3f7-29bd-4d50-8b6e-0f4712d9e5c2",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 300],
+      "parameters": {
+        "jsCode": "const accounts = $json.accounts;\nconst count = accounts.length;\nconst date = new Date().toISOString().slice(0, 10);\n\nconst sentimentEmoji = (s) => {\n  if (!s) return '-';\n  const val = s.toLowerCase();\n  if (val === 'positive') return ':large_green_circle: Positive';\n  if (val === 'negative') return ':red_circle: Negative';\n  if (val === 'neutral') return ':large_yellow_circle: Neutral';\n  return s;\n};\n\nconst formatMRR = (mrr) => {\n  if (mrr == null) return 'N/A';\n  return '$' + Number(mrr).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });\n};\n\nlet rows = accounts.map((a, i) => {\n  const rank = i + 1;\n  const name = a.Name || 'Unknown';\n  const score = a.Recent_Health_Score__c != null ? a.Recent_Health_Score__c : 'N/A';\n  const mrr = formatMRR(a.Average_MRR__c);\n  const sentiment = sentimentEmoji(a.Account_Owner_Sentiment__c);\n  return rank + '. *' + name + '* -- Score: ' + score + ' | MRR: ' + mrr + ' | Sentiment: ' + sentiment;\n}).join('\\n');\n\nconst message = ':warning: *Daily At-Risk Account Summary -- ' + date + '*\\n' +\n  count + ' account(s) with Health Score below 50 (worst first):\\n\\n' +\n  rows;\n\nreturn [{ json: { message } }];"
+      }
+    },
+    {
+      "id": "e2b7f4a9-6c1d-4e8f-a3b5-9d0c2e7f1a8b",
+      "name": "Post to #cs-health-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [1200, 300],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-health-alerts"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [{ "node": "SF -- At-Risk Accounts", "type": "main", "index": 0 }]
+      ]
+    },
+    "SF -- At-Risk Accounts": {
+      "main": [
+        [{ "node": "Aggregate All Accounts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Aggregate All Accounts": {
+      "main": [
+        [{ "node": "Build Slack Message", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [{ "node": "Post to #cs-health-alerts", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

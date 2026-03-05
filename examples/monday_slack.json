@@ -1,0 +1,235 @@
+{
+  "name": "Daily Overdue Marketing Tasks \u00e2\u0086\u0092 Slack",
+  "nodes": [
+    {
+      "id": "node-001",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "node-002",
+      "name": "Get Marketing Tasks",
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "mondayComApi": {
+          "id": "XsKPBAGItELeiJ8S",
+          "name": "Monday.com API"
+        }
+      },
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "boardItem",
+        "operation": "getAll",
+        "boardId": "YOUR_BOARD_ID",
+        "groupId": "YOUR_GROUP_ID",
+        "returnAll": true
+      }
+    },
+    {
+      "id": "node-003",
+      "name": "Find Overdue Tasks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const today = DateTime.now().startOf('day');\nconst items = $input.all();\nconst overdue = [];\n\nfor (const item of items) {\n  const cols = item.json.column_values || [];\n  const dueDateCol = cols.find(c => c.title === 'Due Date');\n  const statusCol = cols.find(c => c.title === 'Status');\n\n  if (!dueDateCol || !dueDateCol.text) continue;\n\n  const dueDate = DateTime.fromISO(dueDateCol.text);\n  const status = statusCol ? statusCol.text : '';\n\n  if (dueDate < today && status !== 'Done') {\n    overdue.push({\n      json: {\n        name: item.json.name,\n        dueDate: dueDateCol.text,\n        status: status\n      }\n    });\n  }\n}\n\nreturn overdue;"
+      }
+    },
+    {
+      "id": "node-004",
+      "name": "Any Overdue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        900,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "has-items",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "node-005",
+      "name": "Build Slack Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst count = items.length;\nconst today = DateTime.now().toFormat('MMMM d, yyyy');\n\nconst taskLines = items.map((item, i) => {\n  const name = item.json.name;\n  const due = item.json.dueDate;\n  const status = item.json.status || 'No status';\n  return (i + 1) + '. *' + name + '* - Due: ' + due + ' | Status: _' + status + '_';\n}).join('\\n');\n\nconst header = '\u00f0\u009f\u009a\u00a8 *Overdue Marketing Tasks - ' + today + '*';\nconst subheader = '\u00f0\u009f\u0093\u008b *' + count + ' task' + (count === 1 ? '' : 's') + ' overdue:*';\nconst footer = '_Please update your tasks in Monday.com today!_ \u00f0\u009f\u0092\u00aa';\nconst message = header + '\\n\\n' + subheader + '\\n\\n' + taskLines + '\\n\\n' + footer;\n\nconst result = { message: message, count: count };\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "node-006",
+      "name": "Send Overdue Reminder",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1340,
+        180
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-team"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "node-007",
+      "name": "Send All Clear",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        420
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-team"
+        },
+        "text": "={{ ' ' + $now.toFormat('MMMM d, yyyy') + '*\\n\\nNo overdue marketing tasks today. Great work team! \u00f0\u009f\u008e\u0089' }}",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "Get Marketing Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Marketing Tasks": {
+      "main": [
+        [
+          {
+            "node": "Find Overdue Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Overdue Tasks": {
+      "main": [
+        [
+          {
+            "node": "Any Overdue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Overdue?": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send All Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Overdue Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

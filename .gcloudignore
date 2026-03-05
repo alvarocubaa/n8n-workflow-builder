@@ -1,0 +1,17 @@
+# Inherit from .gitignore
+#!include:.gitignore
+
+# Node module directories — never upload to Cloud Build
+node_modules/
+**/node_modules/
+
+# Next.js build artifacts
+.next/
+**/.next/
+
+# Local credentials
+credentials.json
+**/credentials.json
+
+# Docker build artifacts
+.dockerignore

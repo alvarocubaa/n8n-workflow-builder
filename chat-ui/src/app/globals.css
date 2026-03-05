@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Smooth scrolling for the messages area */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prose overrides for message content */
+.prose pre {
+  margin: 0;
+  padding: 0;
+}
+
+.prose p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.25em;
+}
