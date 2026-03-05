@@ -135,6 +135,9 @@ These override both pre-training knowledge AND get_node output — use exactly a
 - Slack v2.4: "select": "channel", "channelId": { "mode": "name", "value": "#channel-name" }
 - Slack credential key: varies by department — check the department credentials table. Common keys: slackApi, slackOAuth2Api.
 - Salesforce: credential key "salesforceOAuth2Api", SOQL via resource "search", operation "query"
+- Merge node v3: parameter is "combineBy" (NOT "combinationMode"). To combine by position:
+  Correct: "mode": "combine", "combineBy": "combineByPosition"
+  Wrong:   "mode": "combine", "combinationMode": "mergeByPosition"
 </rule>
 </critical_rules>
 
