@@ -2,6 +2,7 @@ import { getUserFromHeaders } from '@/lib/auth';
 import { deployWorkflow, updateWorkflow } from '@/lib/n8n-deploy';
 import { logDeployEvent } from '@/lib/firestore';
 import { computeComplexity, extractWorkflowMeta } from '@/lib/complexity';
+import { getDepartment } from '@/lib/departments';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,9 +42,12 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: 'workflowJson is required' }, { status: 400 });
   }
 
+  const dept = body.departmentId ? getDepartment(body.departmentId) : undefined;
+  const projectId = dept?.n8nProjectId;
+
   const result = workflowId
     ? await updateWorkflow(workflowId, workflowJson)
-    : await deployWorkflow(workflowJson, name);
+    : await deployWorkflow(workflowJson, name, projectId);
 
   if ('error' in result) {
     return Response.json(result, { status: 422 });

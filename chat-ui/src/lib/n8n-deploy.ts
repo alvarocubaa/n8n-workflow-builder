@@ -47,13 +47,28 @@ async function tagWorkflow(workflowId: string): Promise<void> {
   }).catch(() => { /* tagging is best-effort — don't fail the deploy */ });
 }
 
+/** Transfer a workflow to a specific n8n project (best-effort). */
+async function transferWorkflowToProject(workflowId: string, projectId: string): Promise<void> {
+  const res = await fetch(`${N8N_API_URL}/api/v1/workflows/${workflowId}/transfer`, {
+    method: 'PUT',
+    headers: n8nHeaders(),
+    body: JSON.stringify({ destinationProjectId: projectId }),
+  }).catch(() => null);
+
+  if (res && !res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(`[n8n-deploy] Failed to transfer workflow ${workflowId} to project ${projectId}: ${res.status} ${text}`);
+  }
+}
+
 /**
  * Deploy a workflow JSON string to the n8n instance.
  * Returns DeployResult on success or DeployError on failure.
  */
 export async function deployWorkflow(
   workflowJson: string,
-  customName?: string
+  customName?: string,
+  projectId?: string,
 ): Promise<DeployResult | DeployError> {
   let parsed: N8nWorkflow;
 
@@ -109,6 +124,11 @@ export async function deployWorkflow(
 
   // Tag as "AI Generated" (best-effort, separate call)
   await tagWorkflow(workflowId);
+
+  // Transfer to department project (best-effort, separate call)
+  if (projectId) {
+    await transferWorkflowToProject(workflowId, projectId);
+  }
 
   return {
     workflowId,

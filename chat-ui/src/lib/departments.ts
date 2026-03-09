@@ -29,6 +29,7 @@ export interface DepartmentConfig {
   specs: string[];               // keys into SPEC_FILE_MAP (department-specific)
   credentials: Credential[];     // department-specific credentials
   promptRules?: string;          // optional extra XML rules for this department
+  n8nProjectId?: string;         // n8n project to deploy workflows into (sandbox)
 }
 
 // ─── Shared resources (available to all departments) ──────────────────────────
@@ -52,6 +53,7 @@ export const DEPARTMENTS: Record<string, DepartmentConfig> = {
     displayName: 'Marketing',
     description: 'Marketing automation, ads, analytics, and content workflows',
     specs: ['hubspot'],
+    n8nProjectId: 'PkYJF1B9yVB8Imbl',
     credentials: [
       // Google Ads
       { service: 'Google Ads', name: "Assaf's google ads api", type: 'googleAdsOAuth2Api', id: '7zPWAntoXHKpq6l7', env: 'sandbox' },
@@ -108,6 +110,7 @@ For Google Sheets operations, prefer the Google Sheets node with googleSheetsOAu
     displayName: 'Customer Success',
     description: 'Customer success management, health scores, and account workflows',
     specs: ['salesforce', 'csm', 'hibob', 'jira'],
+    n8nProjectId: 'kh5kTQJhrQ8KNoSC',
     credentials: [
       // ── Sandbox ──
       { service: 'Salesforce (Sandbox)', name: 'Salesforce Partial Sandbox', type: 'salesforceOAuth2Api', id: 'aBjJNGRAjYF66z5F', env: 'sandbox' },
@@ -141,6 +144,7 @@ Avoid Code nodes — CS users are non-technical.
     displayName: 'Customer Experience',
     description: 'Support operations, ticket management, and customer workflows',
     specs: ['zendesk', 'salesforce', 'jira'],
+    n8nProjectId: 'W62G9hxuK9c7cKwo',
     credentials: [
       // ── Sandbox ──
       { service: 'Zendesk (Sandbox)', name: 'Zendesk sandbox', type: 'zendeskApi', id: 'PEFCagywCPGDJGjg', env: 'sandbox' },
@@ -189,6 +193,7 @@ Avoid Code nodes — CX users are non-technical.
     displayName: 'Onboarding',
     description: 'Client onboarding workflows and setup automation',
     specs: ['salesforce', 'zendesk', 'jira'],
+    n8nProjectId: 'Yh0x22sXaF1PEsGT',
     credentials: [
       // ── Production ──
       { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
@@ -215,6 +220,7 @@ Avoid Code nodes — Onboarding users are non-technical.
     displayName: 'Payments',
     description: 'Payment processing, billing, and fee reconciliation workflows',
     specs: ['zuora', 'salesforce', 'admin_data'],
+    n8nProjectId: 'ahDlEt5r1gShUBKY',
     credentials: [
       // ── Sandbox ──
       { service: 'Slack (Test)', name: 'Slack ask-pay-test', type: 'slackApi', id: '0l2bJ3SquNB8nyFd', env: 'sandbox' },
@@ -244,6 +250,7 @@ For Zuora data, use BigQuery (zuora_analytics tables). The native Zuora node is 
     displayName: 'Finance',
     description: 'Financial reporting, invoice reconciliation, and accounting workflows',
     specs: ['zuora', 'admin_data', 'salesforce', 'hibob'],
+    n8nProjectId: 'EuTGww8zaCWPb8Cr',
     credentials: [
       // ── Sandbox ──
       { service: 'Zendesk (Sandbox)', name: 'Zendesk Sandbox - Info@guesty.com', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },

@@ -18,14 +18,17 @@ export default function QualityMetrics({ events, deploys, feedback }: Props) {
   const totalFeedback = thumbsUp + thumbsDown;
   const satisfactionRate = totalFeedback > 0 ? Math.round((thumbsUp / totalFeedback) * 100) : 0;
 
-  const avgToolCalls = totalSessions > 0
-    ? (events.reduce((sum, e) => sum + e.toolCallCount, 0) / totalSessions).toFixed(1)
-    : '0';
+  // Exclude seeded events — they have approximate tool counts and no latency data
+  const liveEvents = events.filter(e => !e.seeded);
 
-  const avgLatency = totalSessions > 0
-    ? (events.filter(e => e.latencyMs > 0).reduce((sum, e) => sum + e.latencyMs, 0) /
-       Math.max(events.filter(e => e.latencyMs > 0).length, 1) / 1000).toFixed(1)
-    : '0';
+  const avgToolCalls = liveEvents.length > 0
+    ? (liveEvents.reduce((sum, e) => sum + e.toolCallCount, 0) / liveEvents.length).toFixed(1)
+    : 'N/A';
+
+  const avgLatency = liveEvents.filter(e => e.latencyMs > 0).length > 0
+    ? (liveEvents.filter(e => e.latencyMs > 0).reduce((sum, e) => sum + e.latencyMs, 0) /
+       liveEvents.filter(e => e.latencyMs > 0).length / 1000).toFixed(1)
+    : 'N/A';
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
