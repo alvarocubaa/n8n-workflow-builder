@@ -70,6 +70,9 @@ Adding a department = adding a config entry in `departments.ts`. No code changes
 - **Phase-gated** workflow building with user confirmation gates
 - **One-click deploy** to n8n cloud (guesty.app.n8n.cloud), tagged "AI Generated"
 - **Conversation persistence** in Firestore with department context
+- **Analytics dashboard** at `/analytics` (admin-only): usage by dept, quality metrics, ROI calculator, feedback log
+- **Feedback loop**: thumbs up/down on all model responses with optional comments
+- **Instrumentation**: every chat turn and deployment logged to Firestore with timing, tool calls, complexity scoring
 
 ## Tested & Verified
 
@@ -142,15 +145,29 @@ These override both Claude's pre-training AND get_node output:
 ### Medium-term (months)
 - More department-specific prompt rules (04_DEPT_* guides)
 - Webhook-triggered workflows (not just schedule+BQ patterns)
-- User feedback loop (thumbs up/down on generated workflows)
+- ~~User feedback loop (thumbs up/down on generated workflows)~~ -- DONE (Mar 9, 2026)
 - Workflow version history in Firestore
 - Template library: save successful workflows as reusable templates
+- Dashboard enhancements: date range filter, n8n execution tracking, drill-down per user
 
 ### Long-term (architectural)
 - **Vector database for specs** -- As specs grow beyond ~25 files or 500KB total, flat .md loading with string matching won't scale. Options: Vertex AI Vector Search, Pinecone, pgvector. Trigger: when spec count exceeds ~25 or total spec size exceeds 500KB.
 - **Multi-model routing** -- Haiku for simple workflows (schedule+BQ+Slack), Sonnet for complex (AI agents, parallel branches). Could reduce cost 80% for simple cases.
 - **Self-improving loop** -- Capture deployed workflow execution results, feed back into specs (e.g., "this SQL pattern failed in production, use X instead").
 - **Workflow diff and versioning** -- Track changes to deployed workflows, show diffs, enable rollback.
+
+## Cross-Project
+
+| Direction | Project | What flows |
+|-----------|---------|------------|
+| **Produces for** | Portfolio | Case studies, architecture diagrams, performance benchmarks |
+| **Consumes from** | Data Sources & Connectors | 11 data source specs loaded at runtime via `get_company_spec()` |
+| **Consumes from** | bigquery | Query patterns, JOIN_MAP.md, table specs for BigQuery node config |
+| **Consumes from** | Agentic Workflows | WAT architecture patterns, n8n gotchas library |
+
+*Update when relationships change. Keep in sync with root CLAUDE.md Projects table.*
+
+---
 
 ## Performance Benchmarks
 
@@ -170,3 +187,26 @@ Key discoveries from iterative testing:
 - **Phase gates need structural enforcement**: "Phase 2 and Phase 3 must be separate conversation turns" works.
 - **No spec auto-injection needed**: Claude reliably calls get_company_spec() on its own.
 - **Credentials: inline top-4, tool for rest**: Full credentials guide in system prompt was redundant.
+
+
+---
+
+## Research & Evidence
+
+*Living reference. Update as the market evolves, competitors shift, or new data emerges. This is the evidence behind the "why."*
+
+### Market Landscape
+
+| Metric | Value | Source | Date |
+|--------|-------|--------|------|
+| | | | |
+
+### Competitive Landscape
+
+| Competitor | Positioning | Pricing | Our Edge |
+|-----------|-------------|---------|----------|
+| | | | |
+
+### Key Research Findings
+
+-
