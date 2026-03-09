@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import FeedbackButtons from './FeedbackButtons';
 
 export interface Message {
   role: 'user' | 'model';
@@ -16,6 +17,9 @@ export interface Message {
 
 interface MessageBubbleProps {
   message: Message;
+  conversationId?: string;
+  departmentId?: string;
+  messageIndex?: number;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -37,7 +41,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function DeployButton({ json }: { json: string }) {
+function DeployButton({ json, conversationId, departmentId }: { json: string; conversationId?: string; departmentId?: string }) {
   const [state, setState] = useState<'idle' | 'deploying' | 'ok' | 'err'>('idle');
   const [workflowUrl, setWorkflowUrl] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -49,7 +53,7 @@ function DeployButton({ json }: { json: string }) {
       const res = await fetch('/api/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workflowJson: json }),
+        body: JSON.stringify({ workflowJson: json, conversationId, departmentId }),
       });
       const data = (await res.json()) as { workflowUrl?: string; workflowName?: string; error?: string; detail?: string };
       if (!res.ok || data.error) {
@@ -97,7 +101,7 @@ function DeployButton({ json }: { json: string }) {
   );
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+export default function MessageBubble({ message, conversationId, departmentId, messageIndex }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -154,7 +158,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
                         {codeString}
                       </SyntaxHighlighter>
                       <div className="absolute right-2 top-2 flex gap-1.5">
-                        {isWorkflow && <DeployButton json={codeString} />}
+                        {isWorkflow && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
                         <CopyButton text={codeString} />
                       </div>
                     </div>
@@ -179,6 +183,11 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         {/* Streaming indicator */}
         {message.isStreaming && (
           <span className="mt-1 inline-block h-4 w-1 animate-pulse rounded-sm bg-gray-400" />
+        )}
+
+        {/* Feedback buttons (shown after streaming completes) */}
+        {!message.isStreaming && (
+          <FeedbackButtons conversationId={conversationId} messageIndex={messageIndex} />
         )}
       </div>
     </div>

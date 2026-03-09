@@ -1,5 +1,6 @@
 import admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
+import type { AnalyticsEvent, DeployEvent, FeedbackEntry } from './types';
 
 // ─── In-memory fallback for local-* conversations (no Firestore) ─────────────
 // Used when Firestore is unavailable and IDs are prefixed with "local-".
@@ -200,6 +201,155 @@ export async function listConversations(
         title: data.title as string,
         updatedAt,
       };
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return [];
+    throw err;
+  }
+}
+
+// ─── Analytics: Write (fire-and-forget) ─────────────────────────────────────
+
+export async function logAnalyticsEvent(event: AnalyticsEvent): Promise<void> {
+  try {
+    await getDb().collection('analytics_events').add({
+      ...event,
+      _createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return;
+    console.error('Failed to log analytics event:', err);
+  }
+}
+
+export async function logDeployEvent(event: DeployEvent): Promise<void> {
+  try {
+    await getDb().collection('analytics_deploys').add({
+      ...event,
+      _createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return;
+    console.error('Failed to log deploy event:', err);
+  }
+}
+
+export async function logFeedback(entry: FeedbackEntry): Promise<void> {
+  try {
+    await getDb().collection('analytics_feedback').add({
+      ...entry,
+      _createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return;
+    console.error('Failed to log feedback:', err);
+  }
+}
+
+// ─── Analytics: Read (for dashboard) ────────────────────────────────────────
+
+function toIso(val: unknown): string {
+  if (val instanceof admin.firestore.Timestamp) return val.toDate().toISOString();
+  if (typeof val === 'string') return val;
+  return new Date().toISOString();
+}
+
+export async function getAnalyticsEvents(
+  from: Date,
+  to: Date,
+): Promise<AnalyticsEvent[]> {
+  try {
+    const snap = await getDb()
+      .collection('analytics_events')
+      .where('_createdAt', '>=', admin.firestore.Timestamp.fromDate(from))
+      .where('_createdAt', '<=', admin.firestore.Timestamp.fromDate(to))
+      .orderBy('_createdAt', 'desc')
+      .limit(5000)
+      .get();
+
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        userEmail: d.userEmail ?? '',
+        departmentId: d.departmentId ?? '',
+        conversationId: d.conversationId ?? '',
+        turnNumber: d.turnNumber ?? 0,
+        sessionStartedAt: toIso(d.sessionStartedAt),
+        latencyMs: d.latencyMs ?? 0,
+        toolCallCount: d.toolCallCount ?? 0,
+        toolCallNames: d.toolCallNames ?? [],
+        skillsLoaded: d.skillsLoaded ?? [],
+        specsLoaded: d.specsLoaded ?? [],
+        seeded: d.seeded ?? false,
+        createdAt: toIso(d._createdAt),
+      } satisfies AnalyticsEvent;
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return [];
+    throw err;
+  }
+}
+
+export async function getDeployEvents(
+  from: Date,
+  to: Date,
+): Promise<DeployEvent[]> {
+  try {
+    const snap = await getDb()
+      .collection('analytics_deploys')
+      .where('_createdAt', '>=', admin.firestore.Timestamp.fromDate(from))
+      .where('_createdAt', '<=', admin.firestore.Timestamp.fromDate(to))
+      .orderBy('_createdAt', 'desc')
+      .limit(5000)
+      .get();
+
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        userEmail: d.userEmail ?? '',
+        departmentId: d.departmentId ?? '',
+        conversationId: d.conversationId ?? '',
+        workflowId: d.workflowId ?? '',
+        workflowUrl: d.workflowUrl ?? '',
+        workflowName: d.workflowName ?? '',
+        nodeCount: d.nodeCount ?? 0,
+        nodeTypes: d.nodeTypes ?? [],
+        hasSqlQuery: d.hasSqlQuery ?? false,
+        complexityScore: d.complexityScore ?? 1,
+        estimatedHoursSaved: d.estimatedHoursSaved ?? 0,
+        estimatedValueUsd: d.estimatedValueUsd ?? 0,
+        createdAt: toIso(d._createdAt),
+      } satisfies DeployEvent;
+    });
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return [];
+    throw err;
+  }
+}
+
+export async function getFeedbackEntries(
+  from: Date,
+  to: Date,
+): Promise<FeedbackEntry[]> {
+  try {
+    const snap = await getDb()
+      .collection('analytics_feedback')
+      .where('_createdAt', '>=', admin.firestore.Timestamp.fromDate(from))
+      .where('_createdAt', '<=', admin.firestore.Timestamp.fromDate(to))
+      .orderBy('_createdAt', 'desc')
+      .limit(1000)
+      .get();
+
+    return snap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        userEmail: d.userEmail ?? '',
+        conversationId: d.conversationId ?? '',
+        messageIndex: d.messageIndex ?? 0,
+        rating: d.rating ?? 'up',
+        comment: d.comment ?? null,
+        createdAt: toIso(d._createdAt),
+      } satisfies FeedbackEntry;
     });
   } catch (err) {
     if (isFirestoreUnavailable(err)) return [];

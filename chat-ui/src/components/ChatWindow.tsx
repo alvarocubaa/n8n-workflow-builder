@@ -231,7 +231,13 @@ export default function ChatWindow({
         ) : (
           <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
             {messages.map((msg, i) => (
-              <MessageBubble key={i} message={msg} />
+              <MessageBubble
+                key={i}
+                message={msg}
+                conversationId={currentConvId.current}
+                departmentId={departmentId}
+                messageIndex={i}
+              />
             ))}
             <div ref={bottomRef} />
           </div>

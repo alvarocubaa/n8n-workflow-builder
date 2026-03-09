@@ -5,8 +5,10 @@ import {
   createConversation,
   appendMessages,
   getConversation,
+  logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
+import type { AnalyticsEvent } from '@/lib/types';
 import {
   getDepartment,
   getDepartmentCredentialsMarkdown,
@@ -107,12 +109,17 @@ export async function POST(req: Request): Promise<Response> {
       const modelChunks: string[] = [];
       const eventStream = streamWorkflowChat(history, enrichedMessage, rawTools, departmentId);
 
+      // Analytics tracking
+      const startTime = Date.now();
+      const toolCallNames: string[] = [];
+
       try {
         for await (const event of eventStream) {
           if (event.type === 'text_chunk') {
             modelChunks.push(event.text);
             enqueue(event);
           } else if (event.type === 'tool_call') {
+            toolCallNames.push(event.name);
             enqueue(event);
           } else if (event.type === 'done') {
             // Persist the user turn + model response
@@ -132,6 +139,22 @@ export async function POST(req: Request): Promise<Response> {
             } catch (err) {
               console.error('Failed to persist messages:', err);
             }
+
+            // Log analytics event (fire-and-forget)
+            const analyticsEvent: AnalyticsEvent = {
+              userEmail: user.email,
+              departmentId,
+              conversationId: convId,
+              turnNumber: Math.floor(history.length / 2) + 1,
+              sessionStartedAt: new Date(startTime).toISOString(),
+              latencyMs: Date.now() - startTime,
+              toolCallCount: toolCallNames.length,
+              toolCallNames,
+              skillsLoaded: toolCallNames.filter(n => n === 'get_n8n_skill'),
+              specsLoaded: toolCallNames.filter(n => n === 'get_company_spec'),
+              createdAt: new Date().toISOString(),
+            };
+            logAnalyticsEvent(analyticsEvent).catch(console.error);
 
             enqueue({ type: 'done', conversationId: convId });
             controller.close();
