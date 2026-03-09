@@ -1,6 +1,6 @@
 # Roadmap -- n8n Workflow Builder
 
-*Last updated: 2026-03-06. This document answers "how and when." For "what and why," see [STRATEGY.md](STRATEGY.md).*
+*Last updated: 2026-03-09. This document answers "how and when." For "what and why," see [STRATEGY.md](STRATEGY.md).*
 
 ---
 
@@ -67,16 +67,23 @@
 
 ---
 
+## Completed (Mar 9, 2026)
+
+- [x] Verify analytics dashboard loads in production — confirmed working
+- [x] Check Firestore collections — 105 events, 85 conversations, all present
+- [x] Firestore composite indexes — not needed (no errors in logs)
+- [x] Review seeded historical data — numbers match, avg tool calls fixed (show N/A for seeded data)
+- [x] Deploy-to-folder by department — tested transfer API (204 success), deployed to prod
+- [x] Department n8n project IDs formalized in `departments.ts`
+
 ## Action Items (Next Session)
 
-- [ ] Verify analytics dashboard loads correctly in production (open `/analytics` via IAP)
-- [ ] Check Firestore console for `analytics_events`, `analytics_deploys`, `analytics_feedback` collections
-- [ ] Create any Firestore composite indexes prompted by error URLs in Cloud Run logs
+- [ ] Test deploy button end-to-end: generate a workflow in any department, click "Deploy to n8n", verify it lands in the correct project folder in n8n
+- [ ] Test feedback buttons end-to-end (thumbs up/down on a real response in production)
 - [ ] Re-verify UC1 and UC2 with redesigned prompts (carried over)
-- [ ] Test feedback buttons end-to-end (thumbs up/down on a real response)
-- [ ] Review seeded historical data on dashboard — validate numbers match reality
 - [ ] Wire `run_regression.py` into CI/CD pipeline (carried over)
 - [ ] Identify next spec to add (carried over)
+- [ ] Push latest commits to GitHub (`alvarocubaa/n8n-workflow-builder`)
 
 ---
 
