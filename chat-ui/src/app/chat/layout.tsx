@@ -1,5 +1,7 @@
 import { headers } from 'next/headers';
+import Link from 'next/link';
 import ConversationList from '@/components/ConversationList';
+import { isAdmin } from '@/lib/admin';
 
 /**
  * Shared layout for /chat and /chat/[id].
@@ -28,7 +30,12 @@ export default async function ChatLayout({
             AI
           </span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center gap-3 text-sm text-gray-600">
+          {isAdmin(email) && (
+            <Link href="/analytics" className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200 hover:text-gray-800">
+              Analytics
+            </Link>
+          )}
           <span className="h-7 w-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
             {displayName[0]?.toUpperCase() ?? '?'}
           </span>

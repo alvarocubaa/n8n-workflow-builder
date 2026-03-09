@@ -69,71 +69,60 @@ function extractWorkflowFromMessages(messages: ConversationDoc['messages']): {
 }
 
 async function main() {
-  console.log('Fetching all users...');
-  const usersSnap = await db.collection('users').get();
-  console.log(`Found ${usersSnap.size} users`);
+  // Use collectionGroup to find ALL conversations — parent user docs may not exist
+  // (Firestore allows subcollections under phantom parents)
+  console.log('Fetching all conversations via collectionGroup...');
+  const allConvs = await db.collectionGroup('conversations').get();
+  console.log(`Found ${allConvs.size} conversations`);
 
-  let totalConversations = 0;
   let totalSeeded = 0;
 
-  for (const userDoc of usersSnap.docs) {
-    const userEmail = userDoc.id;
-    console.log(`\nProcessing user: ${userEmail}`);
+  for (const convDoc of allConvs.docs) {
+    const data = convDoc.data() as ConversationDoc;
+    const userEmail = convDoc.ref.parent.parent?.id ?? 'unknown';
+    const messages = data.messages ?? [];
+    const turnCount = Math.floor(messages.filter(m => m.role === 'user').length);
 
-    const convsSnap = await userDoc.ref.collection('conversations')
-      .orderBy('createdAt', 'desc')
-      .get();
+    const workflow = extractWorkflowFromMessages(data.messages);
 
-    console.log(`  ${convsSnap.size} conversations`);
-    totalConversations += convsSnap.size;
+    const createdAt = data.createdAt instanceof admin.firestore.Timestamp
+      ? data.createdAt.toDate()
+      : new Date();
 
-    for (const convDoc of convsSnap.docs) {
-      const data = convDoc.data() as ConversationDoc;
-      const messages = data.messages ?? [];
-      const turnCount = Math.floor(messages.filter(m => m.role === 'user').length);
-
-      const workflow = extractWorkflowFromMessages(data.messages);
-
-      const createdAt = data.createdAt instanceof admin.firestore.Timestamp
-        ? data.createdAt.toDate()
-        : new Date();
-
-      // Extract tool call names from model messages (approximate)
-      const toolCallNames: string[] = [];
-      for (const msg of messages) {
-        if (msg.role !== 'model') continue;
-        if (msg.content.includes('get_company_spec')) toolCallNames.push('get_company_spec');
-        if (msg.content.includes('get_n8n_skill')) toolCallNames.push('get_n8n_skill');
-        if (msg.content.includes('search_nodes')) toolCallNames.push('search_nodes');
-        if (msg.content.includes('validate_node')) toolCallNames.push('validate_node');
-      }
-
-      const event = {
-        userEmail,
-        departmentId: data.departmentId ?? 'cx',
-        conversationId: convDoc.id,
-        turnNumber: turnCount,
-        sessionStartedAt: createdAt.toISOString(),
-        latencyMs: 0, // unknown for historical data
-        toolCallCount: toolCallNames.length,
-        toolCallNames,
-        skillsLoaded: toolCallNames.filter(n => n === 'get_n8n_skill'),
-        specsLoaded: toolCallNames.filter(n => n === 'get_company_spec'),
-        seeded: true,
-        createdAt: createdAt.toISOString(),
-        _createdAt: admin.firestore.Timestamp.fromDate(createdAt),
-      };
-
-      await db.collection('analytics_events').add(event);
-      totalSeeded++;
-
-      if (workflow.found) {
-        console.log(`    Conv ${convDoc.id}: ${turnCount} turns, workflow found (${workflow.nodeCount} nodes)`);
-      }
+    // Extract tool call names from model messages (approximate)
+    const toolCallNames: string[] = [];
+    for (const msg of messages) {
+      if (msg.role !== 'model') continue;
+      if (msg.content.includes('get_company_spec')) toolCallNames.push('get_company_spec');
+      if (msg.content.includes('get_n8n_skill')) toolCallNames.push('get_n8n_skill');
+      if (msg.content.includes('search_nodes')) toolCallNames.push('search_nodes');
+      if (msg.content.includes('validate_node')) toolCallNames.push('validate_node');
     }
+
+    const event = {
+      userEmail,
+      departmentId: data.departmentId ?? 'cx',
+      conversationId: convDoc.id,
+      turnNumber: turnCount,
+      sessionStartedAt: createdAt.toISOString(),
+      latencyMs: 0, // unknown for historical data
+      toolCallCount: toolCallNames.length,
+      toolCallNames,
+      skillsLoaded: toolCallNames.filter(n => n === 'get_n8n_skill'),
+      specsLoaded: toolCallNames.filter(n => n === 'get_company_spec'),
+      seeded: true,
+      createdAt: createdAt.toISOString(),
+      _createdAt: admin.firestore.Timestamp.fromDate(createdAt),
+    };
+
+    await db.collection('analytics_events').add(event);
+    totalSeeded++;
+
+    const label = workflow.found ? `workflow (${workflow.nodeCount} nodes)` : `${turnCount} turns`;
+    console.log(`  ${userEmail} | ${convDoc.id} | ${label}`);
   }
 
-  console.log(`\nDone! Seeded ${totalSeeded} analytics events from ${totalConversations} conversations.`);
+  console.log(`\nDone! Seeded ${totalSeeded} analytics events from ${allConvs.size} conversations.`);
   process.exit(0);
 }
 
