@@ -46,8 +46,8 @@ export async function POST(req: Request): Promise<Response> {
   const projectId = dept?.n8nProjectId;
 
   const result = workflowId
-    ? await updateWorkflow(workflowId, workflowJson)
-    : await deployWorkflow(workflowJson, name, projectId);
+    ? await updateWorkflow(workflowId, workflowJson, user.email, projectId)
+    : await deployWorkflow(workflowJson, name, user.email, projectId);
 
   if ('error' in result) {
     return Response.json(result, { status: 422 });

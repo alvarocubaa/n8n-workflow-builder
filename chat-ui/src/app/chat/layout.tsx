@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import ConversationList from '@/components/ConversationList';
+import SidebarToggle from '@/components/SidebarToggle';
 import { isAdmin } from '@/lib/admin';
 
 /**
@@ -44,10 +45,9 @@ export default async function ChatLayout({
       </header>
 
       {/* Body: sidebar + main content */}
-      <div className="flex flex-1 overflow-hidden">
-        <ConversationList />
-        <main className="flex-1 overflow-hidden">{children}</main>
-      </div>
+      <SidebarToggle sidebar={<ConversationList />}>
+        {children}
+      </SidebarToggle>
     </div>
   );
 }

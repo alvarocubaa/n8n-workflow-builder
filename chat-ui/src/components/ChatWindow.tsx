@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import ChatInput from './ChatInput';
+import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 
@@ -22,6 +22,7 @@ export default function ChatWindow({
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? 'cx');
+  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const departmentLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConvId = useRef<string | undefined>(conversationId);
@@ -35,11 +36,18 @@ export default function ChatWindow({
     const text = input.trim();
     if (!text || streaming) return;
 
+    // Build message with optional file content
+    let messageText = text;
+    if (attachedFile) {
+      messageText = `[Attached file: ${attachedFile.name}]\n<file_content>\n${attachedFile.content}\n</file_content>\n\n${text}`;
+    }
+
     setInput('');
+    setAttachedFile(null);
     setStreaming(true);
 
-    // Append user message immediately
-    const userMsg: Message = { role: 'user', content: text };
+    // Append user message immediately (show original text, not file content)
+    const userMsg: Message = { role: 'user', content: attachedFile ? `[${attachedFile.name}] ${text}` : text };
     setMessages(prev => [...prev, userMsg]);
 
     // Prepare a placeholder for the assistant response
@@ -59,7 +67,7 @@ export default function ChatWindow({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
+          message: messageText,
           conversationId: currentConvId.current,
           departmentId,
         }),
@@ -250,6 +258,9 @@ export default function ChatWindow({
         onChange={setInput}
         onSend={sendMessage}
         disabled={streaming}
+        attachedFile={attachedFile}
+        onAttachFile={setAttachedFile}
+        onRemoveFile={() => setAttachedFile(null)}
       />
     </div>
   );

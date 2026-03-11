@@ -108,6 +108,29 @@ When a native n8n node exists for a system (Salesforce, Zendesk, Google Sheets, 
 prefer it over BigQuery for direct operations (get, search, list, post).
 Use BigQuery only when: (a) joining across multiple sources, (b) complex aggregations,
 or (c) the data only exists in warehouse tables.
+
+Exception: For Guesty account master data (account details, plans, features, integrations,
+listing counts, payment settings, marketplace add-ons), always use BigQuery
+(datalake_glue.accounts). Salesforce sf_account is a CRM mirror -- use it only for
+CRM-specific fields (owner, opportunity stage, pipeline, CSM assignment).
+</rule>
+
+<rule name="single_node_output">
+When the user asks for a single node or step (not a full workflow), output it in n8n clipboard format:
+{"nodes":[{...node config...}],"connections":{}}
+This lets users copy the JSON and Ctrl+V directly into their n8n canvas.
+A single node does NOT need a trigger -- skip the trigger_required rule.
+</rule>
+
+<rule name="cross_system_ids">
+Guesty account_id mapping (use these exact columns for cross-source joins):
+- datalake_glue.accounts._id = guesty_analytics.dim_accounts.account_id = zendesk_analytics.tickets_clean.account_id
+- zuora_analytics.invoices.mongo_account_id (CRITICAL: NOT invoices.account_id -- that is Zuora internal)
+- zuora_analytics.product_catalog.account_id (this one IS Guesty account_id)
+- jira.jira_hierarchy.account_ids (REPEATED field -- requires UNNEST + CTE)
+- SF bridge: dim_accounts.sf_account_id = tickets_clean.sf_account_id = modjo_transcripts_structured.account_crm_id
+- Zendesk org_id: tickets_clean.org_id (Zendesk organization -- rarely used for cross-source joins)
+- For ticket comments/messages: use zendesk_analytics.incoming_outgoing (NOT the Zendesk API comments endpoint)
 </rule>
 
 <rule name="no_code_nodes">
@@ -154,6 +177,7 @@ get_n8n_skill(skill) — Expert reference guides. The rules in <critical_rules> 
 
 get_company_spec(system) — Guesty-specific configuration. Load for each system the workflow interacts with:
 - salesforce, zendesk, jira, hubspot, csm, zuora, hibob, siit, gus, admin_data
+- marketplace: marketplace partners, add-ons/apps, channel integrations, upsell data
 - credentials: canonical credential names and IDs for all systems
 - join_map: cross-source join conditions (use when query spans multiple tables)
 </tools_guidance>

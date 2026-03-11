@@ -45,22 +45,31 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
   const [state, setState] = useState<'idle' | 'deploying' | 'ok' | 'err'>('idle');
   const [workflowUrl, setWorkflowUrl] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [transferWarning, setTransferWarning] = useState<string | null>(null);
 
   async function handleDeploy() {
     setState('deploying');
     setErrMsg(null);
+    setTransferWarning(null);
     try {
       const res = await fetch('/api/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflowJson: json, conversationId, departmentId }),
       });
-      const data = (await res.json()) as { workflowUrl?: string; workflowName?: string; error?: string; detail?: string };
+      const data = (await res.json()) as {
+        workflowUrl?: string; workflowName?: string;
+        error?: string; detail?: string;
+        transferStatus?: string; transferError?: string;
+      };
       if (!res.ok || data.error) {
         setErrMsg(data.detail ?? data.error ?? 'Deploy failed');
         setState('err');
       } else {
         setWorkflowUrl(data.workflowUrl ?? null);
+        if (data.transferStatus === 'failed') {
+          setTransferWarning(data.transferError ?? 'Transfer to department project failed');
+        }
         setState('ok');
       }
     } catch (e) {
@@ -71,21 +80,28 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
 
   if (state === 'ok' && workflowUrl) {
     return (
-      <a
-        href={workflowUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-500"
-      >
-        Open in n8n ↗
-      </a>
+      <div className="flex flex-col items-end gap-0.5">
+        <a
+          href={workflowUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded bg-green-600 px-2 py-0.5 text-xs text-white hover:bg-green-500"
+        >
+          Open in n8n ↗
+        </a>
+        {transferWarning && (
+          <span className="rounded bg-yellow-600 px-2 py-0.5 text-xs text-white" title={transferWarning}>
+            Transfer to project failed
+          </span>
+        )}
+      </div>
     );
   }
 
   if (state === 'err') {
     return (
       <span className="rounded bg-red-700 px-2 py-0.5 text-xs text-white" title={errMsg ?? undefined}>
-        Deploy failed ✕
+        Deploy failed
       </span>
     );
   }
@@ -96,7 +112,7 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
       disabled={state === 'deploying'}
       className="rounded bg-orange-600 px-2 py-0.5 text-xs text-white hover:bg-orange-500 disabled:opacity-50"
     >
-      {state === 'deploying' ? 'Deploying…' : 'Deploy to n8n'}
+      {state === 'deploying' ? 'Deploying...' : 'Deploy to n8n'}
     </button>
   );
 }
@@ -145,8 +161,16 @@ export default function MessageBubble({ message, conversationId, departmentId, m
 
                 if (isBlock) {
                   const isJson = match[1] === 'json';
-                  // Only show Deploy button if the JSON looks like an n8n workflow
+                  // Detect n8n workflow JSON (has nodes + connections)
                   const isWorkflow = isJson && codeString.includes('"nodes"') && codeString.includes('"connections"');
+                  // Single-node snippet: only 1 node — show "Copy for n8n" instead of Deploy
+                  let isSingleNode = false;
+                  if (isWorkflow) {
+                    try {
+                      const parsed = JSON.parse(codeString) as { nodes?: unknown[] };
+                      isSingleNode = Array.isArray(parsed.nodes) && parsed.nodes.length === 1;
+                    } catch { /* ignore parse errors */ }
+                  }
                   return (
                     <div className="relative">
                       <SyntaxHighlighter
@@ -158,7 +182,7 @@ export default function MessageBubble({ message, conversationId, departmentId, m
                         {codeString}
                       </SyntaxHighlighter>
                       <div className="absolute right-2 top-2 flex gap-1.5">
-                        {isWorkflow && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
+                        {isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
                         <CopyButton text={codeString} />
                       </div>
                     </div>

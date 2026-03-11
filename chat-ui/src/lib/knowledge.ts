@@ -40,6 +40,7 @@ const SPEC_FILE_MAP: Record<string, string> = {
   siit:        '02_SRC_Siit_Spec.md',
   gus:         '02_SRC_Gus_Spec.md',
   admin_data:  '02_SRC_AdminData_Spec.md',
+  marketplace: '02_SRC_Marketplace_Spec.md',
   credentials: '01_INFRA_Credentials_Guide.md',
   join_map:    '03_JOIN_MAP.md',
 };

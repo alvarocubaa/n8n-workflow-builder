@@ -102,14 +102,14 @@ For Google Sheets operations, prefer the Google Sheets node with googleSheetsOAu
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CUSTOMER SUCCESS — n8n projects: kh5kTQJhrQ8KNoSC + HSINMLm9Tt4FHjL3
+  // CUSTOMER SUCCESS — sandbox: kh5kTQJhrQ8KNoSC | production: HSINMLm9Tt4FHjL3
   // Has both sandbox (Salesforce Partial Sandbox) and production credentials.
   // ═══════════════════════════════════════════════════════════════════════════
   cs: {
     id: 'cs',
     displayName: 'Customer Success',
     description: 'Customer success management, health scores, and account workflows',
-    specs: ['salesforce', 'csm', 'hibob', 'jira'],
+    specs: ['salesforce', 'csm', 'hibob', 'jira', 'marketplace'],
     n8nProjectId: 'kh5kTQJhrQ8KNoSC',
     credentials: [
       // ── Sandbox ──
@@ -130,21 +130,22 @@ For Google Sheets operations, prefer the Google Sheets node with googleSheetsOAu
       { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
     ],
     promptRules: `<department_rules>
-Prefer the native Salesforce node over BigQuery for direct Salesforce operations.
-Avoid Code nodes — CS users are non-technical.
+Prefer the native Salesforce node over BigQuery for direct Salesforce CRM operations (owner, pipeline, opportunities).
+For Guesty account data (plans, features, integrations, listings), use BigQuery datalake_glue.accounts.
+Avoid Code nodes -- CS users are non-technical.
 </department_rules>`,
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CUSTOMER EXPERIENCE — n8n project: W62G9hxuK9c7cKwo (133 workflows)
+  // CUSTOMER EXPERIENCE — sandbox: EuTGww8zaCWPb8Cr | production: W62G9hxuK9c7cKwo
   // REFERENCE DEPARTMENT — comprehensive credential set, both envs.
   // ═══════════════════════════════════════════════════════════════════════════
   cx: {
     id: 'cx',
     displayName: 'Customer Experience',
     description: 'Support operations, ticket management, and customer workflows',
-    specs: ['zendesk', 'salesforce', 'jira'],
-    n8nProjectId: 'W62G9hxuK9c7cKwo',
+    specs: ['zendesk', 'salesforce', 'jira', 'marketplace'],
+    n8nProjectId: 'EuTGww8zaCWPb8Cr',
     credentials: [
       // ── Sandbox ──
       { service: 'Zendesk (Sandbox)', name: 'Zendesk sandbox', type: 'zendeskApi', id: 'PEFCagywCPGDJGjg', env: 'sandbox' },
@@ -179,8 +180,9 @@ Avoid Code nodes — CS users are non-technical.
       { service: 'n8n (self)', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
     ],
     promptRules: `<department_rules>
-Prefer native Zendesk and Salesforce nodes over BigQuery for direct operations.
-Avoid Code nodes — CX users are non-technical.
+Prefer native Zendesk and Salesforce nodes over BigQuery for direct CRM/ticket operations.
+For Guesty account data (plans, features, integrations, listings), use BigQuery datalake_glue.accounts.
+Avoid Code nodes -- CX users are non-technical.
 </department_rules>`,
   },
 
@@ -206,8 +208,9 @@ Avoid Code nodes — CX users are non-technical.
       { service: 'BigQuery (OB SA)', name: '(OB) Service Account - AI Team', type: 'googleApi', id: 'jTPSwPeDuM4ipl69', env: 'production' },
     ],
     promptRules: `<department_rules>
-Prefer native Salesforce and Zendesk nodes over BigQuery for direct operations.
-Avoid Code nodes — Onboarding users are non-technical.
+Prefer native Salesforce and Zendesk nodes over BigQuery for direct CRM/ticket operations.
+For Guesty account data (plans, features, integrations, listings), use BigQuery datalake_glue.accounts.
+Avoid Code nodes -- Onboarding users are non-technical.
 </department_rules>`,
   },
 
@@ -242,7 +245,7 @@ For Zuora data, use BigQuery (zuora_analytics tables). The native Zuora node is 
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // FINANCE — n8n project: EuTGww8zaCWPb8Cr (22 workflows)
+  // FINANCE — sandbox: WrQXt2ZvpTq5Lkzo | production: EuTGww8zaCWPb8Cr (22 workflows)
   // Has Zendesk sandbox credential for testing.
   // ═══════════════════════════════════════════════════════════════════════════
   finance: {
@@ -250,7 +253,7 @@ For Zuora data, use BigQuery (zuora_analytics tables). The native Zuora node is 
     displayName: 'Finance',
     description: 'Financial reporting, invoice reconciliation, and accounting workflows',
     specs: ['zuora', 'admin_data', 'salesforce', 'hibob'],
-    n8nProjectId: 'EuTGww8zaCWPb8Cr',
+    n8nProjectId: 'WrQXt2ZvpTq5Lkzo',
     credentials: [
       // ── Sandbox ──
       { service: 'Zendesk (Sandbox)', name: 'Zendesk Sandbox - Info@guesty.com', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },

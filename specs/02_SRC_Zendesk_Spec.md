@@ -35,7 +35,7 @@ This document gives **exact** connection, schema, and query details so the AI do
 | Logical table | Full BigQuery path | Rows | Purpose |
 |---------------|--------------------|------|---------|
 | tickets_clean | `guesty-data.zendesk_analytics.tickets_clean` | ~2M+ | Main ticket data with sentiment, CSAT, account linkage |
-| incoming_outgoing | `guesty-data.zendesk_analytics.incoming_outgoing` | — | Event-level messages/activity per ticket |
+| incoming_outgoing | `guesty-data.zendesk_analytics.incoming_outgoing` | — | **Ticket comments/messages** — event-level messages/activity per ticket |
 | productivity_hourly | `guesty-data.zendesk_analytics.productivity_hourly` | — | Agent productivity metrics by hour |
 | qa_data | `guesty-data.zendesk_analytics.qa_data` | ~607K | QA audit scores per ticket (empathy, professionalism, grammar) |
 | feedback_dash | `guesty-data.zendesk_analytics.feedback_dash` | ~10.5K | NSAT feedback, coaching logs, root cause analysis |
@@ -348,11 +348,47 @@ The Zendesk dataset provides sentiment and quality signals across multiple table
 
 </details>
 
-### 2.1.2. incoming_outgoing
+### 2.1.2. incoming_outgoing (Ticket Comments / Messages)
 
 **BigQuery table:** `guesty-data.zendesk_analytics.incoming_outgoing`
 
+> **This is the "comments" table.** Each row represents a message or activity event on a ticket.
+> Use this table when the user asks for "ticket comments," "ticket messages," "ticket replies,"
+> "conversation history," or "full ticket details."
+
 **Table**: `incoming_outgoing` — event-level data (messages/activity). **Join to tickets_clean on ticket_id** (and **ticket_url** if needed for consistency).
+
+**Verified SQL — Get conversation history for a ticket:**
+```sql
+SELECT
+  ticket_id,
+  e_created_at,
+  direction,
+  event_user_email,
+  guesty_employee,
+  channel,
+  subject
+FROM `guesty-data.zendesk_analytics.incoming_outgoing`
+WHERE ticket_id = '12345'
+ORDER BY e_created_at ASC
+```
+
+**Verified SQL — Count messages per ticket (conversation depth):**
+```sql
+SELECT
+  t.ticket_id,
+  t.subject,
+  t.ticket_status,
+  COUNT(io.event_id) AS message_count,
+  COUNTIF(io.direction = 'Incoming') AS customer_messages,
+  COUNTIF(io.direction = 'Outgoing') AS agent_messages
+FROM `guesty-data.zendesk_analytics.tickets_clean` t
+JOIN `guesty-data.zendesk_analytics.incoming_outgoing` io
+  ON t.ticket_id = io.ticket_id
+WHERE t.account_id = 'ACCOUNT_ID_HERE'
+GROUP BY 1, 2, 3
+ORDER BY message_count DESC
+```
 
 **Key columns:**
 
@@ -736,9 +772,20 @@ The Zendesk dataset provides sentiment and quality signals across multiple table
 
 ## 4. API Endpoints (When Using HTTP Request)
 
+### Guesty Zendesk Subdomains
+
+| Environment | Subdomain | Base URL |
+|-------------|-----------|----------|
+| Sandbox | `guesty33961681113172` | `https://guesty33961681113172.zendesk.com/api/v2/` |
+| Production | `guesty3396` | `https://guesty3396.zendesk.com/api/v2/` |
+
+Use sandbox for testing/development workflows. Use production for read-only reporting workflows. The credential `env` field in departments.ts indicates which environment each credential targets.
+
+### Common Endpoints
+
 | Item | Value |
 |------|--------|
-| **Base URL** | `https://{subdomain}.zendesk.com/api/v2/` |
+| **Base URL** | `https://{subdomain}.zendesk.com/api/v2/` (see subdomain table above) |
 | **List tickets** | `GET /tickets.json` — use query params for filtering (e.g. `query=created_at>...`). |
 | **Single ticket** | `GET /tickets/{id}.json` |
 | **Search** | `GET /search.json?query=type:ticket ...` |

@@ -19,7 +19,7 @@ const VERTEX_REGION = 'us-east5';
 
 // ─── Knowledge tools (local file reads — no MCP round-trip) ─────────────────
 
-const ALL_SPEC_KEYS = ['salesforce', 'zendesk', 'jira', 'hubspot', 'csm', 'zuora', 'hibob', 'siit', 'gus', 'admin_data', 'credentials', 'join_map'];
+const ALL_SPEC_KEYS = ['salesforce', 'zendesk', 'jira', 'hubspot', 'csm', 'zuora', 'hibob', 'siit', 'gus', 'admin_data', 'marketplace', 'credentials', 'join_map'];
 
 /** Returns knowledge tools with get_company_spec enum scoped to the department. */
 function getKnowledgeTools(departmentId?: string): Tool[] {

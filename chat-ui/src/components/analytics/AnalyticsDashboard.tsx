@@ -4,6 +4,7 @@ import type { AnalyticsEvent, DeployEvent, FeedbackEntry } from '@/lib/types';
 import UsageOverview from './UsageOverview';
 import QualityMetrics from './QualityMetrics';
 import ROICalculator from './ROICalculator';
+import DeployLog from './DeployLog';
 import FeedbackLog from './FeedbackLog';
 
 interface Props {
@@ -57,6 +58,9 @@ export default function AnalyticsDashboard({ events, deploys, feedback, dateRang
 
       {/* ROI */}
       <ROICalculator deploys={deploys} />
+
+      {/* Deploy log */}
+      <DeployLog deploys={deploys} />
 
       {/* Feedback log */}
       <FeedbackLog feedback={feedback} />

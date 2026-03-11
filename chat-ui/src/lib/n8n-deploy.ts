@@ -5,7 +5,7 @@
  * Created workflows are:
  *   - Tagged "AI Generated" (tag id: 8pUFynxIQ58Bfpba) via separate tags endpoint
  *   - Created inactive (user activates manually)
- *   - Named with [AI] prefix for easy identification
+ *   - Named with [AI by username] prefix for easy identification
  */
 
 const N8N_API_URL = (process.env.N8N_API_URL ?? 'https://guesty.app.n8n.cloud').replace(/\/$/, '');
@@ -24,6 +24,8 @@ export interface DeployResult {
   workflowId: string;
   workflowUrl: string;
   workflowName: string;
+  transferStatus?: 'ok' | 'failed' | 'skipped';
+  transferError?: string;
 }
 
 export interface DeployError {
@@ -47,17 +49,27 @@ async function tagWorkflow(workflowId: string): Promise<void> {
   }).catch(() => { /* tagging is best-effort — don't fail the deploy */ });
 }
 
-/** Transfer a workflow to a specific n8n project (best-effort). */
-async function transferWorkflowToProject(workflowId: string, projectId: string): Promise<void> {
-  const res = await fetch(`${N8N_API_URL}/api/v1/workflows/${workflowId}/transfer`, {
-    method: 'PUT',
-    headers: n8nHeaders(),
-    body: JSON.stringify({ destinationProjectId: projectId }),
-  }).catch(() => null);
+/** Transfer a workflow to a specific n8n project. Returns status for UI feedback. */
+async function transferWorkflowToProject(workflowId: string, projectId: string): Promise<{ status: 'ok' | 'failed'; error?: string }> {
+  try {
+    const res = await fetch(`${N8N_API_URL}/api/v1/workflows/${workflowId}/transfer`, {
+      method: 'PUT',
+      headers: n8nHeaders(),
+      body: JSON.stringify({ destinationProjectId: projectId }),
+    });
 
-  if (res && !res.ok) {
+    if (res.ok || res.status === 204) {
+      return { status: 'ok' };
+    }
+
     const text = await res.text().catch(() => '');
-    console.warn(`[n8n-deploy] Failed to transfer workflow ${workflowId} to project ${projectId}: ${res.status} ${text}`);
+    const error = `Transfer failed (${res.status}): ${text}`;
+    console.warn(`[n8n-deploy] ${error}`);
+    return { status: 'failed', error };
+  } catch (err) {
+    const error = `Transfer network error: ${err instanceof Error ? err.message : String(err)}`;
+    console.warn(`[n8n-deploy] ${error}`);
+    return { status: 'failed', error };
   }
 }
 
@@ -68,6 +80,7 @@ async function transferWorkflowToProject(workflowId: string, projectId: string):
 export async function deployWorkflow(
   workflowJson: string,
   customName?: string,
+  userEmail?: string,
   projectId?: string,
 ): Promise<DeployResult | DeployError> {
   let parsed: N8nWorkflow;
@@ -86,9 +99,11 @@ export async function deployWorkflow(
     return { error: 'Invalid workflow JSON — missing connections object' };
   }
 
-  // Ensure name has [AI] prefix; strip existing id so n8n creates a new one
+  // Ensure name has [AI by user] prefix; strip existing id so n8n creates a new one
+  const username = userEmail ? userEmail.split('@')[0] : 'unknown';
   const baseName = customName ?? parsed.name ?? 'Untitled Workflow';
-  const name = baseName.startsWith('[AI]') ? baseName : `[AI] ${baseName}`;
+  const aiPrefix = `[AI by ${username}]`;
+  const name = baseName.startsWith('[AI') ? baseName : `${aiPrefix} ${baseName}`;
 
   const payload: N8nWorkflow = {
     name,
@@ -125,15 +140,21 @@ export async function deployWorkflow(
   // Tag as "AI Generated" (best-effort, separate call)
   await tagWorkflow(workflowId);
 
-  // Transfer to department project (best-effort, separate call)
+  // Transfer to department project
+  let transferStatus: 'ok' | 'failed' | 'skipped' = 'skipped';
+  let transferError: string | undefined;
   if (projectId) {
-    await transferWorkflowToProject(workflowId, projectId);
+    const transfer = await transferWorkflowToProject(workflowId, projectId);
+    transferStatus = transfer.status;
+    transferError = transfer.error;
   }
 
   return {
     workflowId,
     workflowUrl: `${N8N_API_URL}/workflow/${workflowId}`,
     workflowName: created.name,
+    transferStatus,
+    transferError,
   };
 }
 
@@ -142,7 +163,9 @@ export async function deployWorkflow(
  */
 export async function updateWorkflow(
   workflowId: string,
-  workflowJson: string
+  workflowJson: string,
+  userEmail?: string,
+  projectId?: string,
 ): Promise<DeployResult | DeployError> {
   let parsed: N8nWorkflow;
 
@@ -152,8 +175,12 @@ export async function updateWorkflow(
     return { error: 'Invalid JSON — cannot parse workflow' };
   }
 
+  const updateUsername = userEmail ? userEmail.split('@')[0] : 'unknown';
+  const updateBaseName = parsed.name ?? 'Workflow';
+  const updateName = updateBaseName.startsWith('[AI') ? updateBaseName : `[AI by ${updateUsername}] ${updateBaseName}`;
+
   const payload: N8nWorkflow = {
-    name: parsed.name ?? '[AI] Workflow',
+    name: updateName,
     nodes: parsed.nodes,
     connections: parsed.connections,
     settings: {
@@ -181,9 +208,20 @@ export async function updateWorkflow(
   const updated = (await res.json()) as { id: string; name: string };
   await tagWorkflow(updated.id);
 
+  // Transfer to department project if provided
+  let transferStatus: 'ok' | 'failed' | 'skipped' = 'skipped';
+  let transferError: string | undefined;
+  if (projectId) {
+    const transfer = await transferWorkflowToProject(updated.id, projectId);
+    transferStatus = transfer.status;
+    transferError = transfer.error;
+  }
+
   return {
     workflowId: updated.id,
     workflowUrl: `${N8N_API_URL}/workflow/${updated.id}`,
     workflowName: updated.name,
+    transferStatus,
+    transferError,
   };
 }
