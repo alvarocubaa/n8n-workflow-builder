@@ -353,7 +353,8 @@ function generateCredentialExamples(creds: Credential[]): string {
  * Includes programmatic JSON examples for commonly confused credential types.
  */
 export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string {
-  const allCreds = [...SHARED_CREDENTIALS, ...dept.credentials];
+  // Dept-specific credentials first so they appear before shared defaults in the table
+  const allCreds = [...dept.credentials, ...SHARED_CREDENTIALS];
 
   const sandboxCreds = allCreds.filter(c => c.env === 'sandbox');
   const productionCreds = allCreds.filter(c => c.env === 'production');
