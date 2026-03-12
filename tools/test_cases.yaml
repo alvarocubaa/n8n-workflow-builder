@@ -86,7 +86,7 @@ cases:
       - googleBigQuery
       - slack
     expected_creds:
-      googleApi: VQ7CU7dKViVcv8Ah
+      googleApi: h7fJ82YhtOnUL58u
       slackApi: 7H6auF31TpX7Wk7M
     checks:
       - encoding
@@ -115,7 +115,7 @@ cases:
       - slack
     expected_creds:
       salesforceOAuth2Api: fCB6gfK7EaGpMnZy
-      googleApi: VQ7CU7dKViVcv8Ah
+      googleApi: h7fJ82YhtOnUL58u
       slackApi: 7H6auF31TpX7Wk7M
     checks:
       - encoding
