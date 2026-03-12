@@ -11,9 +11,11 @@ cases:
     department: finance
     prompt: >
       I need a daily workflow that reconciles payment gateway fees in Zuora. Compare the
-      configured fees in product_catalog against the actually invoiced amounts in invoice_items.
-      Flag any accounts where the configured fee doesn't match what was invoiced. Post a
-      summary alert to Slack with the mismatched accounts. Run daily at 9am UTC.
+      configured fees in product_catalog against the actually invoiced amounts in invoice_items
+      from the last 30 days. Flag any accounts where the configured fee differs from the invoiced
+      amount by more than $1. Include all fee types. Post a per-account summary to
+      #finance-reconciliation in Slack showing account name, configured fee, invoiced amount,
+      and the difference. Run daily at 9am UTC.
     confirm_message: "Looks good, build it"
     expected_nodes:
       - googleBigQuery
