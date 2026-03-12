@@ -52,7 +52,7 @@ export const DEPARTMENTS: Record<string, DepartmentConfig> = {
     id: 'marketing',
     displayName: 'Marketing',
     description: 'Marketing automation, ads, analytics, and content workflows',
-    specs: ['hubspot'],
+    specs: ['hubspot', 'salesforce'],
     n8nProjectId: 'PkYJF1B9yVB8Imbl',
     credentials: [
       // Google Ads
@@ -298,9 +298,59 @@ export function getDepartmentSpecKeys(dept: DepartmentConfig): string[] {
   return [...new Set([...dept.specs, ...SHARED_SPECS, 'credentials'])];
 }
 
+// Common wrong credential types for JSON examples (observed hallucination patterns)
+const WRONG_TYPES: Record<string, string> = {
+  slackApi: 'slackOAuth2Api',
+  slackOAuth2Api: 'slackApi',
+  googleApi: 'googleBigQueryOAuth2Api',
+  salesforceOAuth2Api: 'salesforceApi',
+  zendeskApi: 'zendeskOAuth2Api',
+};
+
+/**
+ * Generate correct/wrong JSON examples for the most commonly confused credential types.
+ * Uses actual department credentials to anchor the examples.
+ */
+function generateCredentialExamples(creds: Credential[]): string {
+  const services = ['Slack', 'BigQuery', 'Salesforce', 'Zendesk'];
+  const examples: string[] = [];
+
+  for (const service of services) {
+    // Find first credential matching this service (case-insensitive, partial match)
+    const cred = creds.find(c =>
+      c.service.toLowerCase().includes(service.toLowerCase()) ||
+      (service === 'BigQuery' && c.type === 'googleApi' && c.service.toLowerCase().includes('google'))
+    );
+    if (!cred) continue;
+
+    const wrongType = WRONG_TYPES[cred.type] ?? `${cred.type}Wrong`;
+    examples.push(
+      `${service} in this department:`,
+      `  Correct: "credentials": { "${cred.type}": { "id": "${cred.id}", "name": "${cred.name}" } }`,
+      `  Wrong:   "credentials": { "${wrongType}": { "id": "...", "name": "${cred.name} - Cross Dept" } }`,
+    );
+  }
+
+  if (examples.length === 0) return '';
+
+  return [
+    '',
+    '<credential_examples>',
+    'When building workflow JSON, credential blocks must look EXACTLY like these examples.',
+    'Copy the type, id, and name character-for-character from the table above.',
+    '',
+    ...examples,
+    '',
+    'Never append suffixes (e.g., "- Cross Dept", "- Read Only") to credential names.',
+    'Never fabricate credential IDs not in the table above.',
+    '</credential_examples>',
+  ].join('\n');
+}
+
 /**
  * Get all credentials for a department (shared + own), formatted as markdown tables.
  * Groups by environment: sandbox first (default), then production.
+ * Includes programmatic JSON examples for commonly confused credential types.
  */
 export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string {
   const allCreds = [...SHARED_CREDENTIALS, ...dept.credentials];
@@ -334,11 +384,16 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
 
   sections.push(
     '',
-    '**IMPORTANT: Use ONLY credentials from the tables above.** These override any defaults in the system prompt. For each service (Slack, BigQuery, etc.), pick the credential from THIS table — not from system prompt fallback defaults.',
+    '**IMPORTANT: Use ONLY credentials from the tables above.** Default to **sandbox** credentials. Only use production when the user explicitly requests it.',
     'The "Credential JSON Key" column is the key to use in workflow JSON: `"credentials": { "<key>": { "id": "...", "name": "..." } }`',
     'Always include both `id` and `name` in credential JSON. The `id` is authoritative for resolution.',
-    'Default to **sandbox** credentials. Only use production when the user explicitly requests it.',
   );
+
+  // Add programmatic JSON examples for commonly confused credential types
+  const examples = generateCredentialExamples(allCreds);
+  if (examples) {
+    sections.push(examples);
+  }
 
   return sections.join('\n');
 }

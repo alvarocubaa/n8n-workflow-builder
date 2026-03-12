@@ -1,0 +1,183 @@
+{
+  "name": "Weekly Marketing Campaign Report",
+  "nodes": [
+    {
+      "id": "a3f1c2d4-8e5b-4f7a-9c1d-2b3e4f5a6b7c",
+      "name": "Every Monday 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b7e2d3f5-9a6c-4e8b-0d2e-3c4f5a6b7c8d",
+      "name": "Query SF Campaigns",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "SELECT Id, Name, StartDate, NumberOfContacts, Status, Type FROM Campaign WHERE (Type = 'Conference' OR Type = 'Webinar') AND StartDate >= LAST_N_DAYS:30"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "c8f3e4a6-0b7d-4f9c-1e3f-4d5a6b7c8d9e",
+      "name": "Write to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Campaigns"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.Name }}",
+            "StartDate": "={{ $json.StartDate }}",
+            "NumberOfContacts": "={{ $json.NumberOfContacts }}",
+            "Status": "={{ $json.Status }}",
+            "Type": "={{ $json.Type }}"
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "d9a4f5b7-1c8e-4a0d-2f4a-5e6b7c8d9e0f",
+      "name": "Summarize Totals",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "count",
+              "field": "Id"
+            },
+            {
+              "aggregation": "sum",
+              "field": "NumberOfContacts"
+            }
+          ]
+        },
+        "options": {
+          "outputFormat": "singleItem"
+        }
+      }
+    },
+    {
+      "id": "e0b5a6c8-2d9f-4b1e-3a5b-6f7c8d9e0f1a",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-events"
+        },
+        "text": "=*Weekly Campaign Report* (past 30 days)\n\n*Total Campaigns (Conference + Webinar):* {{ $json.countId }}\n*Total Contacts:* {{ $json.sumNumberOfContacts }}\n\n_Data written to Google Sheets. Run: {{ $now.toFormat('yyyy-MM-dd') }}_"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query SF Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query SF Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Write to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Summarize Totals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Totals": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

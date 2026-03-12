@@ -1,0 +1,191 @@
+{
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "authentication": "triggerOAuth2",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "mode": "id",
+          "value": "0"
+        },
+        "event": "rowAdded"
+      },
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "D8pj4nOG0SuFxj5h",
+          "name": "Google Sheets Trigger account 13"
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Generate Compliance Draft",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-1.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a compliance-focused content writer for Guesty, a property management platform. Based on the following content brief, write a clear, accurate, and regulation-compliant marketing draft of exactly 200 words. Avoid exaggerated claims, ensure factual accuracy, and use professional language suitable for a B2B SaaS audience.\n\nContent Brief:\n{{ $json['B'] }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 400,
+          "temperature": 0.7
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "3a1b2c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Write Draft to Column C",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_SPREADSHEET_ID"
+        },
+        "sheetName": {
+          "mode": "id",
+          "value": "0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Google Sheets Trigger').item.json['row_number'] }}",
+            "C": "={{ $json.text }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": true,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "C",
+              "displayName": "C",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": false,
+              "display": true,
+              "type": "string",
+              "removed": false
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "9b8a7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-content"
+        },
+        "text": "=:pencil: *New MTC Draft Ready!*\n\nA new compliance-focused draft has been generated and written to your Google Sheet.\n\n*Brief (Column B):*\n{{ $('Google Sheets Trigger').item.json['B'] }}\n\n*Draft preview (Column C):*\n{{ $('Generate Compliance Draft').item.json.text.substring(0, 300) }}...\n\n<https://docs.google.com/spreadsheets/d/YOUR_SPREADSHEET_ID|View in Google Sheets>"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate Compliance Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Compliance Draft": {
+      "main": [
+        [
+          {
+            "node": "Write Draft to Column C",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Draft to Column C": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -40,24 +40,28 @@ def parse_sse_stream(response) -> list:
     for chunk in response:
         text = chunk.decode("utf-8", errors="replace")
         buffer += text
+        # Process all complete SSE events (delimited by double newline)
         while "\n\n" in buffer:
             event_str, buffer = buffer.split("\n\n", 1)
-            for line in event_str.split("\n"):
-                if line.startswith("data: "):
-                    data = line[6:]
-                    try:
-                        events.append(json.loads(data))
-                    except json.JSONDecodeError:
-                        pass
-    # Handle remaining buffer
+            _parse_event_lines(event_str, events)
+    # Handle remaining buffer (final event may not end with \n\n)
     if buffer.strip():
-        for line in buffer.split("\n"):
-            if line.startswith("data: "):
-                try:
-                    events.append(json.loads(line[6:]))
-                except json.JSONDecodeError:
-                    pass
+        _parse_event_lines(buffer, events)
     return events
+
+
+def _parse_event_lines(event_str: str, events: list) -> None:
+    """Extract and parse all 'data: ' lines from an SSE event string."""
+    for line in event_str.split("\n"):
+        line = line.strip()
+        if line.startswith("data: "):
+            data = line[6:]
+            if data == "[DONE]":
+                continue
+            try:
+                events.append(json.loads(data))
+            except json.JSONDecodeError:
+                pass
 
 
 def send_message(base_url: str, message: str, department: str,
@@ -91,9 +95,9 @@ def send_message(base_url: str, message: str, department: str,
 
     for ev in events:
         if ev.get("type") == "text_chunk":
-            full_text += ev.get("content", "")
+            full_text += ev.get("text", "") or ev.get("content", "")
         elif ev.get("type") == "tool_call":
-            tool_calls.append(ev.get("tool", "unknown"))
+            tool_calls.append(ev.get("name", "") or ev.get("tool", "unknown"))
         elif ev.get("type") == "done":
             conv_id = ev.get("conversationId", conv_id)
 

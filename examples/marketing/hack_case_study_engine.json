@@ -1,0 +1,215 @@
+{
+  "name": "Case Study Draft Generator",
+  "nodes": [
+    {
+      "id": "a1f3c2d4-e5b6-4789-a012-b3c4d5e6f701",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "case-study-generator",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "b2e4d3f5-a6c7-4890-b123-c4d5e6f70812",
+      "name": "Generate Case Study Draft",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "model",
+              "content": "You are an expert B2B SaaS content writer specializing in customer case studies. Your writing is professional, results-driven, and compelling. You always follow the exact structure provided and write in a clear, authoritative tone that resonates with business decision-makers."
+            },
+            {
+              "role": "user",
+              "content": "Write a 500-word B2B SaaS case study for the following customer. Use a professional, results-driven tone. Structure the case study exactly as follows:\n\n## Title\nHow [Customer Name] [achieved key result] with Guesty\n\n## The Challenge\n[2-3 paragraphs describing the business challenge and pain points]\n\n## The Solution\n[2-3 paragraphs describing how Guesty solved the challenge]\n\n## The Results\n[2-3 paragraphs with specific, quantified outcomes where possible]\n\n## Customer Quote\n[A compelling pull quote from the customer]\n\n---\nCustomer Name: {{ $json.body.customerName }}\nIndustry: {{ $json.body.industry }}\nChallenge: {{ $json.body.challenge }}\nSolution: {{ $json.body.solution }}\nResults: {{ $json.body.results }}\nQuotation: {{ $json.body.quotation }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 1200,
+          "temperature": 0.7
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "c3f5e4a6-b7d8-4901-c234-d5e6f7081923",
+      "name": "Create Google Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "document",
+        "operation": "create",
+        "driveId": "myDrive",
+        "folderId": "root",
+        "title": "=[Case Study] {{ $('Webhook').item.json.body.customerName }} - {{ $('Webhook').item.json.body.industry }}"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "d4a6f5b7-c8e9-4012-d345-e6f708192034",
+      "name": "Add Content to Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "document",
+        "operation": "update",
+        "documentURL": "={{ $json.documentId }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "object": "text",
+              "action": "insert",
+              "locationChoice": "endOfSegmentLocation",
+              "text": "={{ $('Generate Case Study Draft').item.json.text }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "e5b7a6c8-d9f0-4123-e456-f708192034a5",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-content"
+        },
+        "text": "=:page_facing_up: *New Case Study Draft Ready!*\n\n*Customer:* {{ $('Webhook').item.json.body.customerName }}\n*Industry:* {{ $('Webhook').item.json.body.industry }}\n\n:link: <https://docs.google.com/document/d/{{ $('Add Content to Doc').item.json.documentId }}/edit|View Google Doc>\n\n_Draft generated automatically -- please review and edit before publishing._"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      }
+    },
+    {
+      "id": "f6c8b7d9-e0a1-4234-f567-081920345b6c",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"customerName\": \"{{ $('Webhook').item.json.body.customerName }}\",\n  \"documentUrl\": \"https://docs.google.com/document/d/{{ $('Add Content to Doc').item.json.documentId }}/edit\"\n}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Case Study Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Case Study Draft": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Add Content to Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Content to Doc": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,241 @@
+{
+  "name": "Marketing Brief Intake",
+  "nodes": [
+    {
+      "id": "a1f3c2e4-7b8d-4e9f-b0c1-2d3e4f5a6b7c",
+      "name": "Receive Marketing Brief",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing-brief",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "b2e4d6f8-9a0b-4c1d-e2f3-4a5b6c7d8e9f",
+      "name": "Validate Brief with Gemini",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a marketing brief quality reviewer. Analyze the following marketing brief submission and determine if it is complete and actionable.\n\nBrief fields:\n- projectName: {{ $json.body.projectName }}\n- assetType: {{ $json.body.assetType }}\n- targetAudience: {{ $json.body.targetAudience }}\n- keyMessage: {{ $json.body.keyMessage }}\n- deadline: {{ $json.body.deadline }}\n- requesterEmail: {{ $json.body.requesterEmail }}\n\nRules:\n1. All 6 fields must be present and non-empty.\n2. assetType must be one of: email, landing-page, blog, social.\n3. targetAudience must be specific (not vague like 'everyone' or 'all users').\n4. keyMessage must be at least 10 words and describe a clear value proposition.\n5. deadline must be a valid future date.\n6. requesterEmail must look like a valid email address.\n\nRespond ONLY with valid JSON in this exact format:\n{\n  \"isValid\": true or false,\n  \"feedback\": \"OK\" if valid, or a bullet-point list of issues if invalid\n}"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "systemMessage": "You are a strict marketing brief validator. Always respond with valid JSON only. No extra text."
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "c3f5e7a9-0b1c-4d2e-f3a4-5b6c7d8e9f0a",
+      "name": "Is Brief Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        300
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-001",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "d4a6b8c0-1c2d-4e3f-a4b5-6c7d8e9f0a1b",
+      "name": "Reject - Respond with Feedback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        960,
+        480
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'rejected', message: 'Your brief is incomplete. Please review the feedback below and resubmit.', feedback: $json.feedback }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      }
+    },
+    {
+      "id": "e5b7c9d1-2d3e-4f4a-b5c6-7d8e9f0a1b2c",
+      "name": "Create Monday.com Item",
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "boardItem",
+        "operation": "create",
+        "boardId": "123456789",
+        "groupId": "topics",
+        "name": "={{ $('Receive Marketing Brief').item.json.body.projectName }}",
+        "additionalFields": {
+          "columnValues": "={{ JSON.stringify({ status: { label: $('Receive Marketing Brief').item.json.body.assetType }, date: { date: $('Receive Marketing Brief').item.json.body.deadline }, long_text: { text: JSON.stringify($('Receive Marketing Brief').item.json.body) } }) }}"
+        }
+      },
+      "credentials": {
+        "mondayComApi": {
+          "id": "XsKPBAGItELeiJ8S",
+          "name": "Monday.com API"
+        }
+      }
+    },
+    {
+      "id": "f6c8d0e2-3e4f-4a5b-c6d7-8e9f0a1b2c3d",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-briefs"
+        },
+        "text": "=:memo: *New Marketing Brief Submitted*\n\n*Project:* {{ $('Receive Marketing Brief').item.json.body.projectName }}\n*Asset Type:* {{ $('Receive Marketing Brief').item.json.body.assetType }}\n*Requester:* {{ $('Receive Marketing Brief').item.json.body.requesterEmail }}\n*Deadline:* {{ $('Receive Marketing Brief').item.json.body.deadline }}\n\n*Monday.com Item:* <https://monday.com/boards/123456789/items/{{ $('Create Monday.com Item').item.json.id }}|View Item>\n\n_Brief validated and created successfully._",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      }
+    },
+    {
+      "id": "a7d9e1f3-4f5a-4b6c-d7e8-9f0a1b2c3d4e",
+      "name": "Respond - Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'created', message: 'Brief accepted and Monday.com item created successfully.', mondayItemId: $('Create Monday.com Item').item.json.id, projectName: $('Receive Marketing Brief').item.json.body.projectName }) }}",
+        "options": {
+          "responseCode": 201
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive Marketing Brief": {
+      "main": [
+        [
+          {
+            "node": "Validate Brief with Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Brief with Gemini": {
+      "main": [
+        [
+          {
+            "node": "Is Brief Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Brief Valid?": {
+      "main": [
+        [
+          {
+            "node": "Create Monday.com Item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject - Respond with Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Monday.com Item": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Slack": {
+      "main": [
+        [
+          {
+            "node": "Respond - Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

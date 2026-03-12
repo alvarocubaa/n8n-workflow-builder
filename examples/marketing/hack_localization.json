@@ -1,0 +1,290 @@
+{
+  "nodes": [
+    {
+      "id": "a1f3c2e4-7b8d-4e9f-b0a1-2c3d4e5f6a7b",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b2e4d6f8-1a2b-4c3d-e5f6-7a8b9c0d1e2f",
+      "name": "Set Document ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            {
+              "name": "documentId",
+              "type": "stringValue",
+              "string": "YOUR_GOOGLE_DOC_ID_HERE"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c3f5e7a9-2b3c-4d5e-f6a7-8b9c0d1e2f3a",
+      "name": "Read Source Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "document",
+        "operation": "get",
+        "documentURL": "={{ $json.documentId }}",
+        "simple": true
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "d4a6b8c0-3c4d-4e5f-a7b8-9c0d1e2f3a4b",
+      "name": "Translate to French",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "model",
+              "content": "You are a professional translator. Translate the provided English text into French. Preserve all formatting, structure, headings, bullet points, and line breaks exactly as they appear in the original. Return only the translated text with no additional commentary."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.body }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 8192
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "e5b7c9d1-4d5e-4f6a-b8c9-0d1e2f3a4b5c",
+      "name": "Build FR Title",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "fields": {
+          "values": [
+            {
+              "name": "frTitle",
+              "type": "stringValue",
+              "string": "={{ $('Read Source Doc').item.json.title }} [FR]"
+            },
+            {
+              "name": "translatedText",
+              "type": "stringValue",
+              "string": "={{ $json.text }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f6c8d0e2-5e6f-4a7b-c9d0-1e2f3a4b5c6d",
+      "name": "Create FR Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "document",
+        "operation": "create",
+        "driveId": "myDrive",
+        "folderId": "root",
+        "title": "={{ $json.frTitle }}"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "a7d9e1f3-6f7a-4b8c-d0e1-2f3a4b5c6d7e",
+      "name": "Write Translation to Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "document",
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "simple": true,
+        "actionsUi": {
+          "actionFields": [
+            {
+              "object": "text",
+              "action": "insert",
+              "locationChoice": "endOfSegmentLocation",
+              "insertSegment": "body",
+              "text": "={{ $('Build FR Title').item.json.translatedText }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "b8e0f2a4-7a8b-4c9d-e1f2-3a4b5c6d7e8f",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-localization"
+        },
+        "text": "=:flag-fr: *New French translation ready!*\n\n*Document:* {{ $('Build FR Title').item.json.frTitle }}\n*Link:* https://docs.google.com/document/d/{{ $('Create FR Doc').item.json.id }}/edit\n\nTranslated from English using Gemini 2.5 Flash."
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Document ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Document ID": {
+      "main": [
+        [
+          {
+            "node": "Read Source Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Source Doc": {
+      "main": [
+        [
+          {
+            "node": "Translate to French",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Translate to French": {
+      "main": [
+        [
+          {
+            "node": "Build FR Title",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build FR Title": {
+      "main": [
+        [
+          {
+            "node": "Create FR Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create FR Doc": {
+      "main": [
+        [
+          {
+            "node": "Write Translation to Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Translation to Doc": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

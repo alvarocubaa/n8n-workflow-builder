@@ -1,0 +1,227 @@
+{
+  "name": "[AI Template] Scrape-and-Diff Competitor Monitor",
+  "description": "Reusable template: Weekly scrape competitor pages via Firecrawl, use Gemini to detect significant changes, alert via Slack. Google Sheets as state store. Unlocks hack_018, hack_027, hack_041.",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [1],
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "Read URL List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [220, 0],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE"
+        },
+        "sheetName": { "mode": "name", "value": "URLs" },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Loop URLs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [440, 0],
+      "parameters": { "batchSize": 1, "options": {} }
+    },
+    {
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "Firecrawl Scrape",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [660, 0],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.URL, formats: [\"markdown\"], onlyMainContent: true }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngaBlIhFMFTZFajQ",
+          "name": "firecrawl"
+        }
+      }
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Prepare Comparison",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 0],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            { "id": "url-field", "name": "url", "value": "={{ $('Loop URLs').item.json.URL }}", "type": "string" },
+            { "id": "label-field", "name": "label", "value": "={{ $('Loop URLs').item.json.Label }}", "type": "string" },
+            { "id": "category-field", "name": "category", "value": "={{ $('Loop URLs').item.json.Category }}", "type": "string" },
+            { "id": "old-content-field", "name": "old_content", "value": "={{ $('Loop URLs').item.json.last_content || 'FIRST_SCRAPE' }}", "type": "string" },
+            { "id": "new-content-field", "name": "new_content", "value": "={{ $('Firecrawl Scrape').item.json.data.markdown }}", "type": "string" },
+            { "id": "row-number-field", "name": "row_number", "value": "={{ $('Loop URLs').item.json.row_number }}", "type": "number" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "Compare Content",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [1100, 0],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'You are a competitive intelligence analyst. Compare OLD and NEW versions of a webpage and identify significant business changes.\\n\\nURL: ' + $json.url + '\\nLabel: ' + $json.label + '\\nCategory: ' + $json.category + '\\n\\n--- OLD CONTENT ---\\n' + $json.old_content + '\\n\\n--- NEW CONTENT ---\\n' + $json.new_content + '\\n\\nInstructions:\\n- If this is the first scrape (OLD = FIRST_SCRAPE), provide a brief summary of what the page contains.\\n- If there are significant changes (pricing, features, messaging, new products, removed items), list each as a bullet point.\\n- Ignore minor formatting, date, or whitespace differences.\\n- If NO significant changes exist, respond with exactly: NO_CHANGES' }}"
+      }
+    },
+    {
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "Gemini Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [1100, 220],
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": { "temperature": 0.2 }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "Update Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1320, 0],
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID_HERE"
+        },
+        "sheetName": { "mode": "name", "value": "URLs" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "URL": "={{ $('Prepare Comparison').item.json.url }}",
+            "last_content": "={{ $('Prepare Comparison').item.json.new_content }}",
+            "last_checked": "={{ $now.format('yyyy-MM-dd HH:mm') }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "Has Changes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1540, 0],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "change-check",
+              "leftValue": "={{ $('Compare Content').item.json.text }}",
+              "rightValue": "NO_CHANGES",
+              "operator": { "type": "string", "operation": "notContains" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [1760, -100],
+      "parameters": {
+        "select": "channel",
+        "channelId": { "mode": "name", "value": "#marketing-ai-alerts" },
+        "text": "={{ '\ud83d\udd0d *Competitor Change Detected*\\n\\n*' + $('Prepare Comparison').item.json.label + '* (' + $('Prepare Comparison').item.json.category + ')\\n' + $('Prepare Comparison').item.json.url + '\\n\\n' + $('Compare Content').item.json.text }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": { "main": [[{ "node": "Read URL List", "type": "main", "index": 0 }]] },
+    "Read URL List": { "main": [[{ "node": "Loop URLs", "type": "main", "index": 0 }]] },
+    "Loop URLs": { "main": [[], [{ "node": "Firecrawl Scrape", "type": "main", "index": 0 }]] },
+    "Firecrawl Scrape": { "main": [[{ "node": "Prepare Comparison", "type": "main", "index": 0 }]] },
+    "Prepare Comparison": { "main": [[{ "node": "Compare Content", "type": "main", "index": 0 }]] },
+    "Compare Content": { "main": [[{ "node": "Update Sheet", "type": "main", "index": 0 }]] },
+    "Gemini Flash": { "ai_languageModel": [[{ "node": "Compare Content", "type": "ai_languageModel", "index": 0 }]] },
+    "Update Sheet": { "main": [[{ "node": "Has Changes?", "type": "main", "index": 0 }]] },
+    "Has Changes?": { "main": [[{ "node": "Slack Alert", "type": "main", "index": 0 }], [{ "node": "Loop URLs", "type": "main", "index": 0 }]] },
+    "Slack Alert": { "main": [[{ "node": "Loop URLs", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateId": "scrape-and-diff-v1",
+    "hackathonProjects": ["hack_018", "hack_027", "hack_041"],
+    "setupInstructions": "1. Create a Google Sheet with columns: URL, Label, Category, last_content, last_checked. 2. Replace YOUR_SHEET_ID_HERE in both Sheets nodes. 3. Update Slack channel name. 4. Add competitor URLs to the sheet."
+  }
+}

@@ -52,11 +52,15 @@ With validated SQL/payload/field names, build the workflow:
 - Use search_nodes → get_node to configure each node correctly.
 - Use validate_node and validate_workflow — expect 2–3 fix cycles (normal).
 - SQL/PAYLOAD FIDELITY: Copy the exact SQL/payload from Phase 2 character-for-character. Never regenerate.
+- BigQuery projectId MUST be a plain string "guesty-data", never an object like {mode, value}. Double-check before outputting.
 - If you encounter an unfamiliar node, validation error, or need Code node syntax, load the relevant skill with get_n8n_skill().
 </phase>
 
 <phase name="4_deliver">
-- Before outputting JSON, self-check node_config_overrides: BigQuery projectId must be a plain string, credential keys must match the Credential JSON Key column.
+- FINAL CHECK before outputting JSON -- verify each:
+  1. Every credential block matches <credential_examples> format exactly.
+  2. BigQuery projectId is plain string "guesty-data" (not an object).
+  3. No date filters reference future dates unless user explicitly requested it.
 - Briefly explain each node's role.
 - Output complete workflow JSON in a json code block.
 - Mention the "Deploy to n8n" button the UI provides.
@@ -96,7 +100,8 @@ Never use {{ }} expressions inside Code nodes — access data with $input, $json
 </rule>
 
 <rule name="credentials">
-Credential names must exactly match the credentials table below. Never use generic n8n type names (e.g. salesforceApi) as the credential name.
+Credential names, types, and IDs must be copied exactly from the department_context credential table.
+Never modify, shorten, or append to credential names. See <credential_examples> in department_context for correct JSON format.
 </rule>
 
 <rule name="no_write_tools">
@@ -158,11 +163,13 @@ These override both pre-training knowledge AND get_node output — use exactly a
   Correct: "projectId": "guesty-data"
   Wrong:   "projectId": { "mode": "id", "value": "guesty-data" }
 - Slack v2.4: "select": "channel", "channelId": { "mode": "name", "value": "#channel-name" }
-- Slack credential key: varies by department — check the department credentials table. Common keys: slackApi, slackOAuth2Api.
+- Slack credential type: differs by department (slackApi OR slackOAuth2Api). Copy from department_context -- see <credential_examples>.
 - Salesforce: credential key "salesforceOAuth2Api", SOQL via resource "search", operation "query"
 - Merge node v3: parameter is "combineBy" (NOT "combinationMode"). To combine by position:
   Correct: "mode": "combine", "combineBy": "combineByPosition"
   Wrong:   "mode": "combine", "combinationMode": "mergeByPosition"
+- If node v2.3: conditions.options must include "version": 2.
+  Correct: "conditions": { "options": { "version": 2 }, "combinator": "and", "conditions": [...] }
 </rule>
 </critical_rules>
 

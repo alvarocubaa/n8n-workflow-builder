@@ -68,3 +68,407 @@ cases:
       - credentials
       - sf_config
       - slack_config
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CS Credential Regression Tests (from bad conversation Mar 13)
+  # Tests: BQ projectId format, Slack credential type, credential name immutability
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: cs_churn_bq_slack
+    description: "CS regression: BQ churn query + Slack alert — tests projectId format and credential types"
+    department: cs
+    prompt: >
+      Create a daily workflow that queries BigQuery csm_churn_report for accounts
+      with recent churn. Include the account owner from Salesforce. Post summary
+      to #cs-churn-alerts in Slack. Run at 9am UTC daily.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: VQ7CU7dKViVcv8Ah
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: cs_renewal_declined_full
+    description: "CS full scenario: SF Trigger + SF query + BQ + Filter + Slack — exact bad conversation pattern"
+    department: cs
+    prompt: >
+      Create a workflow that polls Salesforce every day at 6pm for updated opportunities.
+      When an opportunity is updated, query Salesforce for the opportunity details including
+      Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, and Account.Guesty_Admin_ID__c.
+      Filter for renewal record type (RecordTypeId = "0125p000001101UAAQ") where Last_Stage__c
+      contains "declined" and churn date is after 2024-01-01. Then query BigQuery csm_churn_report
+      for max_paid_listings using the Guesty Admin ID. Format and post a churn alert to
+      #cs-churn-notifications in Slack.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforceTrigger
+      - salesforce
+      - filter
+      - googleBigQuery
+      - set
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      googleApi: VQ7CU7dKViVcv8Ah
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - sf_config
+      - slack_config
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Marketing Hackathon Test Cases (Tier 1 — Fully Buildable)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: hack_event_sf_dashboards
+    description: "Hackathon P1: Salesforce campaign data -> Google Sheets -> Slack (Danielle Morad)"
+    department: marketing
+    prompt: >
+      Create a weekly workflow that runs every Monday at 8am UTC. Query Salesforce
+      for all Campaign records from the past 30 days where Type = 'Conference' or
+      Type = 'Webinar'. Include Campaign Name, StartDate, NumberOfContacts, and
+      Status. Write the results to a Google Sheet. Post a summary count to
+      #marketing-events in Slack with total campaigns and contacts. Use the native
+      Salesforce node, not BigQuery.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - googleSheets
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - sf_config
+      - slack_config
+
+  - name: hack_hubspot_insights
+    description: "Hackathon P2: BigQuery HubSpot data -> Gemini AI insights -> Slack + Sheets (Diyor Abdullaev)"
+    department: marketing
+    prompt: >
+      Build a daily workflow that runs at 8am UTC. Query BigQuery marketing_data
+      tables for HubSpot email campaign performance from the past 7 days. Include
+      campaign name, emails sent, opens, clicks, and unsubscribes. Use the Google
+      Gemini node to generate a 3-bullet insight summary highlighting top and
+      underperforming campaigns. Post the summary to #marketing-insights in Slack.
+      Write the raw metrics to a Google Sheet.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - googleSheets
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: hack_ppc_audit
+    description: "Hackathon P3: Google Ads -> Set/If calculations -> Slack alerts (Miguel Bordoy)"
+    department: marketing
+    prompt: >
+      Create a weekly workflow that runs every Monday at 7am UTC. Use the Google
+      Ads node to pull campaign performance for the past 7 days including campaign
+      name, impressions, clicks, cost, and conversions. Use Set nodes to calculate
+      CTR and CPC. Flag campaigns where CPC exceeds $5 or CTR is below 1%. Post
+      flagged campaigns to #marketing-ppc-alerts in Slack with campaign name,
+      spend, CTR, and CPC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleAds
+      - slack
+    expected_creds:
+      googleAdsOAuth2Api: 7zPWAntoXHKpq6l7
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_mtc_content
+    description: "Hackathon P4: Google Sheets Trigger -> Gemini AI draft -> Sheets write-back (Karin Levavi)"
+    department: marketing
+    prompt: >
+      Create a workflow triggered when a new row is added to a Google Sheet (using
+      Google Sheets Trigger). When triggered, read the value from column B (the
+      content brief). Use the Google Gemini node to generate a 200-word
+      compliance-focused draft based on that brief. Write the AI draft back to
+      column C of the same row in the Google Sheet. Post a notification to
+      #marketing-content in Slack that a new MTC draft is ready.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleSheets
+      - slack
+    expected_creds:
+      googleSheetsTriggerOAuth2Api: D8pj4nOG0SuFxj5h
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_localization
+    description: "Hackathon P5: Google Docs -> Gemini translate -> new Doc -> Slack (Michal Daskal)"
+    department: marketing
+    prompt: >
+      Build a manually triggered workflow. Read a Google Doc by its document ID
+      containing English product newsletter content. Use the Google Gemini node to
+      translate the content into French, keeping formatting intact. Create a new
+      Google Doc with the translated content and include '[FR]' in the title. Post
+      a notification to #marketing-localization in Slack with a link to the new
+      document.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleDocs
+      - slack
+    expected_creds:
+      googleDocsOAuth2Api: sgzXeonPZK1apIGE
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_event_command_center
+    description: "Hackathon P6: Salesforce + BigQuery HubSpot -> Gemini analysis -> Sheets + Slack (Sivan Bell)"
+    department: marketing
+    prompt: >
+      Create a weekly workflow that runs every Monday at 8am UTC. Step 1: Query
+      Salesforce for Campaign records where Type = 'Conference' and StartDate is
+      in the next 30 days. Step 2: Query BigQuery marketing_data for HubSpot
+      email metrics associated with those campaign names. Step 3: Use the Google
+      Gemini node to generate a strategic summary comparing event pipeline data
+      with marketing engagement. Step 4: Write results to a Google Sheet. Step 5:
+      Post the AI summary to #marketing-events in Slack.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - googleBigQuery
+      - googleSheets
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      googleApi: h7fJ82YhtOnUL58u
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - sf_config
+      - slack_config
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Marketing Hackathon Test Cases (Tier 1.5 — Native Nodes, Complex Patterns)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: hack_market_voice_sync
+    description: "Hackathon T2-P1: RSS + Firecrawl scraping -> Gemini analysis -> Slack + Sheets (Amarelle Wenkert)"
+    department: marketing
+    prompt: >
+      Create a weekly workflow that runs every Monday at 9am UTC.
+      Step 1: Use the RSS Read node to fetch the latest 10 articles from
+      https://example.com/industry-news/feed (placeholder RSS URL).
+      Step 2: Use the Firecrawl node to scrape the homepage of a competitor
+      website (use https://competitor.example.com as placeholder URL) and
+      extract the main content text.
+      Step 3: Use the Google Gemini node to analyze both the RSS headlines
+      and the competitor page content. Generate a 5-bullet brief identifying
+      market trends that overlap or diverge.
+      Step 4: Post the AI brief to #marketing-intelligence in Slack.
+      Step 5: Write the raw RSS headlines and competitor extract to a Google Sheet
+      for historical tracking.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - slack
+      - googleSheets
+    expected_creds:
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_case_study_engine
+    description: "Hackathon T2-P2: Webhook -> Gemini case study draft -> Google Docs -> Slack (Gal Givoli)"
+    department: marketing
+    prompt: >
+      Build a webhook-triggered workflow for generating case study first drafts.
+      Step 1: A webhook receives a JSON payload with fields: customerName,
+      industry, challenge, solution, results, and quotation.
+      Step 2: Use the Google Gemini node to generate a 500-word case study
+      draft following this structure: Title, Challenge, Solution, Results,
+      Customer Quote. Use a professional B2B SaaS tone.
+      Step 3: Create a new Google Doc with the generated case study. Title
+      the document "[Case Study] {customerName} - {industry}".
+      Step 4: Post a notification to #marketing-content in Slack with the
+      customer name and a link to the new Google Doc.
+      Step 5: Return the Google Doc URL in the webhook response.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - slack
+    expected_creds:
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      googleDocsOAuth2Api: sgzXeonPZK1apIGE
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_ai_marketing_brief
+    description: "Hackathon T2-P3: Webhook -> Gemini validation -> Monday.com item -> Slack (Liat Shohet)"
+    department: marketing
+    prompt: >
+      Build a webhook-triggered workflow that creates a Monday.com item from
+      a marketing brief submission.
+      Step 1: A webhook receives JSON with fields: projectName, assetType
+      (one of: "email", "landing-page", "blog", "social"), targetAudience,
+      keyMessage, deadline, and requesterEmail.
+      Step 2: Use the Google Gemini node to validate the brief completeness.
+      If any critical field is missing or too vague, generate a structured
+      feedback message listing what's needed.
+      Step 3: Create an item on a Monday.com board (use board ID 123456789
+      as placeholder). Map projectName to Name column, assetType to Status
+      column, deadline to Date column, and the full brief JSON to a Long Text
+      column.
+      Step 4: Post a confirmation to #marketing-briefs in Slack with the
+      project name, asset type, and Monday.com item link.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - slack
+    expected_creds:
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      mondayComApi: XsKPBAGItELeiJ8S
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Marketing Hackathon Test Cases (Tier 2 — HTTP Request Required)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: hack_seo_reporting
+    description: "Hackathon T2-P4: HTTP Request (Semrush API) -> Set parse -> Sheets + Slack (Estefania Jaramillo)"
+    department: marketing
+    prompt: >
+      Create a weekly workflow that runs every Monday at 6am UTC.
+      Step 1: Use an HTTP Request node to call the Semrush API domain
+      analytics endpoint. Use GET method to
+      https://api.semrush.com/?type=domain_ranks&key={{SEMRUSH_API_KEY}}&domain=guesty.com&database=us
+      (use a placeholder API key). Parse the CSV response.
+      Step 2: Use a second HTTP Request to get keyword rankings:
+      https://api.semrush.com/?type=domain_organic&key={{SEMRUSH_API_KEY}}&domain=guesty.com&database=us&display_limit=20
+      Step 3: Use a Set node to parse the CSV responses and extract: domain
+      rank, organic traffic, organic keywords count, and top 20 keyword
+      positions.
+      Step 4: Write all metrics to a Google Sheet with columns: Date, Domain
+      Rank, Organic Traffic, Organic Keywords, and a row per keyword with
+      Position and Search Volume.
+      Step 5: Post a summary to #marketing-seo in Slack with domain rank
+      change and top 5 keywords by traffic.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - httpRequest
+      - googleSheets
+      - slack
+    expected_creds:
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_linkedin_content
+    description: "Hackathon T2-P5: Google Docs -> Gemini 3 LinkedIn variations -> Sheets + Slack (Miguel Bordoy)"
+    department: marketing
+    prompt: >
+      Build a manually triggered workflow for LinkedIn content repurposing.
+      Step 1: Read a Google Doc by document ID containing a long-form blog
+      post or article.
+      Step 2: Use the Google Gemini node to generate 3 LinkedIn post
+      variations from the content: (a) a thought-leadership hook post
+      under 200 words, (b) a data-driven insight post with bullet points,
+      (c) a storytelling post with a personal angle. Each should include
+      3 relevant hashtags.
+      Step 3: Write all 3 variations to a Google Sheet in separate rows with
+      columns: Variation Type, Post Text, Hashtags, Character Count.
+      Step 4: Post a notification to #marketing-content in Slack that 3
+      LinkedIn drafts are ready for review, with a link to the Google Sheet.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleDocs
+      - googleSheets
+      - slack
+    expected_creds:
+      googleDocsOAuth2Api: sgzXeonPZK1apIGE
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: hack_webinar_creation
+    description: "Hackathon T2-P6: Google Docs transcript -> Gemini extract + generate assets -> Sheets + Docs + Slack (Roberto + Nechama)"
+    department: marketing
+    prompt: >
+      Build a manually triggered workflow for webinar asset creation.
+      Step 1: Read a Google Doc by document ID containing a webinar
+      transcript or planning document.
+      Step 2: Use the Google Gemini node to extract from the transcript:
+      webinar title, 3 key topics, target audience, and 5 bullet-point
+      takeaways.
+      Step 3: Use a second Google Gemini call to generate webinar
+      marketing assets: (a) a 100-word landing page description,
+      (b) a promotional email subject line and 150-word body,
+      (c) 3 social media posts (Twitter-length, under 280 chars each).
+      Step 4: Write all generated assets to a Google Sheet with columns:
+      Asset Type, Content, Character Count.
+      Step 5: Create a new Google Doc titled "[Webinar Assets] {webinar title}"
+      containing all assets formatted with headers.
+      Step 6: Post to #marketing-events in Slack with the webinar title and
+      links to both the Google Sheet and the assets Google Doc.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleDocs
+      - googleSheets
+      - slack
+    expected_creds:
+      googleDocsOAuth2Api: sgzXeonPZK1apIGE
+      googlePalmApi: LL8fLgZSrUn8oZtV
+      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: MkMAiC1ecfpYtIz1
+    checks:
+      - encoding
+      - uuids
+      - credentials

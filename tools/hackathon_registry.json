@@ -1,0 +1,882 @@
+{
+  "metadata": {
+    "hackathon": "Marketing AI Hackathon 9.3",
+    "created": "2026-03-11",
+    "totalSubmissions": 34,
+    "tiers": { "tier1": 6, "tier2": 9, "tier3": 5, "notBuildable": 6, "empty": 8, "note": "3 projects (hack_018, hack_027, hack_041) promoted from tier3 to tier2 via scrape-and-diff template (2026-03-12)" }
+  },
+  "projects": [
+    {
+      "id": "hack_001",
+      "submitter": "Martyna Borowy",
+      "projectName": "Automated Weekly Competitor Intelligence Loop",
+      "problemStatement": "Manual copy-paste from AI research bot into Excel. Delays delivery of competitor insights.",
+      "solutionOverview": "Weekly n8n trigger -> AI research -> Excel/Sheets sync -> Gemini synthesis -> Slack brief",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Needs external AI bot (Cursor) integration. Could partially build with Firecrawl for scraping + Gemini for analysis.",
+        "toolsRequired": ["N8N", "Google Sheets", "Cursor AI", "Gemini", "Slack"],
+        "toolsAvailable": ["Google Sheets", "Gemini", "Slack", "Firecrawl"],
+        "toolsMissing": ["Cursor AI bot"],
+        "dataNeeded": ["Competitor websites", "Cursor AI output"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Could use Firecrawl for competitor scraping instead of Cursor"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_002",
+      "submitter": "Estefania Jaramillo",
+      "projectName": "Automate SEO/AEO Reporting (SEMrush Pipeline)",
+      "problemStatement": "Traditional SEO reporting doesn't cover AI Overviews, Featured Snippets. Multi-hour manual process.",
+      "solutionOverview": "Schedule -> HTTP Request (Semrush API) -> Google Sheets -> Looker Studio",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Semrush has a well-documented API. HTTP Request node can call it. Google Sheets available.",
+        "toolsRequired": ["Semrush", "N8N", "Google Sheets", "Looker Studio"],
+        "toolsAvailable": ["Google Sheets", "HTTP Request"],
+        "toolsMissing": ["Semrush (native node)"],
+        "dataNeeded": ["Semrush API key", "Website URLs to track"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Semrush API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_003",
+      "submitter": "Estefania Jaramillo",
+      "projectName": "Figma to Lovable to HTML/CSS Web Design",
+      "problemStatement": "Migrating templates manually causes disconnect between design intention and developer execution.",
+      "solutionOverview": "Figma Dev Mode -> Lovable -> HTML/CSS export for Gutenberg/WordPress",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "This is a design tool pipeline (Figma -> Lovable), not an n8n automation workflow.",
+        "toolsRequired": ["Lovable", "Figma"],
+        "toolsAvailable": [],
+        "toolsMissing": ["Lovable", "Figma"],
+        "dataNeeded": ["Figma wireframes", "Figma Dev seat", "Lovable Pro"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_004",
+      "submitter": "Miguel Bordoy",
+      "projectName": "LinkedIn Repurposing Content for ICs",
+      "problemStatement": "Individual contributors not active on LinkedIn. No repeatable system for content publishing.",
+      "solutionOverview": "Capture content types -> Gemini generates drafts -> lightweight review -> scheduling",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Google Drive + Gemini + Sheets available. LinkedIn posting API needs HTTP Request.",
+        "toolsRequired": ["Google Drive", "Figma", "Google Sheets", "N8N", "Gemini"],
+        "toolsAvailable": ["Google Drive", "Google Sheets", "Gemini"],
+        "toolsMissing": ["LinkedIn API (native)", "Figma"],
+        "dataNeeded": ["Content templates", "Figma Buzz seat"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["LinkedIn API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_005",
+      "submitter": "Miguel Bordoy",
+      "projectName": "Weekly PPC Auditing and Optimisation",
+      "problemStatement": "Time-consuming to get weekly performance view. Manual audits reduce consistency and slow action.",
+      "solutionOverview": "Schedule -> Google Ads data pull -> Gemini analysis -> anomaly alerts -> Slack summary",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "Google Ads node with credential available in Marketing. Gemini for analysis. Slack for delivery.",
+        "toolsRequired": ["Google Ads", "Gemini", "Slack"],
+        "toolsAvailable": ["Google Ads", "Gemini", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Google Ads campaign data"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_ppc_audit",
+        "department": "marketing",
+        "priority": "P3"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_006",
+      "submitter": "Roberto Bricio",
+      "projectName": "Webinar Creation",
+      "problemStatement": "Streamline webinar creation process from planning to asset generation.",
+      "solutionOverview": "Transcript -> extract topics -> create LP/email/social content -> WordPress/HubSpot",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Google Docs, Sheets available. WordPress needs HTTP Request. Integrates with Nechama's project.",
+        "toolsRequired": ["Google Docs", "Google Sheets", "N8N", "HubSpot", "WordPress"],
+        "toolsAvailable": ["Google Docs", "Google Sheets", "Gemini"],
+        "toolsMissing": ["WordPress (native)", "HubSpot (native node limited)"],
+        "dataNeeded": ["Meeting transcripts", "User/product lists", "LP/email templates"],
+        "specsAvailable": ["hubspot"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["WordPress REST API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_007",
+      "submitter": "Aviv Yativ Segal",
+      "projectName": "Real Time Behavioral Personas",
+      "problemStatement": "User understanding fragmented and frozen in time. Manual research too slow.",
+      "solutionOverview": "Transform raw product data into dynamic User Identities with weekly Slack report.",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Requires product behavioral data not in any documented spec. No tools specified.",
+        "toolsRequired": [],
+        "toolsAvailable": [],
+        "toolsMissing": ["Product analytics platform"],
+        "dataNeeded": ["Behavioral data from the product"],
+        "specsAvailable": [],
+        "specsMissing": ["Product behavioral data"],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_008",
+      "submitter": "Roman Ivanytskyi",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_009",
+      "submitter": "Adah Nuchi",
+      "projectName": "Product Messaging Aggregator",
+      "problemStatement": "Product messaging fragmented across files by multiple team members. No way to find existing assets.",
+      "solutionOverview": "AI agent that locates all existing assets and aggregates by feature in reverse chronological order.",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Requires 9+ platforms (Figma, Pendo, Instagram, LinkedIn, YouTube, etc.). Too many missing integrations.",
+        "toolsRequired": ["Figma", "Google Docs", "Google Drive", "YouTube", "HubSpot", "LinkedIn", "Pendo", "N8N", "Instagram"],
+        "toolsAvailable": ["Google Docs", "Google Drive"],
+        "toolsMissing": ["Figma", "YouTube", "LinkedIn", "Pendo", "Instagram"],
+        "dataNeeded": ["Messaging docs and assets across all platforms"],
+        "specsAvailable": ["hubspot"],
+        "specsMissing": ["Pendo", "YouTube", "LinkedIn", "Instagram", "Figma"],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_010",
+      "submitter": "Amarelle Wenkert",
+      "projectName": "Market-Voice Sync",
+      "problemStatement": "No automated way to verify if market trends are discussed by leads/customers.",
+      "solutionOverview": "RSS monitor -> Firecrawl competitors -> Modjo call data -> AI brief -> Slack",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "RSS Read node exists. Firecrawl for scraping. Modjo credential and spec available. Gemini + Slack.",
+        "toolsRequired": ["N8N", "RSS", "HTTP Request", "Modjo", "Google Sheets", "AI", "Slack", "Monday.com"],
+        "toolsAvailable": ["RSS Read", "Firecrawl", "Modjo", "Google Sheets", "Gemini", "Slack", "Monday.com"],
+        "toolsMissing": [],
+        "dataNeeded": ["RSS feed URLs", "Competitor page URLs", "Modjo transcripts", "ICP matrix"],
+        "specsAvailable": ["csm"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Competitor pages via Firecrawl"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_011",
+      "submitter": "Aryeh Eastman",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_012",
+      "submitter": "Assaf Norman",
+      "projectName": "BQ Text to Dashboard Analysis",
+      "problemStatement": "Managing 10 geos across several platforms. Time-consuming to find problems.",
+      "solutionOverview": "Query BQ data -> create dashboard for performance review",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Dashboard creation is not an n8n capability. Can query BQ and output to Sheets but not create interactive dashboards.",
+        "toolsRequired": ["BigQuery", "Dashboard tool"],
+        "toolsAvailable": ["BigQuery", "Google Sheets"],
+        "toolsMissing": ["Dashboard creation"],
+        "dataNeeded": ["BigQuery geo performance data"],
+        "specsAvailable": ["salesforce"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_013",
+      "submitter": "Danielle Morad",
+      "projectName": "Automating Event SF Dashboards",
+      "problemStatement": "Manually creates SF dashboards per event, pulls KPIs at 2wk/1mo/3mo/6mo intervals.",
+      "solutionOverview": "Schedule -> Salesforce query -> Google Sheets update -> Slack notification",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "All nodes available: Schedule, Salesforce, Google Sheets, Slack. Salesforce spec added to Marketing.",
+        "toolsRequired": ["Google Sheets", "Salesforce", "Slack", "N8N"],
+        "toolsAvailable": ["Google Sheets", "Salesforce", "Slack", "Schedule Trigger"],
+        "toolsMissing": [],
+        "dataNeeded": ["Events Info Google Sheet", "Salesforce Dashboard reference"],
+        "specsAvailable": ["salesforce"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_event_sf_dashboards",
+        "department": "marketing",
+        "priority": "P1"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_014",
+      "submitter": "Diyor Abdullaev",
+      "projectName": "Post-Campaign Auto-Insights Generator (HubSpot x n8n)",
+      "problemStatement": "Post-campaign analysis manual, inconsistent, often skipped.",
+      "solutionOverview": "Schedule -> BigQuery (HubSpot data) -> Gemini AI analysis -> Slack/Sheets",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "HubSpot data in BigQuery. Gemini for AI analysis. Slack + Sheets for output.",
+        "toolsRequired": ["HubSpot", "N8N", "Slack", "Google Sheets"],
+        "toolsAvailable": ["BigQuery", "Gemini", "Slack", "Google Sheets"],
+        "toolsMissing": [],
+        "dataNeeded": ["HubSpot campaign metrics", "Historical benchmarks"],
+        "specsAvailable": ["hubspot"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_hubspot_insights",
+        "department": "marketing",
+        "priority": "P2"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_015",
+      "submitter": "Eran Hayo",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_016",
+      "submitter": "Gal Givoli",
+      "projectName": "Case Study Engine",
+      "problemStatement": "Internal case study process is manual and takes too long.",
+      "solutionOverview": "Online form -> AI writes first draft -> content writer QA only",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Webhook for form input, Gemini for AI draft, Google Docs for output. All available.",
+        "toolsRequired": ["Webhook/Form", "AI", "Google Docs"],
+        "toolsAvailable": ["Webhook", "Gemini", "Google Docs"],
+        "toolsMissing": [],
+        "dataNeeded": ["Case study template", "Customer data"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_017",
+      "submitter": "Jo Cox",
+      "projectName": "Event Intelligence Engine (EIE)",
+      "problemStatement": "Field Marketing manually researches 100+ global events. Info fragmented.",
+      "solutionOverview": "AI-powered: discover events -> extract details -> standardize -> score -> compare",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Firecrawl for scraping, Gemini for analysis. But event discovery from scratch is complex.",
+        "toolsRequired": ["Gmail", "Google Docs", "Browser", "Google Drive", "N8N", "Slack"],
+        "toolsAvailable": ["Google Docs", "Google Drive", "Slack", "Firecrawl", "Gemini"],
+        "toolsMissing": [],
+        "dataNeeded": ["Event calendars 2024/2025", "ICP definitions"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Web scraping via Firecrawl"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_018",
+      "submitter": "Josh Genuth",
+      "projectName": "Automated Competitor Monitoring",
+      "problemStatement": "Comparison pages rely on manual monitoring. Risk of outdated claims.",
+      "solutionOverview": "Schedule -> scrape competitors -> detect changes -> AI summarize -> Slack report",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "UNLOCKED: Scrape-and-diff template uses Gemini for change detection instead of Code nodes. No Code nodes needed.",
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
+        "toolsAvailable": ["Firecrawl", "Google Sheets", "Gemini", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Competitor URLs (Google Sheet input)"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Firecrawl API via HTTP Request"]
+      },
+      "testCase": {
+        "name": "hack_scrape_and_diff",
+        "department": "marketing",
+        "priority": "T3-P1",
+        "templateWorkflowId": "hFJ9qOzGC77Y4WOD"
+      },
+      "testStatus": "template_ready"
+    },
+    {
+      "id": "hack_019",
+      "submitter": "Karin Levavi",
+      "projectName": "Moving the Cheese (MTC)",
+      "problemStatement": "No standardized process for MTC updates. 3-day SLA, manual content creation.",
+      "solutionOverview": "Sheets Trigger -> read Google Doc -> Gemini compliance-focused draft -> write back",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "All nodes available: Sheets Trigger, Google Docs, Gemini, Sheets, Slack.",
+        "toolsRequired": ["Google Drive", "HubSpot", "Google Sheets", "Google Docs", "N8N"],
+        "toolsAvailable": ["Google Sheets Trigger", "Google Docs", "Gemini", "Google Sheets", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Source Google Doc", "Sheet trigger config", "Legal tone guidelines"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_mtc_content",
+        "department": "marketing",
+        "priority": "P4"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_020",
+      "submitter": "Kate Cox",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_021",
+      "submitter": "Kayla Adams",
+      "projectName": "Dashboard-ify Geo Deep Dives",
+      "problemStatement": "Manual process to evaluate market conditions per geo. Data not consolidated.",
+      "solutionOverview": "Multi-stage: events list, SFDC->Sheets, funnel data from BQ, competitor monitoring",
+      "impactCategory": "Business",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Stage 2 (SFDC->Sheets) and Stage 3 (BQ->Sheets) buildable. Stage 1+4 need scraping.",
+        "toolsRequired": ["Google Sheets", "Google Slides", "Apify", "N8N", "Salesforce", "Looker Studio"],
+        "toolsAvailable": ["Google Sheets", "Salesforce", "BigQuery"],
+        "toolsMissing": ["Apify", "Looker Studio API", "Google Slides"],
+        "dataNeeded": ["Events list", "SFDC competitor data", "Funnel data"],
+        "specsAvailable": ["salesforce"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Apify API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_022",
+      "submitter": "Liat Shohet",
+      "projectName": "AI Marketing Brief",
+      "problemStatement": "Info gathering process failing. Forms bypassed, incomplete data.",
+      "solutionOverview": "Slack AI agent -> conversational requirements gathering -> Monday.com board population",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Monday.com node available. Slack available. Gemini for AI. Multi-turn Slack bot complex but doable.",
+        "toolsRequired": ["Monday.com", "N8N", "Slack", "Google Drive"],
+        "toolsAvailable": ["Monday.com", "Slack", "Google Drive", "Gemini"],
+        "toolsMissing": [],
+        "dataNeeded": ["Monday.com board structure", "Asset type requirements"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_023",
+      "submitter": "Lior Taubenblatt",
+      "projectName": "Influencer Performance Analysis",
+      "problemStatement": "Manually analyzing each influencer campaign monthly. Inconsistent.",
+      "solutionOverview": "Monthly trigger -> fetch engagement data -> AI analysis -> Slack/Email report",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "YouTube, Instagram, Partnerstack APIs all need HTTP Request. Complex multi-source.",
+        "toolsRequired": ["Browser", "YouTube", "Gmail", "Google Sheets", "Instagram", "Slack"],
+        "toolsAvailable": ["Google Sheets", "Slack", "Gemini"],
+        "toolsMissing": ["YouTube API", "Instagram API", "Partnerstack API"],
+        "dataNeeded": ["Influencer performance sheet", "BI conversion data", "Partnerstack data"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["YouTube/Instagram/Partnerstack APIs via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_024",
+      "submitter": "Michal Daskal",
+      "projectName": "Product NL Localization Automation",
+      "problemStatement": "Monthly newsletter requires manual localization into FR, DE, IT, ES.",
+      "solutionOverview": "Google Docs (English) -> Gemini translate -> HubSpot email modules -> Slack notification",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "Google Docs, Gemini/Translate, Slack all available. Core flow doesn't need Figma.",
+        "toolsRequired": ["Google Docs", "HubSpot", "Figma", "Google Drive"],
+        "toolsAvailable": ["Google Docs", "Gemini", "Google Translate (SA)", "Slack", "Google Drive"],
+        "toolsMissing": [],
+        "dataNeeded": ["English newsletter content", "Brand glossary", "HubSpot template"],
+        "specsAvailable": ["hubspot"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_localization",
+        "department": "marketing",
+        "priority": "P5"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_025",
+      "submitter": "Michelle Chiera",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_026",
+      "submitter": "Nechama Rausman",
+      "projectName": "Webinar Asset Creation",
+      "problemStatement": "Too much time creating templetized webinar assets.",
+      "solutionOverview": "Transcripts + research -> automate LP, emails, PPC ads -> push live -> presentation deck",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "rationale": "Overlaps with Roberto's. Google Slides not native. Rest (HubSpot, Docs, Drive, Sheets) available.",
+        "toolsRequired": ["N8N", "HubSpot", "Google Slides", "Google Docs", "Google Drive", "Google Sheets"],
+        "toolsAvailable": ["Google Docs", "Google Drive", "Google Sheets", "Gemini"],
+        "toolsMissing": ["Google Slides (native)"],
+        "dataNeeded": ["Webinar asset templates", "Presentation template", "Speaker info"],
+        "specsAvailable": ["hubspot"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Google Slides API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_027",
+      "submitter": "Noa Shenfeld",
+      "projectName": "AI Competitive Intelligence & Website Change Tracker",
+      "problemStatement": "Competitive analysis manual, inconsistent. No real-time view of competitor shifts.",
+      "solutionOverview": "Monitor competitor websites -> detect changes -> classify -> weekly digest with insights",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "UNLOCKED: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
+        "toolsAvailable": ["Firecrawl", "Gemini", "Google Sheets", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Competitor URLs (Google Sheet input)", "Categorization framework"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Firecrawl API via HTTP Request"]
+      },
+      "testCase": {
+        "name": "hack_scrape_and_diff",
+        "department": "marketing",
+        "priority": "T3-P2",
+        "templateWorkflowId": "hFJ9qOzGC77Y4WOD",
+        "note": "Uses same template as hack_018. Customize Gemini prompt for classification categories."
+      },
+      "testStatus": "template_ready"
+    },
+    {
+      "id": "hack_028",
+      "submitter": "Roei Zamir",
+      "projectName": "End to End Content Update",
+      "problemStatement": "Blog content updates time-consuming across ideation, production, review, publication.",
+      "solutionOverview": "Identify content needing updates -> update it -> publish on WordPress",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Search Console and WordPress both need HTTP Request. Gemini for content generation.",
+        "toolsRequired": ["N8N", "Search Console", "WordPress", "Google Sheets", "Google Docs"],
+        "toolsAvailable": ["Google Sheets", "Google Docs", "Gemini"],
+        "toolsMissing": ["Search Console (native)", "WordPress (native)"],
+        "dataNeeded": ["Search Console blog performance data"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Search Console + WordPress APIs via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_029",
+      "submitter": "Roei Zamir",
+      "projectName": "End to End New Content Production",
+      "problemStatement": "Creating new content needs lots of data and research x 5 languages.",
+      "solutionOverview": "Internal data (Modjo) + external (SEO) -> ideas/briefs -> generate -> publish",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Modjo spec available. But needs Semrush, Search Console, WordPress, Apify. Too many externals.",
+        "toolsRequired": ["N8N", "WordPress", "Search Console", "Semrush", "Modjo", "Google Docs", "Apify"],
+        "toolsAvailable": ["Modjo", "Google Docs", "Gemini"],
+        "toolsMissing": ["WordPress", "Search Console", "Semrush", "Apify"],
+        "dataNeeded": ["Search Console data", "Semrush rankings", "Modjo calls", "SERP data"],
+        "specsAvailable": ["csm"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Multiple APIs via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_030",
+      "submitter": "Samantha Burd",
+      "projectName": "Competitor Analysis (Events)",
+      "problemStatement": "No visibility into competitor event attendance.",
+      "solutionOverview": "Scrape for competitor event attendance -> excel comparing vs our attendance",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Firecrawl for scraping event sponsor pages. Unstructured discovery is complex.",
+        "toolsRequired": ["Browser", "Google Sheets"],
+        "toolsAvailable": ["Google Sheets", "Firecrawl"],
+        "toolsMissing": [],
+        "dataNeeded": ["Global events with sponsor lists"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Firecrawl for scraping"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_031",
+      "submitter": "Samuel Green",
+      "projectName": "Video Podcast Processor",
+      "problemStatement": "Need all supporting content for a video podcast.",
+      "solutionOverview": "Upload video -> subtitles, reel proposals, Spotify/YouTube descriptions",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Video processing requires specialized media APIs not available in n8n.",
+        "toolsRequired": ["Google Docs", "Google Drive", "N8N", "Slack", "Google Sheets"],
+        "toolsAvailable": ["Google Docs", "Google Drive", "Slack", "Google Sheets", "Gemini"],
+        "toolsMissing": ["Video transcription service"],
+        "dataNeeded": ["Video file", "Output templates"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Could use Whisper API via HTTP Request for transcription"]
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_032",
+      "submitter": "Shani Alon",
+      "projectName": "Automate Test Results to Roadmap Dashboard",
+      "problemStatement": "Manually inserting info to Monday and Mixpanel then integrating to tests excel.",
+      "solutionOverview": "One sheet summarizing all tests (Monday) + results (Mixpanel) with uplift data",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Monday.com available but Mixpanel and VWO have no native nodes or specs.",
+        "toolsRequired": ["Google Sheets", "Monday.com", "Mixpanel", "VWO"],
+        "toolsAvailable": ["Google Sheets", "Monday.com"],
+        "toolsMissing": ["Mixpanel", "VWO"],
+        "dataNeeded": ["Mixpanel test results"],
+        "specsAvailable": [],
+        "specsMissing": ["Mixpanel", "VWO"],
+        "httpRequestWorkarounds": ["Mixpanel API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_033",
+      "submitter": "Shani Alon",
+      "projectName": "Qualitative Data Dashboard",
+      "problemStatement": "Many qualitative sources with different perspectives.",
+      "solutionOverview": "Google Sheets incorporating qualitative data mapped to repetitive points",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Modjo available but Clarity and Lyssna have no nodes, APIs, or specs.",
+        "toolsRequired": ["Modjo", "Clarity", "Lyssna"],
+        "toolsAvailable": ["Modjo"],
+        "toolsMissing": ["Clarity", "Lyssna"],
+        "dataNeeded": ["Qualitative data from all three tools"],
+        "specsAvailable": ["csm"],
+        "specsMissing": ["Clarity", "Lyssna"],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_034",
+      "submitter": "Shay Ziv",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_035",
+      "submitter": "Sivan Bell",
+      "projectName": "AI Global Event Command Center",
+      "problemStatement": "100+ global events. Reporting reactive, attribution inconsistent.",
+      "solutionOverview": "AI layer: Salesforce + HubSpot -> Gemini analysis -> pipeline by region -> quarterly insights",
+      "impactCategory": "Revenue",
+      "buildability": {
+        "tier": 1,
+        "tierLabel": "Fully Buildable",
+        "rationale": "Salesforce + BigQuery (HubSpot) + Gemini + Sheets + Slack. All available. Most complex Tier 1.",
+        "toolsRequired": ["Google Sheets", "Gmail", "HubSpot", "Salesforce"],
+        "toolsAvailable": ["Salesforce", "BigQuery", "Gemini", "Google Sheets", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Salesforce event/campaign data", "HubSpot marketing metrics in BigQuery"],
+        "specsAvailable": ["salesforce", "hubspot"],
+        "specsMissing": [],
+        "httpRequestWorkarounds": []
+      },
+      "testCase": {
+        "name": "hack_event_command_center",
+        "department": "marketing",
+        "priority": "P6"
+      },
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_036",
+      "submitter": "Tomer Shabtay",
+      "projectName": null,
+      "problemStatement": null,
+      "solutionOverview": null,
+      "impactCategory": null,
+      "buildability": { "tier": null, "tierLabel": "No Submission" },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_037",
+      "submitter": "Tessa Eskin",
+      "projectName": "Reddit/Forum Scraping for Product Insights",
+      "problemStatement": "No visibility into how users describe Guesty outside of CS.",
+      "solutionOverview": "Scrape Reddit/forums -> organize by product/sentiment on spreadsheet",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "Firecrawl for scraping. Gemini for sentiment. Google Sheets for output.",
+        "toolsRequired": ["Browser", "Google Sheets", "Google Drive"],
+        "toolsAvailable": ["Firecrawl", "Google Sheets", "Google Drive", "Gemini"],
+        "toolsMissing": [],
+        "dataNeeded": ["Reddit/forum URLs"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Reddit API + Firecrawl"]
+      },
+      "testCase": null,
+      "testStatus": "not_started"
+    },
+    {
+      "id": "hack_038",
+      "submitter": "Yoni Sharon",
+      "projectName": "Competitor Ad Analysis",
+      "problemStatement": "No regular visibility into competitor ads and messaging.",
+      "solutionOverview": "Pull competitor ads + text + dates -> analyze strategy -> generate counter messaging",
+      "impactCategory": "Growth",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Needs YouTube, Facebook, Google Display, LinkedIn ad APIs + Apify. Too many externals.",
+        "toolsRequired": ["YouTube", "Facebook", "Google Display", "LinkedIn", "Apify"],
+        "toolsAvailable": ["Facebook Graph (limited)"],
+        "toolsMissing": ["YouTube Ads", "Google Display", "LinkedIn Ads", "Apify"],
+        "dataNeeded": ["Competitor ad data across platforms"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Apify via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_039",
+      "submitter": "Yoni Sharon",
+      "projectName": "Brand Infringement Tracker",
+      "problemStatement": "Competitors use Guesty brand in their ads.",
+      "solutionOverview": "Scrape Google SERP for sponsored ads not leading to Guesty -> takedown report",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Needs SERP scraping (Apify). No native node.",
+        "toolsRequired": ["Apify"],
+        "toolsAvailable": [],
+        "toolsMissing": ["Apify / SERP scraping"],
+        "dataNeeded": ["Google SERP results for brand queries"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Apify API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_040",
+      "submitter": "Anna Pancheshnikov",
+      "projectName": "Creative Performance Meta",
+      "problemStatement": "Hard to see best performing ads and analyze WoW performance.",
+      "solutionOverview": "Integrate Facebook Ads Manager -> Google Sheets weekly report",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": null,
+        "tierLabel": "Not Buildable",
+        "rationale": "Facebook Graph API credential exists but Meta Ads reporting requires complex API calls. No spec.",
+        "toolsRequired": ["Facebook"],
+        "toolsAvailable": ["Facebook Graph (limited)"],
+        "toolsMissing": [],
+        "dataNeeded": ["Facebook Ads Manager campaign data"],
+        "specsAvailable": [],
+        "specsMissing": ["Facebook Ads"],
+        "httpRequestWorkarounds": ["Facebook Marketing API via HTTP Request"]
+      },
+      "testCase": null,
+      "testStatus": "not_applicable"
+    },
+    {
+      "id": "hack_041",
+      "submitter": "Elodie Sitbon",
+      "projectName": "Competitor Release Monitoring",
+      "problemStatement": "Biweekly manual review of competitor release pages. AI summaries lack nuance.",
+      "solutionOverview": "AI agent monitors competitor releases, classifies by strategic importance",
+      "impactCategory": "Efficiency",
+      "buildability": {
+        "tier": 3,
+        "tierLabel": "Partially Buildable",
+        "rationale": "UNLOCKED: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
+        "tier": 2,
+        "tierLabel": "Mostly Buildable",
+        "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
+        "toolsAvailable": ["Firecrawl", "Gemini", "Google Sheets", "Slack"],
+        "toolsMissing": [],
+        "dataNeeded": ["Competitor release page URLs (Google Sheet input)"],
+        "specsAvailable": [],
+        "specsMissing": [],
+        "httpRequestWorkarounds": ["Firecrawl API via HTTP Request"]
+      },
+      "testCase": {
+        "name": "hack_scrape_and_diff",
+        "department": "marketing",
+        "priority": "T3-P3",
+        "templateWorkflowId": "hFJ9qOzGC77Y4WOD",
+        "note": "Uses same template as hack_018. Customize Gemini prompt for release classification by strategic importance."
+      },
+      "testStatus": "template_ready"
+    }
+  ]
+}

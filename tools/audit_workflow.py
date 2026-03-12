@@ -55,9 +55,11 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
         results["uuids"] = (True, f"{len(ids)} unique UUIDs")
 
     # --- 3. Credentials ---
+    all_cred_types_used = set()
     for node in nodes:
         creds = node.get("credentials", {})
         for ctype, cdata in creds.items():
+            all_cred_types_used.add(ctype)
             cid = cdata.get("id", "")
             cname = cdata.get("name", "")
             label = f"{node['name']} -> {ctype}"
@@ -69,8 +71,16 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
                     results[f"cred:{label}"] = (True, f"{cname} ({cid})")
                 else:
                     results[f"cred:{label}"] = (False, f"Expected {expected_creds[ctype]}, got {cid}")
+            elif expected_creds and cid not in expected_creds.values():
+                results[f"cred:{label}"] = (False, f"Unexpected credential type '{ctype}' with unknown ID {cid}")
             else:
                 results[f"cred:{label}"] = (True, f"{cname} ({cid})")
+
+    # Check for expected credential types that are missing entirely
+    if expected_creds:
+        for etype in expected_creds:
+            if etype not in all_cred_types_used:
+                results[f"cred_missing:{etype}"] = (False, f"Expected credential type '{etype}' not found in any node")
 
     # --- 4. BigQuery projectId ---
     for node in nodes:
@@ -119,7 +129,18 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
             else:
                 results[label] = (False, f"select={select}, channelId={cid}")
 
-    # --- 7. jira_ids precision ---
+    # --- 7. Future date detection ---
+    from datetime import datetime, timedelta
+    one_year_ahead = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+    all_text = raw  # scan entire workflow JSON for date literals
+    future_dates = re.findall(r"\b(20\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01]))\b", all_text)
+    bad_dates = [d for d in future_dates if d > one_year_ahead]
+    if bad_dates:
+        results["future_dates"] = (False, f"Dates >1yr in future: {list(set(bad_dates))}")
+    elif future_dates:
+        results["future_dates"] = (True, f"All dates within range")
+
+    # --- 8. jira_ids precision ---
     all_code = " ".join(
         n.get("parameters", {}).get("sqlQuery", "") + " " + n.get("parameters", {}).get("jsCode", "")
         for n in nodes

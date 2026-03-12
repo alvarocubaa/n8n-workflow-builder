@@ -1,0 +1,472 @@
+{
+  "name": "LinkedIn Content Repurposing",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Read Google Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "operation": "get",
+        "documentURL": "YOUR_GOOGLE_DOC_ID_OR_URL"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "3d594a5e-1b2f-4c8a-9e3d-6f7a8b9c0d1e",
+      "name": "Gemini - Thought Leadership",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        80
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a LinkedIn content expert. Based on the following article, write a thought-leadership hook post for LinkedIn.\n\nRequirements:\n- Under 200 words\n- Start with a bold, attention-grabbing hook sentence\n- Share a strong opinion or insight\n- End with a question to drive engagement\n- Include exactly 3 relevant hashtags at the end\n\nFormat your response EXACTLY as:\nPOST TEXT:\n[the post text here]\n\nHASHTAGS:\n[hashtag1] [hashtag2] [hashtag3]\n\nARTICLE:\n{{ $json.body }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 600,
+          "systemMessage": "You are a professional LinkedIn content strategist for Guesty, a property management platform for short-term rental operators."
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "a1b4c7d2-e5f8-4a3b-9c6d-2e1f0a3b4c5d",
+      "name": "Gemini - Data Driven",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a LinkedIn content expert. Based on the following article, write a data-driven insight post for LinkedIn.\n\nRequirements:\n- Lead with a compelling data-backed or insight-driven headline\n- Use bullet points (3-5 bullets) to present key data points or insights from the article\n- End with a clear takeaway or call to action\n- Include exactly 3 relevant hashtags at the end\n\nFormat your response EXACTLY as:\nPOST TEXT:\n[the post text here]\n\nHASHTAGS:\n[hashtag1] [hashtag2] [hashtag3]\n\nARTICLE:\n{{ $json.body }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 700,
+          "systemMessage": "You are a professional LinkedIn content strategist for Guesty, a property management platform for short-term rental operators."
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "b2c5d8e3-f6a9-4b4c-0d7e-3f2a1b4c5d6e",
+      "name": "Gemini - Storytelling",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        520
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a LinkedIn content expert. Based on the following article, write a storytelling post with a personal angle for LinkedIn.\n\nRequirements:\n- Open with a personal anecdote or relatable scenario inspired by the article's theme\n- Weave in the key message naturally through the story\n- Make it feel authentic and human, written in first person\n- End with a personal reflection or call to action\n- Include exactly 3 relevant hashtags at the end\n\nFormat your response EXACTLY as:\nPOST TEXT:\n[the post text here]\n\nHASHTAGS:\n[hashtag1] [hashtag2] [hashtag3]\n\nARTICLE:\n{{ $json.body }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 700,
+          "systemMessage": "You are a professional LinkedIn content strategist for Guesty, a property management platform for short-term rental operators."
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "c3d6e9f4-a7b0-4c5d-1e8f-4a3b2c5d6e7f",
+      "name": "Format Thought Leadership Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        740,
+        80
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-tl-1",
+              "name": "Variation Type",
+              "type": "string",
+              "value": "Thought Leadership Hook"
+            },
+            {
+              "id": "assign-tl-2",
+              "name": "Post Text",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim() }}"
+            },
+            {
+              "id": "assign-tl-3",
+              "name": "Hashtags",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[1].trim() : '' }}"
+            },
+            {
+              "id": "assign-tl-4",
+              "name": "Character Count",
+              "type": "number",
+              "value": "={{ ($json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim()).length }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d4e7f0a5-b8c1-4d6e-2f9a-5b4c3d6e7f8a",
+      "name": "Format Data Driven Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        740,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-dd-1",
+              "name": "Variation Type",
+              "type": "string",
+              "value": "Data-Driven Insight"
+            },
+            {
+              "id": "assign-dd-2",
+              "name": "Post Text",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim() }}"
+            },
+            {
+              "id": "assign-dd-3",
+              "name": "Hashtags",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[1].trim() : '' }}"
+            },
+            {
+              "id": "assign-dd-4",
+              "name": "Character Count",
+              "type": "number",
+              "value": "={{ ($json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim()).length }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e5f8a1b6-c9d2-4e7f-3a0b-6c5d4e7f8a9b",
+      "name": "Format Storytelling Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        740,
+        520
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-st-1",
+              "name": "Variation Type",
+              "type": "string",
+              "value": "Storytelling Personal Angle"
+            },
+            {
+              "id": "assign-st-2",
+              "name": "Post Text",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim() }}"
+            },
+            {
+              "id": "assign-st-3",
+              "name": "Hashtags",
+              "type": "string",
+              "value": "={{ $json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[1].trim() : '' }}"
+            },
+            {
+              "id": "assign-st-4",
+              "name": "Character Count",
+              "type": "number",
+              "value": "={{ ($json.text.includes('HASHTAGS:') ? $json.text.split('HASHTAGS:')[0].replace('POST TEXT:', '').trim() : $json.text.trim()).length }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f6a9b2c7-d0e3-4f8a-4b1c-7d6e5f8a9b0c",
+      "name": "Merge All 3 Rows",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 3
+      }
+    },
+    {
+      "id": "a7b0c3d8-e1f4-4a9b-5c2d-8e7f6a9b0c1d",
+      "name": "Write to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1240,
+        300
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "LinkedIn Drafts"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Variation Type": "={{ $json['Variation Type'] }}",
+            "Post Text": "={{ $json['Post Text'] }}",
+            "Hashtags": "={{ $json['Hashtags'] }}",
+            "Character Count": "={{ $json['Character Count'] }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "b8c1d4e9-f2a5-4b0c-6d3e-9f8a7b0c1d2e",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1480,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-content"
+        },
+        "text": ":pencil: *3 LinkedIn post drafts are ready for review!*\n\nGemini has generated 3 variations from your latest article:\n- Thought Leadership Hook (under 200 words)\n- Data-Driven Insight (bullet points)\n- Storytelling Personal Angle (first person)\n\nEach includes 3 relevant hashtags.\n\n:link: *Review them here:* https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID\n\nPlease review, edit, and approve before publishing. :rocket:"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Thought Leadership",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini - Data Driven",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini - Storytelling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Thought Leadership": {
+      "main": [
+        [
+          {
+            "node": "Format Thought Leadership Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Data Driven": {
+      "main": [
+        [
+          {
+            "node": "Format Data Driven Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Storytelling": {
+      "main": [
+        [
+          {
+            "node": "Format Storytelling Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Thought Leadership Row": {
+      "main": [
+        [
+          {
+            "node": "Merge All 3 Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data Driven Row": {
+      "main": [
+        [
+          {
+            "node": "Merge All 3 Rows",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format Storytelling Row": {
+      "main": [
+        [
+          {
+            "node": "Merge All 3 Rows",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge All 3 Rows": {
+      "main": [
+        [
+          {
+            "node": "Write to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

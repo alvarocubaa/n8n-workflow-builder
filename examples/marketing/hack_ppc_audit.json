@@ -1,0 +1,247 @@
+{
+  "nodes": [
+    {
+      "id": "a3f1c2d4-e5b6-4789-a012-b3c4d5e6f701",
+      "name": "Every Monday 7am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b7e2d3f5-a6c7-4890-b123-c4d5e6f70812",
+      "name": "Get Campaign Performance",
+      "type": "n8n-nodes-base.googleAds",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "resource": "campaign",
+        "operation": "getAll",
+        "managerCustomerId": "",
+        "clientCustomerId": "",
+        "additionalOptions": {
+          "dateRange": "LAST_7_DAYS",
+          "campaignStatus": "ENABLED"
+        }
+      },
+      "credentials": {
+        "googleAdsOAuth2Api": {
+          "id": "7zPWAntoXHKpq6l7",
+          "name": "Assaf's google ads api"
+        }
+      }
+    },
+    {
+      "id": "c8f3e4a6-b7d8-4901-c234-d5e6f7081923",
+      "name": "Calculate CTR and CPC",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "mode": "keepExisting",
+        "fields": {
+          "values": [
+            {
+              "name": "campaign_name",
+              "type": "stringValue",
+              "stringValue": "={{ $json.campaign?.name }}"
+            },
+            {
+              "name": "impressions",
+              "type": "numberValue",
+              "numberValue": "={{ $json.metrics?.impressions ?? 0 }}"
+            },
+            {
+              "name": "clicks",
+              "type": "numberValue",
+              "numberValue": "={{ $json.metrics?.interactions ?? 0 }}"
+            },
+            {
+              "name": "cost_usd",
+              "type": "numberValue",
+              "numberValue": "={{ ($json.metrics?.cost_micros ?? 0) / 1000000 }}"
+            },
+            {
+              "name": "conversions",
+              "type": "numberValue",
+              "numberValue": "={{ $json.metrics?.conversions ?? 0 }}"
+            },
+            {
+              "name": "ctr_pct",
+              "type": "numberValue",
+              "numberValue": "={{ $json.metrics?.impressions > 0 ? Math.round(($json.metrics.interactions / $json.metrics.impressions) * 10000) / 100 : 0 }}"
+            },
+            {
+              "name": "cpc_usd",
+              "type": "numberValue",
+              "numberValue": "={{ $json.metrics?.interactions > 0 ? Math.round((($json.metrics.cost_micros / 1000000) / $json.metrics.interactions) * 100) / 100 : 0 }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d9a4f5b7-c8e9-4012-d345-e6f708192034",
+      "name": "Flag Underperforming Campaigns",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-cpc",
+              "leftValue": "={{ $json.cpc_usd }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "cond-ctr",
+              "leftValue": "={{ $json.ctr_pct }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      }
+    },
+    {
+      "id": "e0b5a6c8-d9f0-4123-e456-f7081920345a",
+      "name": "Build Alert Flags",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "mode": "keepExisting",
+        "fields": {
+          "values": [
+            {
+              "name": "flag_reasons",
+              "type": "stringValue",
+              "stringValue": "={{ ($json.cpc_usd > 5 ? 'High CPC ($' + $json.cpc_usd + ')' : '') + ($json.cpc_usd > 5 && $json.ctr_pct < 1 ? ' | ' : '') + ($json.ctr_pct < 1 ? 'Low CTR (' + $json.ctr_pct + '%)' : '') }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f1c6b7d9-e0a1-4234-f567-081920345b6c",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-ppc-alerts"
+        },
+        "text": "={{ ':rotating_light: *PPC Alert* | ' + $json.campaign_name + '\\n' + ':money_with_wings: *Spend:* $' + $json.cost_usd + '  |  :bar_chart: *CTR:* ' + $json.ctr_pct + '%  |  :dollar: *CPC:* $' + $json.cpc_usd + '\\n' + ':triangular_flag_on_post: *Flags:* ' + $json.flag_reasons }}"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 7am UTC": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign Performance": {
+      "main": [
+        [
+          {
+            "node": "Calculate CTR and CPC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate CTR and CPC": {
+      "main": [
+        [
+          {
+            "node": "Flag Underperforming Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag Underperforming Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Flags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert Flags": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

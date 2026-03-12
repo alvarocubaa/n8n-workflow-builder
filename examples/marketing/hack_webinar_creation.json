@@ -1,0 +1,602 @@
+{
+  "name": "Webinar Asset Creation",
+  "nodes": [
+    {
+      "id": "a1b2c3d4-1111-4abc-8def-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "b2c3d4e5-2222-4abc-8def-000000000002",
+      "name": "Read Webinar Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        460,
+        400
+      ],
+      "parameters": {
+        "resource": "document",
+        "operation": "get",
+        "documentURL": "YOUR_GOOGLE_DOC_ID_HERE"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "c3d4e5f6-3333-4abc-8def-000000000003",
+      "name": "Gemini - Extract Info",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        400
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a webinar content analyst. Analyze the following webinar transcript or planning document and extract the following information. Return your response as valid JSON only, with no markdown formatting or code blocks.\n\nReturn this exact JSON structure:\n{\n  \"webinar_title\": \"the webinar title\",\n  \"key_topics\": [\"topic 1\", \"topic 2\", \"topic 3\"],\n  \"target_audience\": \"description of the target audience\",\n  \"takeaways\": [\"takeaway 1\", \"takeaway 2\", \"takeaway 3\", \"takeaway 4\", \"takeaway 5\"]\n}\n\nDocument content:\n{{ $json.body.content }}",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "maxOutputTokens": 1000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "d4e5f6a7-4444-4abc-8def-000000000004",
+      "name": "Gemini - Generate Assets",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        400
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are a B2B SaaS marketing copywriter. Using the webinar information below, generate marketing assets. Return your response as valid JSON only, with no markdown formatting or code blocks.\n\nWebinar Title: {{ $json.text.webinar_title }}\nKey Topics: {{ $json.text.key_topics.join(', ') }}\nTarget Audience: {{ $json.text.target_audience }}\nKey Takeaways: {{ $json.text.takeaways.join(' | ') }}\n\nReturn this exact JSON structure:\n{\n  \"landing_page_description\": \"exactly 100 words describing the webinar for a landing page\",\n  \"email_subject\": \"a compelling promotional email subject line\",\n  \"email_body\": \"a 150-word promotional email body\",\n  \"social_post_1\": \"Twitter/X post under 280 characters\",\n  \"social_post_2\": \"Twitter/X post under 280 characters with a different angle\",\n  \"social_post_3\": \"Twitter/X post under 280 characters focused on a key takeaway\"\n}",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "jsonOutput": true,
+        "options": {
+          "maxOutputTokens": 2000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "e5f6a7b8-5555-4abc-8def-000000000005",
+      "name": "Prepare Sheet Rows",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "webinar_title",
+              "value": "={{ $node[\"Gemini - Extract Info\"].json.text.webinar_title }}",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "landing_page_description",
+              "value": "={{ $json.text.landing_page_description }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "email_subject",
+              "value": "={{ $json.text.email_subject }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "email_body",
+              "value": "={{ $json.text.email_body }}",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "social_post_1",
+              "value": "={{ $json.text.social_post_1 }}",
+              "type": "string"
+            },
+            {
+              "id": "f6",
+              "name": "social_post_2",
+              "value": "={{ $json.text.social_post_2 }}",
+              "type": "string"
+            },
+            {
+              "id": "f7",
+              "name": "social_post_3",
+              "value": "={{ $json.text.social_post_3 }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f6a7b8c9-6666-4abc-8def-000000000006",
+      "name": "Write Landing Page",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        160
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Landing Page Description",
+            "Content": "={{ $json.landing_page_description }}",
+            "Character Count": "={{ $json.landing_page_description.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "a7b8c9d0-7777-4abc-8def-000000000007",
+      "name": "Write Email Subject",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Email Subject Line",
+            "Content": "={{ $node[\"Prepare Sheet Rows\"].json.email_subject }}",
+            "Character Count": "={{ $node[\"Prepare Sheet Rows\"].json.email_subject.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "b8c9d0e1-8888-4abc-8def-000000000008",
+      "name": "Write Email Body",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        440
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Promotional Email Body",
+            "Content": "={{ $node[\"Prepare Sheet Rows\"].json.email_body }}",
+            "Character Count": "={{ $node[\"Prepare Sheet Rows\"].json.email_body.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "c9d0e1f2-9999-4abc-8def-000000000009",
+      "name": "Write Social Post 1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        580
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Social Post 1",
+            "Content": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_1 }}",
+            "Character Count": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_1.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "d0e1f2a3-aaaa-4abc-8def-00000000000a",
+      "name": "Write Social Post 2",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        720
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Social Post 2",
+            "Content": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_2 }}",
+            "Character Count": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_2.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "e1f2a3b4-bbbb-4abc-8def-00000000000b",
+      "name": "Write Social Post 3",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1340,
+        860
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Asset Type": "Social Post 3",
+            "Content": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_3 }}",
+            "Character Count": "={{ $node[\"Prepare Sheet Rows\"].json.social_post_3.length }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "f2a3b4c5-cccc-4abc-8def-00000000000c",
+      "name": "Create Assets Google Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        510
+      ],
+      "parameters": {
+        "resource": "document",
+        "operation": "create",
+        "driveId": "myDrive",
+        "folderId": "root",
+        "title": "=[Webinar Assets] {{ $node[\"Prepare Sheet Rows\"].json.webinar_title }}"
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "a3b4c5d6-dddd-4abc-8def-00000000000d",
+      "name": "Update Doc with Assets",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        510
+      ],
+      "parameters": {
+        "resource": "document",
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "=WEBINAR ASSETS: {{ $node[\"Prepare Sheet Rows\"].json.webinar_title }}\n\n--- LANDING PAGE DESCRIPTION ---\n{{ $node[\"Prepare Sheet Rows\"].json.landing_page_description }}\n\n--- EMAIL SUBJECT LINE ---\n{{ $node[\"Prepare Sheet Rows\"].json.email_subject }}\n\n--- PROMOTIONAL EMAIL BODY ---\n{{ $node[\"Prepare Sheet Rows\"].json.email_body }}\n\n--- SOCIAL MEDIA POSTS ---\n\nPost 1:\n{{ $node[\"Prepare Sheet Rows\"].json.social_post_1 }}\n\nPost 2:\n{{ $node[\"Prepare Sheet Rows\"].json.social_post_2 }}\n\nPost 3:\n{{ $node[\"Prepare Sheet Rows\"].json.social_post_3 }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "sgzXeonPZK1apIGE",
+          "name": "Google Docs account 11"
+        }
+      }
+    },
+    {
+      "id": "b4c5d6e7-eeee-4abc-8def-00000000000e",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2000,
+        510
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-events"
+        },
+        "text": "=:rocket: *New Webinar Assets Created!*\n\n*Webinar:* {{ $node[\"Prepare Sheet Rows\"].json.webinar_title }}\n\n:bar_chart: *Google Sheet (all assets):*\nhttps://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID_HERE\n\n:page_facing_up: *Assets Google Doc:*\nhttps://docs.google.com/document/d/{{ $node[\"Create Assets Google Doc\"].json.id }}\n\nAll marketing assets are ready for review!"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Webinar Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Webinar Doc": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Extract Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Extract Info": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Generate Assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Generate Assets": {
+      "main": [
+        [
+          {
+            "node": "Prepare Sheet Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Sheet Rows": {
+      "main": [
+        [
+          {
+            "node": "Write Landing Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Email Subject",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Email Body",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Social Post 1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Social Post 2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write Social Post 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Social Post 3": {
+      "main": [
+        [
+          {
+            "node": "Create Assets Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Assets Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Update Doc with Assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Doc with Assets": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

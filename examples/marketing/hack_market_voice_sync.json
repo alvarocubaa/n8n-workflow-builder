@@ -1,0 +1,363 @@
+{
+  "name": "Weekly Market Intelligence Brief",
+  "nodes": [
+    {
+      "id": "a1f3c2e4-7b8d-4e9f-b0c1-2d3e4f5a6b7c",
+      "name": "Every Monday 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2e4d6f8-9a0b-4c1d-e2f3-4a5b6c7d8e9f",
+      "name": "Fetch RSS Feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        460,
+        180
+      ],
+      "parameters": {
+        "url": "https://example.com/industry-news/feed"
+      }
+    },
+    {
+      "id": "c3f5e7a9-0b1c-4d2e-f3a4-5b6c7d8e9f0a",
+      "name": "Limit to 10 Articles",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        680,
+        180
+      ],
+      "parameters": {
+        "maxItems": 10
+      }
+    },
+    {
+      "id": "d4a6f8b0-1c2d-4e3f-a4b5-6c7d8e9f0a1b",
+      "name": "Aggregate RSS Headlines",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        900,
+        180
+      ],
+      "parameters": {
+        "aggregate": "aggregateIndividualFields",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "title",
+              "renameField": true,
+              "outputFieldName": "headlines"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e5b7a9c1-2d3e-4f4a-b5c6-7d8e9f0a1b2c",
+      "name": "Scrape Competitor Site",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        460,
+        440
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "https://competitor.example.com"
+            },
+            {
+              "name": "formats",
+              "value": "={{ [\"markdown\"] }}"
+            }
+          ]
+        },
+        "onError": "continueRegularOutput",
+        "retryOnFail": true,
+        "maxTries": 2
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngaBlIhFMFTZFajQ",
+          "name": "firecrawl"
+        }
+      }
+    },
+    {
+      "id": "f6c8b0d2-3e4f-4a5b-c6d7-8e9f0a1b2c3d",
+      "name": "Merge RSS and Competitor Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition"
+      }
+    },
+    {
+      "id": "a7d9c1e3-4f5a-4b6c-d7e8-9f0a1b2c3d4e",
+      "name": "Gemini Market Brief",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=You are a senior marketing analyst. Analyze the following data and produce a concise 5-bullet market intelligence brief.\n\nINDUSTRY NEWS HEADLINES (from RSS feed this week):\n- {{ $json.headlines.join('\\n- ') }}\n\nCOMPETITOR HOMEPAGE CONTENT:\n{{ $json.data.markdown ? $json.data.markdown.slice(0, 3000) : 'No competitor content available.' }}\n\nInstructions:\n- Identify 5 key market trends\n- For each trend, note whether it OVERLAPS (both sources show it) or DIVERGES (only one source shows it)\n- Keep each bullet to 1-2 sentences\n- Format as: [OVERLAP] or [DIVERGE] followed by the trend description\n- Be specific and actionable for a marketing team"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 1024,
+          "temperature": 0.7
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "b8e0d2f4-5a6b-4c7d-e8f9-0a1b2c3d4e5f",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1560,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-intelligence"
+        },
+        "text": "=*:bar_chart: Weekly Market Intelligence Brief*\n_Week of {{ $now.toFormat('MMMM d, yyyy') }}_\n\n{{ $json.text }}\n\n_Sources: Industry RSS + Competitor homepage ({{ $now.toFormat('EEE, MMM d') }})_"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    },
+    {
+      "id": "c9f1e3a5-6b7c-4d8e-f9a0-1b2c3d4e5f6a",
+      "name": "Set Sheet Row Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        440
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "name": "date",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "name": "rss_headlines",
+              "value": "={{ $('Aggregate RSS Headlines').item.json.headlines.join(' | ') }}",
+              "type": "string"
+            },
+            {
+              "name": "competitor_extract",
+              "value": "={{ $('Scrape Competitor Site').item.json.data && $('Scrape Competitor Site').item.json.data.markdown ? $('Scrape Competitor Site').item.json.data.markdown.slice(0, 2000) : 'Scrape unavailable' }}",
+              "type": "string"
+            },
+            {
+              "name": "ai_brief",
+              "value": "={{ $('Gemini Market Brief').item.json.text }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d0a2f4b6-7c8d-4e9f-a0b1-2c3d4e5f6a7b",
+      "name": "Write to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1780,
+        440
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Market Intelligence"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $json.date }}",
+            "rss_headlines": "={{ $json.rss_headlines }}",
+            "competitor_extract": "={{ $json.competitor_extract }}",
+            "ai_brief": "={{ $json.ai_brief }}"
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch RSS Feed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Scrape Competitor Site",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch RSS Feed": {
+      "main": [
+        [
+          {
+            "node": "Limit to 10 Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit to 10 Articles": {
+      "main": [
+        [
+          {
+            "node": "Aggregate RSS Headlines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate RSS Headlines": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS and Competitor Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Competitor Site": {
+      "main": [
+        [
+          {
+            "node": "Merge RSS and Competitor Data",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge RSS and Competitor Data": {
+      "main": [
+        [
+          {
+            "node": "Gemini Market Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Market Brief": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set Sheet Row Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Sheet Row Data": {
+      "main": [
+        [
+          {
+            "node": "Write to Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,388 @@
+{
+  "nodes": [
+    {
+      "id": "a1f3c2e4-7b8d-4e9f-b2a1-3c5d7e9f1a2b",
+      "name": "Every Monday 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2e4d6f8-9a1c-4b3e-c5d7-e9f1a3b5c7d9",
+      "name": "SF: Get Conference Campaigns",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "SELECT Id, Name, Type, StartDate, EndDate, Status, Description FROM Campaign WHERE Type = 'Conference' AND StartDate >= TODAY AND StartDate <= NEXT_N_DAYS:30 ORDER BY StartDate ASC LIMIT 50"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "c3f5e7a9-1b2d-4c4f-d6e8-f0a2b4c6d8e0",
+      "name": "Aggregate SF Campaigns",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "campaigns",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "d4a6b8c0-2c3e-4d5a-e7f9-a1b3c5d7e9f1",
+      "name": "BQ: HubSpot Email Metrics",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "projectId": {
+          "mode": "id",
+          "value": "guesty-data"
+        },
+        "sqlQuery": "SELECT campaignName, COUNT(*) AS total_events, COUNTIF(event_type = 'OPEN') AS opens, COUNTIF(event_type = 'CLICK') AS clicks, COUNTIF(event_type = 'DELIVERED') AS delivered, COUNTIF(event_type = 'BOUNCE') AS bounces, SAFE_DIVIDE(COUNTIF(event_type = 'OPEN'), COUNTIF(event_type = 'DELIVERED')) AS open_rate, SAFE_DIVIDE(COUNTIF(event_type = 'CLICK'), COUNTIF(event_type = 'OPEN')) AS click_to_open_rate FROM `guesty-data.marketing_data.hubspot_emails_events` WHERE event_created_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY) GROUP BY campaignName ORDER BY total_events DESC"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "e5b7c9d1-3d4f-4e6b-f8a0-b2c4d6e8f0a2",
+      "name": "Aggregate BQ Email Metrics",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "emailMetrics",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "f6c8d0e2-4e5a-4f7c-a9b1-c3d5e7f9a1b3",
+      "name": "Build Gemini Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa11bb22-cc33-4444-dd55-ee6677889900",
+              "name": "prompt",
+              "type": "string",
+              "value": "={{ 'You are a marketing strategist at Guesty. Today is Monday. Analyze the following data and produce a concise strategic summary (max 400 words) for the marketing team.\\n\\nUPCOMING CONFERENCE CAMPAIGNS (next 30 days from Salesforce):\\n' + $json.campaigns.map(function(c){ return '- ' + c.Name + ' | Start: ' + c.StartDate + ' | Status: ' + c.Status; }).join('\\n') + '\\n\\nHUBSPOT EMAIL ENGAGEMENT METRICS (last 90 days):\\n' + $json.emailMetrics.map(function(e){ return '- ' + e.campaignName + ' | Delivered: ' + e.delivered + ' | Opens: ' + e.opens + ' | Clicks: ' + e.clicks + ' | Open Rate: ' + (e.open_rate * 100).toFixed(1) + '% | CTOR: ' + (e.click_to_open_rate * 100).toFixed(1) + '%'; }).join('\\n') + '\\n\\nYour summary should:\\n1. Highlight which upcoming conferences have strong email engagement signals\\n2. Identify any gaps -- conferences with no matching email activity\\n3. Recommend 2-3 specific marketing actions for the week\\n4. Flag any open rate or click-to-open rate concerns\\nKeep the tone concise and action-oriented.' }}"
+            },
+            {
+              "id": "bb22cc33-dd44-5555-ee66-ff7788990011",
+              "name": "conferenceCount",
+              "type": "number",
+              "value": "={{ $json.campaigns.length }}"
+            },
+            {
+              "id": "cc33dd44-ee55-6666-ff77-aa8899001122",
+              "name": "emailCampaignCount",
+              "type": "number",
+              "value": "={{ $json.emailMetrics.length }}"
+            },
+            {
+              "id": "dd44ee55-ff66-7777-aa88-bb9900112233",
+              "name": "runDate",
+              "type": "string",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "id": "ee55ff66-aa77-8888-bb99-cc0011223344",
+              "name": "topCampaignByOpens",
+              "type": "string",
+              "value": "={{ $json.emailMetrics.length > 0 ? $json.emailMetrics.reduce(function(a,b){ return a.opens > b.opens ? a : b; }).campaignName : 'N/A' }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a7d9e1f3-5f6a-4a8d-b0c2-d4e6f8a0b2c4",
+      "name": "Gemini: Generate Summary",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        300
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "mode": "id",
+          "value": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.prompt }}",
+              "role": "user"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxOutputTokens": 1024,
+          "temperature": 0.4
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "b8e0f2a4-6a7b-4b9e-c1d3-e5f7a9b1c3d5",
+      "name": "Prepare Final Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1780,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f6a7b8c9-d0e1-2345-fab0-456789012345",
+              "name": "runDate",
+              "type": "string",
+              "value": "={{ $('Build Gemini Prompt').item.json.runDate }}"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-3456-abc1-567890123456",
+              "name": "conferenceCount",
+              "type": "number",
+              "value": "={{ $('Build Gemini Prompt').item.json.conferenceCount }}"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4567-bcd2-678901234567",
+              "name": "emailCampaignCount",
+              "type": "number",
+              "value": "={{ $('Build Gemini Prompt').item.json.emailCampaignCount }}"
+            },
+            {
+              "id": "c9d0e1f2-a3b4-5678-cde3-789012345678",
+              "name": "aiSummary",
+              "type": "string",
+              "value": "={{ $json.content }}"
+            },
+            {
+              "id": "d0e1f2a3-b4c5-6789-def4-890123456789",
+              "name": "topCampaignByOpens",
+              "type": "string",
+              "value": "={{ $('Build Gemini Prompt').item.json.topCampaignByOpens }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c9f1a3b5-7b8c-4c0f-d2e4-f6a8b0c2d4e6",
+      "name": "Write to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2000,
+        180
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_SHEET_ID_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Weekly Reports"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Date": "={{ $json.runDate }}",
+            "Conferences Found": "={{ $json.conferenceCount }}",
+            "Email Campaigns Analyzed": "={{ $json.emailCampaignCount }}",
+            "Top Campaign by Opens": "={{ $json.topCampaignByOpens }}",
+            "AI Summary": "={{ $json.aiSummary }}"
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "d0a2b4c6-8c9d-4d1a-e3f5-a7b9c1d3e5f7",
+      "name": "Slack: Post to #marketing-events",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2000,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-events"
+        },
+        "text": "=:bar_chart: *Weekly Marketing Events Intelligence Report*\n:calendar: *Week of:* {{ $('Prepare Final Data').item.json.runDate }}\n:office: *Upcoming Conferences (next 30 days):* {{ $('Prepare Final Data').item.json.conferenceCount }} found\n:email: *Email Campaigns Analyzed:* {{ $('Prepare Final Data').item.json.emailCampaignCount }}\n\n{{ $('Prepare Final Data').item.json.aiSummary }}\n\n:link: Full data logged to Google Sheets."
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "SF: Get Conference Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SF: Get Conference Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Aggregate SF Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate SF Campaigns": {
+      "main": [
+        [
+          {
+            "node": "BQ: HubSpot Email Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ: HubSpot Email Metrics": {
+      "main": [
+        [
+          {
+            "node": "Aggregate BQ Email Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate BQ Email Metrics": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gemini Prompt": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Data": {
+      "main": [
+        [
+          {
+            "node": "Write to Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack: Post to #marketing-events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
