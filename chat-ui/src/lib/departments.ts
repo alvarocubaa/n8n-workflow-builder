@@ -390,7 +390,8 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
   );
 
   // Add programmatic JSON examples for commonly confused credential types
-  const examples = generateCredentialExamples(allCreds);
+  // Dept-specific credentials first so examples prefer them over shared defaults
+  const examples = generateCredentialExamples([...dept.credentials, ...SHARED_CREDENTIALS]);
   if (examples) {
     sections.push(examples);
   }
