@@ -3,7 +3,7 @@
     "hackathon": "Marketing AI Hackathon 9.3",
     "created": "2026-03-11",
     "totalSubmissions": 34,
-    "tiers": { "tier1": 6, "tier2": 9, "tier3": 5, "notBuildable": 6, "empty": 8, "note": "3 projects (hack_018, hack_027, hack_041) promoted from tier3 to tier2 via scrape-and-diff template (2026-03-12)" }
+    "tiers": { "tier1": 6, "tier2": 12, "tier3": 2, "notBuildable": 6, "empty": 8, "note": "3 projects (hack_018, hack_027, hack_041) promoted from tier3 to tier2 via scrape-and-diff template (2026-03-12). All 18 buildable projects have test cases. 12/12 Marketing tests passed." }
   },
   "projects": [
     {
@@ -47,8 +47,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": ["Semrush API via HTTP Request"]
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_seo_reporting",
+        "department": "marketing",
+        "priority": "T2-P4"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_003",
@@ -91,8 +95,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": ["LinkedIn API via HTTP Request"]
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_linkedin_content",
+        "department": "marketing",
+        "priority": "T2-P5"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_005",
@@ -139,8 +147,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": ["WordPress REST API via HTTP Request"]
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_webinar_creation",
+        "department": "marketing",
+        "priority": "T2-P6"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_007",
@@ -216,8 +228,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": ["Competitor pages via Firecrawl"]
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_market_voice_sync",
+        "department": "marketing",
+        "priority": "T2-P1"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_011",
@@ -334,8 +350,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": []
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_case_study_engine",
+        "department": "marketing",
+        "priority": "T2-P2"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_017",
@@ -367,11 +387,9 @@
       "solutionOverview": "Schedule -> scrape competitors -> detect changes -> AI summarize -> Slack report",
       "impactCategory": "Efficiency",
       "buildability": {
-        "tier": 3,
-        "tierLabel": "Partially Buildable",
-        "rationale": "UNLOCKED: Scrape-and-diff template uses Gemini for change detection instead of Code nodes. No Code nodes needed.",
         "tier": 2,
         "tierLabel": "Mostly Buildable",
+        "rationale": "Promoted from Tier 3: Scrape-and-diff template uses Gemini for change detection instead of Code nodes.",
         "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
         "toolsAvailable": ["Firecrawl", "Google Sheets", "Gemini", "Slack"],
         "toolsMissing": [],
@@ -466,8 +484,12 @@
         "specsMissing": [],
         "httpRequestWorkarounds": []
       },
-      "testCase": null,
-      "testStatus": "not_started"
+      "testCase": {
+        "name": "hack_ai_marketing_brief",
+        "department": "marketing",
+        "priority": "T2-P3"
+      },
+      "testStatus": "passed"
     },
     {
       "id": "hack_023",
@@ -558,11 +580,9 @@
       "solutionOverview": "Monitor competitor websites -> detect changes -> classify -> weekly digest with insights",
       "impactCategory": "Growth",
       "buildability": {
-        "tier": 3,
-        "tierLabel": "Partially Buildable",
-        "rationale": "UNLOCKED: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
         "tier": 2,
         "tierLabel": "Mostly Buildable",
+        "rationale": "Promoted from Tier 3: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
         "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
         "toolsAvailable": ["Firecrawl", "Gemini", "Google Sheets", "Slack"],
         "toolsMissing": [],
@@ -856,11 +876,9 @@
       "solutionOverview": "AI agent monitors competitor releases, classifies by strategic importance",
       "impactCategory": "Efficiency",
       "buildability": {
-        "tier": 3,
-        "tierLabel": "Partially Buildable",
-        "rationale": "UNLOCKED: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
         "tier": 2,
         "tierLabel": "Mostly Buildable",
+        "rationale": "Promoted from Tier 3: Scrape-and-diff template provides state management via Google Sheets + Gemini comparison.",
         "toolsRequired": ["N8N", "Firecrawl", "Google Sheets", "Gemini", "Slack"],
         "toolsAvailable": ["Firecrawl", "Gemini", "Google Sheets", "Slack"],
         "toolsMissing": [],
