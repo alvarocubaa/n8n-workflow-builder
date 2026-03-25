@@ -1,9 +1,20 @@
+// ─── Assistant modes ─────────────────────────────────────────────────────────
+
+export type AssistantMode = 'builder' | 'data';
+
 // ─── Event types streamed to the client ──────────────────────────────────────
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+}
 
 export type ChatEvent =
   | { type: 'tool_call'; name: string; args: Record<string, unknown> }
   | { type: 'text_chunk'; text: string }
-  | { type: 'done' }
+  | { type: 'done'; usage?: TokenUsage; truncated?: boolean; toolSummary?: string }
   | { type: 'error'; message: string };
 
 // ─── Analytics types ────────────────────────────────────────────────────────
@@ -20,6 +31,12 @@ export interface AnalyticsEvent {
   skillsLoaded: string[];     // get_n8n_skill calls
   specsLoaded: string[];      // get_company_spec calls
   seeded?: boolean;           // true for historically seeded records
+  inputTokens?: number;       // total input tokens (incl. cache)
+  outputTokens?: number;      // total output tokens
+  cacheReadTokens?: number;   // tokens read from prompt cache
+  cacheWriteTokens?: number;  // tokens written to prompt cache
+  truncated?: boolean;        // true if any API call hit max_tokens
+  mode?: AssistantMode;       // 'builder' | 'data'
   createdAt: string;          // ISO 8601
 }
 

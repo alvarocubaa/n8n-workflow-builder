@@ -1,0 +1,38 @@
+- name: harvested_cx_004
+  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] HQ Billing - Get Manual Billing Sheet"
+  department: cx
+  prompt: >
+    PRD — HQ Billing Automation (Updated)
+    Overview
+    A manually triggered n8n automation that processes HQ billing accounts, fetches Zuora invoices, downloads relevant files, and drafts emails with the correct attachments based on each account's billing model.
+    
+    Trigger
+    Manual 
+    Source sheet: Google Sheet (HQ Billing — tab: N8N)
+    Account Types & Required Deliverables
+    Billing Model	Invoice PDF	Attachment CSV	Manual Billing GSheet
+    HQ pays for all	✅	✅	✅
+    Hybrid	✅	✅	✅
+    Subaccount	✅	❌	❌
+    Flow
+    Step 1 — Fetch A...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - httpRequest
+  expected_creds:
+    googleSheetsOAuth2Api: 7ORQ8IRh8B5Gh30x
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: Kch8a78DXx4shvXEdp8z
+    source_user: roni.shif@guesty.com
+    deployed: true
+    deployed_workflow_id: RVcqVk7MPLWuC50T
+    workflow_name: "[AI by roni.shif] HQ Billing - Get Manual Billing Sheet"
+    node_count: 1
+    complexity_score: 4
+    harvested_at: 2026-03-20T12:38:09.957Z
+    confidence: medium
+    workflow_json_file: harvested_cx_004_workflow.json

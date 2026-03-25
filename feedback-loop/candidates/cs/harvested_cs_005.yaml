@@ -1,0 +1,43 @@
+- name: harvested_cs_005
+  description: "Harvested from roni.shif@guesty.com - [Attached file: Weekly HQ Ticket Reporting - @Ronishif co..."
+  department: cs
+  prompt: >
+    [Attached file: Weekly HQ Ticket Reporting - @Ronishif copy (4).json]
+    <file_content>
+    {
+      "name": "Weekly HQ Ticket Reporting - @Ronishif copy",
+      "nodes": [
+        {
+          "parameters": {
+            "rule": {
+              "interval": [
+                {
+                  "field": "cronExpression",
+                  "expression": "0 9 * * 1"
+                }
+              ]
+            }
+          },
+          "id": "f38065f7-8833-4b92-b5a4-8346743fb8cb",
+          "name": "Every Monday at 9AM",
+          "type": "n8n-nodes-base.scheduleTri...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - @n8n/n8n-nodes-langchain.googleGemini
+  expected_creds:
+    googlePalmApi: FSUdg9cOOhjJ5bfh
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: ya8DVdyZmmhPii1ZcyD4
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "[Attached file: Weekly HQ Ticket Reporting - @Ronishif co..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.958Z
+    confidence: medium
+    workflow_json_file: harvested_cs_005_workflow.json

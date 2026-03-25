@@ -42,3 +42,6 @@ __pycache__/
 *.log
 logs/
 docker-compose.override.yml
+
+# Old output dir (replaced by feedback-loop/)
+output/

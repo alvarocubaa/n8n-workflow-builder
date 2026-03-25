@@ -1,0 +1,18 @@
+{
+  "harvested_at": "2026-03-20T12:38:09.972Z",
+  "total_candidates": 13,
+  "workflow_jsons_written": 13,
+  "by_department": {
+    "marketing": 0,
+    "cs": 5,
+    "cx": 7,
+    "ob": 0,
+    "payments": 1,
+    "finance": 0
+  },
+  "by_confidence": {
+    "high": 3,
+    "medium": 10,
+    "low": 0
+  }
+}

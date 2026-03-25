@@ -1,0 +1,47 @@
+- name: harvested_cx_005
+  description: "Harvested from roni.shif@guesty.com - the following is an automation in production 
+
+{
+  \"nodes..."
+  department: cx
+  prompt: >
+    the following is an automation in production 
+    
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "documentId": {
+              "__rl": true,
+              "value": "1uufa0K4rpTjsjK-YsJ4CDZ3rcR8gMBsv-lhcGMrKzKk",
+              "mode": "id"
+            },
+            "sheetName": {
+              "__rl": true,
+              "value": 1673902714,
+              "mode": "list",
+              "cachedResultName": "N8N",
+              "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uufa0K4rpTjsjK-YsJ4CDZ3rcR8gMBsv-lhcGMrKzKk/edi...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - httpRequest
+  expected_creds:
+    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: O1QJuZknzpVWCKXhzKDo
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "the following is an automation in production 
+
+{
+  \"nodes..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.957Z
+    confidence: medium
+    workflow_json_file: harvested_cx_005_workflow.json

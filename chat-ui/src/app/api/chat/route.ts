@@ -1,5 +1,5 @@
 import { getUserFromHeaders } from '@/lib/auth';
-import { streamWorkflowChat } from '@/lib/claude';
+import { streamWorkflowChat, manageContext } from '@/lib/claude';
 import { getRawMcpTools, type RawMcpTool } from '@/lib/mcp-bridge';
 import {
   createConversation,
@@ -8,7 +8,7 @@ import {
   logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
-import type { AnalyticsEvent } from '@/lib/types';
+import type { AnalyticsEvent, AssistantMode } from '@/lib/types';
 import {
   getDepartment,
   getDepartmentCredentialsMarkdown,
@@ -21,10 +21,19 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** Build an XML context block with department-scoped credentials and rules. */
-function buildDepartmentContext(dept: DepartmentConfig): string {
-  const credTable = getDepartmentCredentialsMarkdown(dept);
+function buildDepartmentContext(dept: DepartmentConfig, mode: AssistantMode = 'builder'): string {
   const systems = dept.specs.join(', ');
 
+  if (mode === 'data') {
+    // Data consultant mode: system list + rules only, no credential IDs
+    return `<department_context department="${dept.displayName}">
+You are assisting a ${dept.displayName} team member. Available data sources for this department: ${systems}.
+${dept.promptRules ?? ''}
+</department_context>`;
+  }
+
+  // Builder mode: full credentials + rules
+  const credTable = getDepartmentCredentialsMarkdown(dept);
   return `<department_context department="${dept.displayName}">
 You are assisting a ${dept.displayName} team member. Scope your responses to these systems: ${systems}.
 
@@ -42,20 +51,27 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  let body: { message?: string; conversationId?: string; departmentId?: string };
+  let body: {
+    message?: string;
+    conversationId?: string;
+    departmentId?: string;
+    mode?: AssistantMode;
+    file?: { name: string; content: string; encoding: 'text' | 'base64'; mediaType: string };
+  };
   try {
-    body = (await req.json()) as { message?: string; conversationId?: string; departmentId?: string };
+    body = (await req.json()) as typeof body;
   } catch {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { message, conversationId: existingConvId } = body;
+  const { message, conversationId: existingConvId, file } = body;
   if (!message?.trim()) {
     return new Response('message is required', { status: 400 });
   }
 
-  // Resolve department
+  // Resolve department and mode
   let departmentId = body.departmentId ?? DEFAULT_DEPARTMENT;
+  let mode: AssistantMode = body.mode ?? 'builder';
 
   // Load or create the conversation
   let conversationId = existingConvId;
@@ -65,9 +81,12 @@ export async function POST(req: Request): Promise<Response> {
     const conv = await getConversation(user.email, conversationId);
     if (conv) {
       history = conv.messages;
-      // Use the conversation's stored department (not the request's)
+      // Use the conversation's stored department and mode (not the request's)
       if (conv.departmentId) {
         departmentId = conv.departmentId;
+      }
+      if (conv.mode) {
+        mode = conv.mode;
       }
     } else {
       conversationId = undefined;
@@ -75,7 +94,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   if (!conversationId) {
-    conversationId = await createConversation(user.email, message, departmentId);
+    conversationId = await createConversation(user.email, message, departmentId, mode);
   }
 
   const convId = conversationId; // narrowed — always defined from here on
@@ -84,7 +103,7 @@ export async function POST(req: Request): Promise<Response> {
   const dept = getDepartment(departmentId);
   let enrichedMessage = message;
   if (!existingConvId && dept) {
-    const contextPrefix = buildDepartmentContext(dept);
+    const contextPrefix = buildDepartmentContext(dept, mode);
     enrichedMessage = `${contextPrefix}\n\n${message}`;
   }
 
@@ -94,6 +113,12 @@ export async function POST(req: Request): Promise<Response> {
     rawTools = await getRawMcpTools();
   } catch (err) {
     console.error('Failed to load MCP tools:', err);
+  }
+
+  // Apply context windowing for long conversations (>16 messages AND >80K tokens)
+  const { messages: managedHistory, windowed } = await manageContext(history, mode);
+  if (windowed) {
+    console.log(`Context windowed: ${history.length} → ${managedHistory.length} messages`);
   }
 
   const encoder = new TextEncoder();
@@ -107,7 +132,7 @@ export async function POST(req: Request): Promise<Response> {
       }
 
       const modelChunks: string[] = [];
-      const eventStream = streamWorkflowChat(history, enrichedMessage, rawTools, departmentId);
+      const eventStream = streamWorkflowChat(managedHistory, enrichedMessage, rawTools, departmentId, file, mode);
 
       // Analytics tracking
       const startTime = Date.now();
@@ -132,6 +157,7 @@ export async function POST(req: Request): Promise<Response> {
               role: 'model',
               content: modelChunks.join(''),
               timestamp: new Date().toISOString(),
+              ...(event.toolSummary ? { toolContext: event.toolSummary } : {}),
             };
 
             try {
@@ -140,10 +166,12 @@ export async function POST(req: Request): Promise<Response> {
               console.error('Failed to persist messages:', err);
             }
 
-            // Log analytics event (fire-and-forget)
+            // Log analytics event with token usage (fire-and-forget)
+            const usage = event.usage;
             const analyticsEvent: AnalyticsEvent = {
               userEmail: user.email,
               departmentId,
+              mode,
               conversationId: convId,
               turnNumber: Math.floor(history.length / 2) + 1,
               sessionStartedAt: new Date(startTime).toISOString(),
@@ -152,6 +180,11 @@ export async function POST(req: Request): Promise<Response> {
               toolCallNames,
               skillsLoaded: toolCallNames.filter(n => n === 'get_n8n_skill'),
               specsLoaded: toolCallNames.filter(n => n === 'get_company_spec'),
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
+              cacheReadTokens: usage?.cacheReadTokens,
+              cacheWriteTokens: usage?.cacheWriteTokens,
+              truncated: event.truncated,
               createdAt: new Date().toISOString(),
             };
             logAnalyticsEvent(analyticsEvent).catch(console.error);

@@ -1,0 +1,63 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-ef1234567890",
+              "name": "ticket_id",
+              "value": "={{ $json.ticket_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-f12345678901",
+              "name": "link",
+              "value": "={{ $json.url }}",
+              "type": "string"
+            },
+            {
+              "id": "c3d4e5f6-a7b8-4c9d-0e1f-123456789012",
+              "name": "status",
+              "value": "={{ $json.custom_status }}",
+              "type": "string"
+            },
+            {
+              "id": "d4e5f6a7-b8c9-4d0e-1f2a-234567890123",
+              "name": "sub_account",
+              "value": "={{ $('Loop Over Items').item.json.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "e5f6a7b8-c9d0-4e1f-2a3b-345678901234",
+              "name": "created_by",
+              "value": "={{\n  const SYSTEM_AUTHORS = ['ian', 'guesty cx', 'zendesk guesty', 'incident.io', 'system/unknown'];\n  const comments = $json.comments || [];\n  \n  // 1. First try: find first real end-user (client)\n  const clientComment = comments.find(c =>\n    c.author_role === 'end-user' &&\n    !SYSTEM_AUTHORS.includes((c.author_name || '').toLowerCase().trim())\n  );\n  if (clientComment) return clientComment.author_name;\n  \n  // 2. Fallback: first agent who is not a system author\n  const agentComment = comments.find(c =>\n    !SYSTEM_AUTHORS.includes((c.author_name || '').toLowerCase().trim())\n  );\n  return agentComment ? agentComment.author_name : 'Unknown';\n}}",
+              "type": "string"
+            },
+            {
+              "id": "f6a7b8c9-d0e1-4f2a-3b4c-456789012345",
+              "name": "thread_history",
+              "value": "={{\n  const NOISE_AUTHORS = ['ian', 'guesty cx', 'zendesk guesty', 'incident.io', 'system/unknown'];\n  const comments = $json.comments || [];\n  \n  // Filter out noise, keep meaningful comments\n  const meaningful = comments.filter(c =>\n    !NOISE_AUTHORS.includes((c.author_name || '').toLowerCase().trim())\n  );\n  \n  // Take last 15 to avoid token overflow\n  const sliced = meaningful.slice(-15);\n  \n  return sliced.map(c =>\n    c.author_name + ' (' + c.author_role + ', ' + c.created_at + '):\\n' + c.body\n  ).join('\\n---\\n');\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-456789012345",
+      "name": "Prep Gemini Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2080,
+        -7088
+      ]
+    }
+  ],
+  "connections": {},
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

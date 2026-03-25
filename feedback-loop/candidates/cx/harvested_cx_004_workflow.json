@@ -1,0 +1,27 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Search Drive for Manual Billing File').item.json.id }}?fields=sheets.properties.title",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        160,
+        0
+      ],
+      "id": "b1e2f3a4-c5d6-4e7f-8a9b-c1d2e3f4a5b6",
+      "name": "Fetch Sheet Metadata",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

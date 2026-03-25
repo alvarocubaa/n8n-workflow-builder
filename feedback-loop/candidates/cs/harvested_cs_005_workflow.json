@@ -1,0 +1,53 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Role: You are a Senior Customer Success Manager at Guesty. You are writing a direct, high-level operational briefing for an HQ Executive.\n\nTask:\nGenerate 2 to 4 concise, fact-based bullet points. Use internal logs to understand the \"story,\" but translate it into a natural, client-facing update.\n\nCRITICAL READING INSTRUCTION:\nThe thread history is provided in REVERSE CHRONOLOGICAL ORDER - the FIRST comment you see is the MOST RECENT update. Always base the current status and next steps on the first comment in the thread. Older context follows after. Do NOT average the thread - the most recent comment is the ground truth for current state.\n\nSTRICT Content Filters (NEVER INCLUDE):\n1. NO INTERNAL IDs: Never show Jira Keys (e.g., T3-123, FIN-456), Incident IDs, Account IDs, or Listing IDs.\n2. NO ROBOTIC OPENERS: Never start sentences with \"The issue is...\", \"The client reported...\", \"The Guesty CX team...\"\n3. NO INTERNAL JARGON: Do not mention \"Tier 3,\" \"LDS,\" or specific department names. Use \"Engineering\" instead.\n\nTone & Phrasing Rules (CRITICAL):\n1. START WITH THE NOUN: Begin bullets directly with the subject (e.g., \"A guest...\", \"Reservation 123...\", \"Owner names...\").\n2. BE NATURAL & DIRECT: Write like a human talking to a peer.\n   - INSTEAD OF: \"The issue immediately escalated to Guesty Development.\"\n   - USE: \"Escalated to engineering and identified as a system bug.\"\n3. KEEP HARD PROOF: Include Reservation Numbers and exact Dollar Amounts where relevant.\n4. CALL TO ACTION: If client input is needed, ask directly.\n   - USE: \"Please flag immediately if you observe this behavior again.\"\n\nOutput Structure (RAW JSON ONLY - no markdown, no code fences, no backticks):\n{\n  \"ticket_metadata\": {\n    \"id\": \"[Use EXACTLY the Ticket ID from Input Data - do not modify]\",\n    \"status\": \"[Use EXACTLY the Ticket Status from Input Data - do NOT rephrase, invent, or infer a new status from the thread]\",\n    \"sub_account\": \"[Use EXACTLY the Sub-Account from Input Data - do NOT infer from ticket content]\",\n    \"created_by\": \"[Name from Created By field in Input Data]\",\n    \"link\": \"[Use EXACTLY the link from Input Data]\",\n    \"subject\": \"[3 to 5 word professional title summarizing the core issue. NO questions, NO IDs, NO dates. Do NOT use the words 'Support Update'. Example: 'Payout Calculation Discrepancy']\"\n  },\n  \"bullet_points\": [\n    \"Bullet 1: Current state of the ticket based on the MOST RECENT comment.\",\n    \"Bullet 2: Background context - what the issue is and what was investigated.\",\n    \"Bullet 3: Guesty action taken or current blocker.\",\n    \"Bullet 4: Optional - next steps or client ask.\"\n  ]\n}",
+              "role": "model"
+            },
+            {
+              "content": "=Input Data:\n\nTicket ID: {{ $json.ticket_id }}\nTicket Status: {{ $json.status }}\nTicket Subject: {{ $json.summary }}\nSub-Account: {{ $json.sub_account }}\nCreated By: {{ $json.created_by }}\nCreated At: {{ $json.createdAt }}\nLink: {{ $json.link }}\n\nThread History (MOST RECENT FIRST):\n{{ $json.thread_history }}\n"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "fa33bd72-e7d6-45e9-9b5d-14f34fcfda97",
+      "name": "Gemini: Summarize & Format",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        2528,
+        -7280
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "FSUdg9cOOhjJ5bfh",
+          "name": "Gemini - AI Team - Cross Dept"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gemini: Summarize & Format": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

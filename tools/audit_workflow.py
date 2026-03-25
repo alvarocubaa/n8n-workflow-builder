@@ -94,9 +94,10 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
             else:
                 results[label] = (False, "Missing projectId")
 
-    # --- 5. Salesforce node config ---
+    # --- 5. Salesforce node config (skip trigger nodes — they don't have resource/operation) ---
     for node in nodes:
-        if "salesforce" in node.get("type", "").lower():
+        ntype = node.get("type", "").lower()
+        if "salesforce" in ntype and "trigger" not in ntype:
             p = node.get("parameters", {})
             res = p.get("resource", "")
             op = p.get("operation", "")
@@ -129,7 +130,24 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
             else:
                 results[label] = (False, f"select={select}, channelId={cid}")
 
-    # --- 7. Future date detection ---
+    # --- 7. BigQuery empty SQL query ---
+    for node in nodes:
+        if "googleBigQuery" in node.get("type", ""):
+            sql = node.get("parameters", {}).get("sqlQuery", "").strip()
+            label = f"bq_query:{node['name']}"
+            if not sql:
+                results[label] = (False, "Empty SQL query")
+            else:
+                results[label] = (True, f"SQL present ({len(sql)} chars)")
+
+    # --- 8. Code node detection (when AI nodes expected) ---
+    code_nodes = [n["name"] for n in nodes if n.get("type", "") == "n8n-nodes-base.code"]
+    if code_nodes:
+        results["no_code_nodes"] = (False, f"Code nodes found: {code_nodes}")
+    else:
+        results["no_code_nodes"] = (True, "No Code nodes")
+
+    # --- 9. Future date detection ---
     from datetime import datetime, timedelta
     one_year_ahead = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
     all_text = raw  # scan entire workflow JSON for date literals
@@ -140,7 +158,7 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
     elif future_dates:
         results["future_dates"] = (True, f"All dates within range")
 
-    # --- 8. jira_ids precision ---
+    # --- 10. jira_ids precision ---
     all_code = " ".join(
         n.get("parameters", {}).get("sqlQuery", "") + " " + n.get("parameters", {}).get("jsCode", "")
         for n in nodes

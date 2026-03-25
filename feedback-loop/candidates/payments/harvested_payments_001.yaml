@@ -1,0 +1,32 @@
+- name: harvested_payments_001
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow with two BigQuery queries run in p..."
+  department: payments
+  prompt: >
+    Build a daily workflow with two BigQuery queries run in parallel. First query: zuora_analytics.product_catalog for configured payment processing fees per account. Second query: zuora_analytics.invoice_items for actually invoiced payment processing amounts in the past month grouped by mongo_account_id. Use a Merge node to combine both results matching by account ID. Use an If node to flag accounts where the configured fee differs from the invoiced amount by more than 10 percent. Post mismatche...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - merge
+    - if
+    - slack
+  expected_creds:
+    googleApi: aLlYQkLWrmANkfFZ
+    slackApi: 87t2GgsbEJDItDs7
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: VbbHlN9rDh9XVUHLSMBB
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a daily workflow with two BigQuery queries run in p..."
+    node_count: 6
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.955Z
+    confidence: high
+    workflow_json_file: harvested_payments_001_workflow.json

@@ -5,25 +5,31 @@ import { useRouter } from 'next/navigation';
 import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
+import ModeSelector from './ModeSelector';
+import type { AssistantMode } from '@/lib/types';
 
 interface ChatWindowProps {
   conversationId?: string;
   initialMessages?: Message[];
   initialDepartmentId?: string;
+  initialMode?: AssistantMode;
 }
 
 export default function ChatWindow({
   conversationId,
   initialMessages = [],
   initialDepartmentId,
+  initialMode,
 }: ChatWindowProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? 'cx');
+  const [mode, setMode] = useState<AssistantMode>(initialMode ?? 'builder');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const departmentLocked = useRef(!!conversationId || initialMessages.length > 0);
+  const modeLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConvId = useRef<string | undefined>(conversationId);
 
@@ -36,18 +42,15 @@ export default function ChatWindow({
     const text = input.trim();
     if (!text || streaming) return;
 
-    // Build message with optional file content
-    let messageText = text;
-    if (attachedFile) {
-      messageText = `[Attached file: ${attachedFile.name}]\n<file_content>\n${attachedFile.content}\n</file_content>\n\n${text}`;
-    }
+    // Capture file before clearing state
+    const fileToSend = attachedFile;
 
     setInput('');
     setAttachedFile(null);
     setStreaming(true);
 
     // Append user message immediately (show original text, not file content)
-    const userMsg: Message = { role: 'user', content: attachedFile ? `[${attachedFile.name}] ${text}` : text };
+    const userMsg: Message = { role: 'user', content: fileToSend ? `[${fileToSend.name}] ${text}` : text };
     setMessages(prev => [...prev, userMsg]);
 
     // Prepare a placeholder for the assistant response
@@ -59,18 +62,31 @@ export default function ChatWindow({
     };
     setMessages(prev => [...prev, assistantMsg]);
 
-    // Lock department after first message
+    // Lock department and mode after first message
     departmentLocked.current = true;
+    modeLocked.current = true;
 
     try {
+      // Build request body — file sent as structured object, not inlined in message
+      const requestBody: Record<string, unknown> = {
+        message: text,
+        conversationId: currentConvId.current,
+        departmentId,
+        mode,
+      };
+      if (fileToSend) {
+        requestBody.file = {
+          name: fileToSend.name,
+          content: fileToSend.content,
+          encoding: fileToSend.encoding,
+          mediaType: fileToSend.mediaType,
+        };
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageText,
-          conversationId: currentConvId.current,
-          departmentId,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!res.ok || !res.body) {
@@ -192,40 +208,45 @@ export default function ChatWindow({
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="mb-4 rounded-full bg-blue-100 p-4">
-              <svg
-                className="h-8 w-8 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
-                />
-              </svg>
-            </div>
             <h2 className="text-lg font-semibold text-gray-800">
-              Build an n8n workflow
+              n8n Workflow Assistant
             </h2>
             <p className="mt-1 max-w-sm text-sm text-gray-500">
-              Select your department, then describe what you want to automate.
+              Choose how you want to work, then select your department.
             </p>
-            <div className="mt-4 mb-4">
+
+            {/* Mode selector */}
+            <div className="mt-5 mb-4">
+              <ModeSelector
+                value={mode}
+                onChange={setMode}
+                disabled={modeLocked.current}
+              />
+            </div>
+
+            {/* Department selector */}
+            <div className="mb-4">
               <DepartmentSelector
                 value={departmentId}
                 onChange={setDepartmentId}
                 disabled={departmentLocked.current}
               />
             </div>
+
+            {/* Mode-specific example prompts */}
             <div className="mt-2 grid max-w-md gap-2 text-sm">
-              {[
-                'Post a Slack message when a webhook is received',
-                'Send a daily report email with data from Google Sheets',
-                'Create a Jira ticket when a GitHub issue is opened',
-              ].map(example => (
+              {(mode === 'data'
+                ? [
+                    'Where does customer churn data live?',
+                    'How do I join Zendesk tickets to Salesforce accounts?',
+                    'Help me plan data sources for an AI agent that detects upsell opportunities',
+                  ]
+                : [
+                    'Post a Slack message when a webhook is received',
+                    'Send a daily report email with data from Google Sheets',
+                    'Create a Jira ticket when a GitHub issue is opened',
+                  ]
+              ).map(example => (
                 <button
                   key={example}
                   onClick={() => setInput(example)}
@@ -245,6 +266,7 @@ export default function ChatWindow({
                 conversationId={currentConvId.current}
                 departmentId={departmentId}
                 messageIndex={i}
+                mode={mode}
               />
             ))}
             <div ref={bottomRef} />
