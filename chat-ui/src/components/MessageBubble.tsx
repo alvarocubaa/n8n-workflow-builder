@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import FeedbackButtons from './FeedbackButtons';
+import type { AssistantMode } from '@/lib/types';
 
 export interface Message {
   role: 'user' | 'model';
@@ -20,6 +21,30 @@ interface MessageBubbleProps {
   conversationId?: string;
   departmentId?: string;
   messageIndex?: number;
+  mode?: AssistantMode;
+}
+
+function DownloadButton({ json, filename }: { json: string; filename?: string }) {
+  function handleDownload() {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename ?? 'workflow.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <button
+      onClick={handleDownload}
+      className="rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300 hover:bg-gray-600"
+    >
+      Download JSON
+    </button>
+  );
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -117,7 +142,7 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
   );
 }
 
-export default function MessageBubble({ message, conversationId, departmentId, messageIndex }: MessageBubbleProps) {
+export default function MessageBubble({ message, conversationId, departmentId, messageIndex, mode = 'builder' }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -162,15 +187,33 @@ export default function MessageBubble({ message, conversationId, departmentId, m
                 if (isBlock) {
                   const isJson = match[1] === 'json';
                   // Detect n8n workflow JSON (has nodes + connections)
-                  const isWorkflow = isJson && codeString.includes('"nodes"') && codeString.includes('"connections"');
-                  // Single-node snippet: only 1 node — show "Copy for n8n" instead of Deploy
+                  const looksLikeWorkflow = isJson && codeString.includes('"nodes"');
+                  let isValidJson = false;
                   let isSingleNode = false;
-                  if (isWorkflow) {
+                  if (looksLikeWorkflow) {
                     try {
                       const parsed = JSON.parse(codeString) as { nodes?: unknown[] };
+                      isValidJson = true;
                       isSingleNode = Array.isArray(parsed.nodes) && parsed.nodes.length === 1;
-                    } catch { /* ignore parse errors */ }
+                    } catch { /* truncated or invalid JSON */ }
                   }
+                  const isWorkflow = looksLikeWorkflow && isValidJson;
+                  const isTruncated = looksLikeWorkflow && !isValidJson;
+
+                  if (isTruncated) {
+                    return (
+                      <div className="relative">
+                        <div className="mb-2 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                          Workflow JSON was truncated. Download the partial file and ask the AI to regenerate.
+                        </div>
+                        <div className="flex gap-1.5">
+                          <DownloadButton json={codeString} filename="workflow-partial.json" />
+                          <CopyButton text={codeString} />
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="relative">
                       <SyntaxHighlighter
@@ -182,7 +225,8 @@ export default function MessageBubble({ message, conversationId, departmentId, m
                         {codeString}
                       </SyntaxHighlighter>
                       <div className="absolute right-2 top-2 flex gap-1.5">
-                        {isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
+                        {mode === 'builder' && isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
+                        {mode === 'builder' && isWorkflow && <DownloadButton json={codeString} />}
                         <CopyButton text={codeString} />
                       </div>
                     </div>

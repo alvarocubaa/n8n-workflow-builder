@@ -1,6 +1,6 @@
 import admin from 'firebase-admin';
 import { randomUUID } from 'crypto';
-import type { AnalyticsEvent, DeployEvent, FeedbackEntry } from './types';
+import type { AnalyticsEvent, AssistantMode, DeployEvent, FeedbackEntry } from './types';
 
 // ─── In-memory fallback for local-* conversations (no Firestore) ─────────────
 // Used when Firestore is unavailable and IDs are prefixed with "local-".
@@ -8,6 +8,7 @@ import type { AnalyticsEvent, DeployEvent, FeedbackEntry } from './types';
 
 interface LocalConv {
   title: string;
+  mode: AssistantMode;
   messages: DisplayMessage[];
 }
 const localStore = new Map<string, LocalConv>();
@@ -27,11 +28,13 @@ export interface DisplayMessage {
   role: 'user' | 'model';
   content: string;
   timestamp: string; // ISO 8601
+  toolContext?: string; // compact summary of tools called this turn (specs, skills, nodes)
 }
 
 export interface ConversationSummary {
   id: string;
   title: string;
+  mode?: AssistantMode;
   updatedAt: string; // ISO 8601
 }
 
@@ -39,6 +42,7 @@ export interface Conversation {
   id: string;
   title: string;
   departmentId?: string;
+  mode?: AssistantMode;
   messages: DisplayMessage[];
 }
 
@@ -73,6 +77,7 @@ export async function createConversation(
   userEmail: string,
   firstMessage: string,
   departmentId?: string,
+  mode?: AssistantMode,
 ): Promise<string> {
   const title =
     firstMessage.length > 60
@@ -86,6 +91,7 @@ export async function createConversation(
       .add({
         title,
         departmentId: departmentId ?? 'cx',
+        mode: mode ?? 'builder',
         createdAt: now,
         updatedAt: now,
         messages: [],
@@ -95,7 +101,7 @@ export async function createConversation(
     if (isFirestoreUnavailable(err)) {
       // No Firestore yet — store in-memory so multi-turn works locally
       const id = `local-${randomUUID()}`;
-      localStore.set(id, { title, messages: [] });
+      localStore.set(id, { title, mode: mode ?? 'builder', messages: [] });
       return id;
     }
     throw err;
@@ -155,7 +161,7 @@ export async function getConversation(
 ): Promise<Conversation | null> {
   if (conversationId.startsWith('local-')) {
     const conv = localStore.get(conversationId);
-    return conv ? { id: conversationId, title: conv.title, messages: conv.messages } : null;
+    return conv ? { id: conversationId, title: conv.title, mode: conv.mode, messages: conv.messages } : null;
   }
 
   try {
@@ -167,6 +173,7 @@ export async function getConversation(
       id: snap.id,
       title: data.title as string,
       departmentId: (data.departmentId as string) ?? undefined,
+      mode: (data.mode as AssistantMode) ?? 'builder',
       messages: (data.messages as DisplayMessage[]) ?? [],
     };
   } catch (err) {
@@ -199,6 +206,7 @@ export async function listConversations(
       return {
         id: doc.id,
         title: data.title as string,
+        mode: (data.mode as AssistantMode) ?? 'builder',
         updatedAt,
       };
     });
@@ -281,6 +289,7 @@ export async function getAnalyticsEvents(
         skillsLoaded: d.skillsLoaded ?? [],
         specsLoaded: d.specsLoaded ?? [],
         seeded: d.seeded ?? false,
+        mode: (d.mode as AssistantMode) ?? 'builder',
         createdAt: toIso(d._createdAt),
       } satisfies AnalyticsEvent;
     });

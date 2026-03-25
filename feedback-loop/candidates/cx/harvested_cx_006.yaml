@@ -1,0 +1,34 @@
+- name: harvested_cx_006
+  description: "Harvested from roni.shif@guesty.com - what will be the best way for me to implement 
+
+I need to..."
+  department: cx
+  prompt: >
+    what will be the best way for me to implement 
+    
+    I need to access a master GSheet, then filter it by UserID, and then send the user a COPY of the sheet but only with the filtered results? in n8n
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - googleSheets
+    - set
+    - merge
+  expected_creds:
+    googleApi: VQ7CU7dKViVcv8Ah
+    googleSheetsOAuth2Api: RPi7Ecm1B3utIhYr
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: UJS4uxBV32mZEymq04Lt
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "what will be the best way for me to implement 
+
+I need to..."
+    node_count: 5
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.958Z
+    confidence: medium
+    workflow_json_file: harvested_cx_006_workflow.json

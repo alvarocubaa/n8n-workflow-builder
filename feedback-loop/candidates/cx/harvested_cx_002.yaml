@@ -1,0 +1,49 @@
+- name: harvested_cx_002
+  description: "Harvested from gil.almog@guesty.com - [AI by gil.almog] GUS Upsell Detection & Handoff"
+  department: cx
+  prompt: >
+    ## **GUS Upsell Framework**
+    
+    By pivoting from passive data to **Active Intent**, we can transition CX from a cost center to a proactive revenue driver. GUS doesn't just answer questions; it identifies the "Product Gap" in real-time.
+    
+    ### **1\. The Operational Workflow (The "Gus" Loop)**
+    
+    Once GUS identifies a high-intent lead through the triggers mentioned below, it executes a seamless handoff to the **Customer Follow-up Team (CFT)**:
+    
+    * **Immediate Outreach:** Following the interaction, GUS ...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - set
+    - googleBigQuery
+    - splitInBatches
+    - httpRequest
+    - code
+    - salesforce
+    - if
+    - slack
+    - gmail
+  expected_creds:
+    googleApi: vWwsUUkc4EYrtsmN
+    zendeskApi: PEFCagywCPGDJGjg
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    slackApi: RdxjTWVc6DaiNrIY
+    gmailOAuth2: 4BConxQW0qmylDKE
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
+  _metadata:
+    source_conversation: hTOCz0a2XLjIlgilrAwK
+    source_user: gil.almog@guesty.com
+    deployed: true
+    deployed_workflow_id: UpzdOqPb5APIg1OV
+    workflow_name: "[AI by gil.almog] GUS Upsell Detection & Handoff"
+    node_count: 15
+    complexity_score: 5
+    harvested_at: 2026-03-20T12:38:09.955Z
+    confidence: medium
+    workflow_json_file: harvested_cx_002_workflow.json

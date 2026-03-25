@@ -104,6 +104,7 @@ def main():
                 expected_creds=expected_creds,
                 save_to=save_to,
                 verbose=args.verbose,
+                checks=case.get("checks"),
             )
             results[name] = "PASS" if passed else "FAIL"
         except Exception as e:

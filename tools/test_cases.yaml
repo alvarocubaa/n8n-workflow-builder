@@ -39,7 +39,7 @@ cases:
       - googleBigQuery
       - slack
     expected_creds:
-      googleApi: vWwsUUkc4EYrtsmN
+      googleApi: 2EJkTXIICSEva3cQ
       slackApi: RdxjTWVc6DaiNrIY
     checks:
       - encoding
@@ -87,6 +87,7 @@ cases:
       - slack
     expected_creds:
       googleApi: VQ7CU7dKViVcv8Ah
+      salesforceOAuth2Api: aBjJNGRAjYF66z5F  # sandbox (ENVIRONMENT PRIORITY)
       slackApi: 7H6auF31TpX7Wk7M
     checks:
       - encoding
@@ -309,6 +310,7 @@ cases:
       googlePalmApi: LL8fLgZSrUn8oZtV
       slackOAuth2Api: MkMAiC1ecfpYtIz1
       googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      httpBearerAuth: ngaBlIhFMFTZFajQ
     checks:
       - encoding
       - uuids
@@ -472,3 +474,391 @@ cases:
       - encoding
       - uuids
       - credentials
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Onboarding (OB) Department Tests
+  # Tests: OB credential scoping, SF/Zendesk/Modjo patterns, webhook triggers
+  # All OB credentials are production-only (no sandbox project)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: ob_sf_closed_won_alert
+    description: "OB: Salesforce closed-won deals alert — tests OB credential scoping and SF config"
+    department: ob
+    prompt: >
+      Create a daily workflow that queries Salesforce for Opportunity records where
+      StageName = 'Closed Won' and CloseDate is within the past 7 days. Include
+      Account.Name, Account.Guesty_Admin_ID__c, Owner.Name, and Amount. Post a
+      summary of new closed-won deals to #ob-new-clients in Slack. Run daily at
+      8am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      slackOAuth2Api: BXeGv4HZaOauuct6
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - sf_config
+      - slack_config
+
+  - name: ob_zendesk_aging_bq
+    description: "OB: Zendesk onboarding ticket aging via BQ — tests OB-specific BQ credential and IFNULL pattern"
+    department: ob
+    prompt: >
+      Build a daily workflow that queries BigQuery for Zendesk tickets from
+      zendesk_analytics.tickets_clean where status = 'open' and group_name =
+      'Onboarding' and created_at is older than 5 days. Group by account_name,
+      show count and oldest ticket per account. Post an escalation report to
+      #ob-escalations in Slack. Run at 10am UTC daily.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: jTPSwPeDuM4ipl69
+      slackOAuth2Api: BXeGv4HZaOauuct6
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: ob_webhook_sf_enrich
+    description: "OB: Webhook-triggered onboarding kickoff — tests webhook pattern and multi-node flow"
+    department: ob
+    prompt: >
+      Create a webhook-triggered workflow that receives a JSON payload with fields:
+      accountName, guestyAdminId, onboardingManager, and startDate. Query Salesforce
+      for the Account record using the Guesty_Admin_ID__c field to get MRR and
+      account details. Use a Set node to combine the webhook data with the Salesforce
+      account details. Post a formatted onboarding kickoff message to #ob-kickoffs
+      in Slack including account name, MRR, and assigned manager.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - set
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      slackOAuth2Api: BXeGv4HZaOauuct6
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - sf_config
+      - slack_config
+
+  - name: ob_modjo_gemini_summary
+    description: "OB: Modjo call summary with Gemini — tests HTTP + AI pattern and httpHeaderAuth credential"
+    department: ob
+    prompt: >
+      Build a daily workflow that uses an HTTP Request node to call the Modjo API
+      (GET https://api.modjo.ai/v1/calls with header authorization) to fetch
+      yesterday's completed calls for the onboarding team. Use the Google Gemini
+      node to summarize the top 3 themes across all calls. Post the AI summary
+      to #ob-call-insights in Slack. Run daily at 6pm UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - httpRequest
+      - slack
+    expected_creds:
+      httpHeaderAuth: 86AbuOAwd0fFd1k6
+      googlePalmApi: FSUdg9cOOhjJ5bfh
+      slackOAuth2Api: BXeGv4HZaOauuct6
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Payments Department Tests
+  # Tests: Zuora BQ tables, Payments credential scoping, Merge/If patterns
+  # Has sandbox Slack (0l2bJ3SquNB8nyFd) + production credentials
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: pay_invoice_aging
+    description: "Payments: Zuora unpaid invoice aging report — tests Zuora BQ tables and Payments Slack cred"
+    department: payments
+    prompt: >
+      Create a daily workflow that queries BigQuery zuora_analytics.invoices for
+      unpaid invoices where status = 'Posted' and balance > 0 and the invoice is
+      older than 30 days. Group by mongo_account_id and show total outstanding
+      amount per account. Post an aging report to #payments-collections in Slack.
+      Run daily at 9am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      slackApi: 0l2bJ3SquNB8nyFd
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: pay_multi_bq_merge
+    description: "Payments: Configured vs invoiced fee comparison — tests Merge v3, If branching, multi-BQ query"
+    department: payments
+    prompt: >
+      Build a daily workflow with two BigQuery queries run in parallel. First query:
+      zuora_analytics.product_catalog for configured payment processing fees per
+      account. Second query: zuora_analytics.invoice_items for actually invoiced
+      payment processing amounts in the past month grouped by mongo_account_id.
+      Use a Merge node to combine both results matching by account ID. Use an If
+      node to flag accounts where the configured fee differs from the invoiced
+      amount by more than 10 percent. Post mismatches to #payments-fee-alerts
+      in Slack. Run daily at 8am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - merge
+      - slack
+    expected_creds:
+      googleApi: aLlYQkLWrmANkfFZ  # n8n-payments (only googleApi in Payments dept — no dedicated BQ cred)
+      slackApi: 0l2bJ3SquNB8nyFd   # sandbox Slack (ENVIRONMENT PRIORITY)
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: pay_sheets_trigger_zendesk
+    description: "Payments: Sheets-triggered dispute ticket creation — tests event-driven pattern and Payments Zendesk cred"
+    department: payments
+    prompt: >
+      Create a workflow triggered when a new row is added to a Google Sheet using
+      Google Sheets Trigger. The sheet contains payment dispute data with columns:
+      ticket_id, account_name, dispute_amount, and reason. When triggered, create
+      a new Zendesk ticket with the dispute details using the native Zendesk node.
+      Set the ticket group to 'Payments' and priority to 'high'. Post a notification
+      to #payments-disputes in Slack with the account name and dispute amount.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - zendesk
+      - slack
+    expected_creds:
+      googleSheetsTriggerOAuth2Api: W6Zn2BYAkgmc1t8W
+      zendeskApi: cFdFPhADfsxMmPFC
+      slackApi: 0l2bJ3SquNB8nyFd
+    checks:
+      - encoding
+      - uuids
+      - credentials
+
+  - name: pay_zuora_sf_reconcile
+    description: "Payments: Zuora-to-Salesforce reconciliation — tests cross-source join via mongo_account_id"
+    department: payments
+    prompt: >
+      Create a weekly workflow running Monday at 7am UTC. Query BigQuery
+      zuora_analytics.invoices for total invoice amounts grouped by mongo_account_id
+      for the past month. Then query Salesforce for the matching Account records
+      to get Account.Name and Account.Account_Owner_F__c. Use a Set node to format
+      a reconciliation report with account name, owner, and total invoiced amount.
+      Post to #payments-reconciliation in Slack.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - salesforce
+      - set
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      slackApi: 0l2bJ3SquNB8nyFd
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - sf_config
+      - slack_config
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Varied Pattern Tests (existing departments, new workflow shapes)
+  # Tests: Webhook+If branching, SF Trigger, Merge node, Loop/batch
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: cx_webhook_if_branch
+    description: "CX: Webhook with If-node VIP routing — tests webhook trigger and conditional branching"
+    department: cx
+    prompt: >
+      Create a webhook-triggered workflow that receives a JSON payload with fields:
+      ticket_id, account_id, priority, and subject. Query BigQuery
+      guesty_analytics.dim_accounts for the account plan_name and mrr using the
+      account_id. Use an If node to branch: if mrr is greater than 5000, post to
+      #cx-vip-tickets in Slack. Otherwise post to #cx-standard-tickets. Include
+      account name, plan, MRR, and ticket subject in both messages.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - if
+      - slack
+    expected_creds:
+      googleApi: 2EJkTXIICSEva3cQ
+      slackApi: RdxjTWVc6DaiNrIY
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  - name: cs_sf_trigger_bq_enrich
+    description: "CS: SF Trigger + BQ enrichment — tests event-driven multi-source with Filter node"
+    department: cs
+    prompt: >
+      Create a workflow triggered by Salesforce when an Opportunity is updated.
+      Query the updated Opportunity for RecordType.Name, StageName, Account.Name,
+      and Account.Guesty_Admin_ID__c. Use a Filter node to keep only opportunities
+      where RecordType.Name = 'Renewal'. Query BigQuery csm.csm_churn_report using
+      the Guesty_Admin_ID__c to get max_paid_listings and churn_reason. Post a
+      renewal status update to #cs-renewals in Slack. Use production credentials.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforceTrigger
+      - salesforce
+      - filter
+      - googleBigQuery
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+      googleApi: VQ7CU7dKViVcv8Ah
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - sf_config
+      - slack_config
+
+  - name: finance_multi_bq_merge
+    description: "Finance: Parallel BQ queries with Merge — tests Merge v3 syntax and multi-query pattern"
+    department: finance
+    prompt: >
+      Build a weekly workflow running Monday at 8am UTC. Run two BigQuery queries
+      in parallel. First: query zuora_analytics.invoices for total invoice_amount
+      grouped by company_code for the past month. Second: query
+      zuora_analytics.invoice_items for total amount grouped by company_code for
+      the same period. Use a Merge node to combine both results by company_code.
+      Use a Set node to calculate the difference between invoice totals and item
+      totals. Post a company-level reconciliation summary to #finance-reconciliation
+      in Slack.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - merge
+      - set
+      - slack
+    expected_creds:
+      googleApi: h7fJ82YhtOnUL58u
+      slackApi: g3NQlNzyjFofD87l
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # v0.19 Test Cases — AI Classification, BQ Credential Scoping, AI Summarization
+  # Tests: ai_for_classification rule, CS-specific BQ credential, no_code_nodes check
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  - name: cx_zendesk_upsell_ai
+    description: "CX: Zendesk upsell intent detection with AI — tests ai_for_classification rule (must use Gemini, NOT Code nodes)"
+    department: cx
+    prompt: >
+      Create a daily workflow that reads recent Zendesk tickets from the past 24 hours
+      using the native Zendesk node. For each ticket, classify whether the customer message
+      contains upsell intent (e.g., asking about upgrades, new features, higher plans).
+      Use an AI/LLM node for the classification — do not use Code nodes. Post tickets with
+      detected upsell intent to #cx-upsell-opportunities in Slack with ticket ID, subject,
+      account name, and the AI confidence score. Run daily at 10am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - zendesk
+      - slack
+    expected_creds:
+      zendeskApi: OTFp18SnDgGUSn9u
+      googlePalmApi: JrzPwNiVhZibKlAr
+      slackApi: RdxjTWVc6DaiNrIY
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - no_code_nodes
+
+  - name: cs_zendesk_bq_aging
+    description: "CS: Zendesk aging tickets via BQ — tests CS-specific BQ credential (must use VQ7CU7dKViVcv8Ah) and bq_query check"
+    department: cs
+    prompt: >
+      Build a daily workflow that queries BigQuery zendesk_analytics.tickets_clean for
+      Zendesk tickets where status is 'open' or 'pending' and the ticket is older than
+      7 days. Group by account_name and show count and oldest ticket date per account.
+      Post the aging report to #cs-ticket-aging in Slack. Run daily at 9am UTC.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - slack
+    expected_creds:
+      googleApi: VQ7CU7dKViVcv8Ah
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId
+      - bq_query
+
+  - name: cs_weekly_support_update_ai
+    description: "CS: Weekly support update with Gemini summarization — tests AI summarization pattern (must use Gemini, NOT Code nodes)"
+    department: cs
+    prompt: >
+      Create a weekly workflow that runs every Monday at 9am UTC. Query Salesforce for
+      all Cases updated in the past 7 days where Status is not 'Closed'. Use the Google
+      Gemini node to generate a summary of the top themes, recurring issues, and any
+      escalation patterns from the case descriptions. Post the AI-generated weekly support
+      summary to #cs-weekly-update in Slack. Do not use Code nodes.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - salesforce
+      - slack
+    expected_creds:
+      salesforceOAuth2Api: aBjJNGRAjYF66z5F
+      googlePalmApi: FSUdg9cOOhjJ5bfh
+      slackApi: 7H6auF31TpX7Wk7M
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - sf_config
+      - no_code_nodes
+
+  - name: cx_loop_zendesk_comment
+    description: "CX: Batch Zendesk comment update — tests loop/batch processing and Zendesk write operation"
+    department: cx
+    prompt: >
+      Create a daily workflow at 8am UTC. Query BigQuery zendesk_analytics.tickets_clean
+      for tickets where status = 'open' and updated_at is older than 14 days. For
+      each ticket in the results, use the native Zendesk node to add an internal
+      comment saying 'Auto-reminder: This ticket has been open for 14+ days. Please
+      review and update.' After processing all tickets, post a summary count of
+      tickets commented on to #cx-ticket-hygiene in Slack.
+    confirm_message: "Looks good, build it"
+    expected_nodes:
+      - googleBigQuery
+      - zendesk
+      - slack
+    expected_creds:
+      googleApi: 2EJkTXIICSEva3cQ
+      zendeskApi: I0sSUZvS0LVHjO2J
+      slackApi: RdxjTWVc6DaiNrIY
+    checks:
+      - encoding
+      - uuids
+      - credentials
+      - bq_projectId

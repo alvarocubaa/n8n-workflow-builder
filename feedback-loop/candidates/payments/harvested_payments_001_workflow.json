@@ -1,0 +1,209 @@
+{
+  "name": "Payment Fee Mismatch - Daily Alert",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Daily 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "BQ - Product Catalog Fees",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        500,
+        160
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "sqlQuery": "SELECT\n  account_id,\n  account_name,\n  plan_name,\n  plan_value        AS configured_fee,\n  charge_model,\n  uom\nFROM `guesty-data.zuora_analytics.product_catalog`\nWHERE LOWER(plan_name) LIKE '%payment gateway%'\n  AND effective_end_date > CURRENT_DATE()",
+        "projectId": "guesty-data",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "aLlYQkLWrmANkfFZ",
+          "name": "n8n-payments"
+        }
+      }
+    },
+    {
+      "id": "3d594a2e-1b8f-4c6d-9e3a-5f7b2c8d1e4f",
+      "name": "BQ - Invoiced Amounts",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        500,
+        440
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "sqlQuery": "SELECT\n  mongo_account_id  AS account_id,\n  SUM(amount)       AS invoiced_amount,\n  COUNT(*)          AS invoice_item_count\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE LOWER(product_name) LIKE '%payment gateway%'\n  AND invoiceitem_servicestartdate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nGROUP BY mongo_account_id",
+        "projectId": "guesty-data",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "aLlYQkLWrmANkfFZ",
+          "name": "n8n-payments"
+        }
+      }
+    },
+    {
+      "id": "9a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      "name": "Merge by Account ID",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByFields",
+        "fieldsToMatchString": "account_id",
+        "joinMode": "keepMatches",
+        "outputDataFrom": "both"
+      }
+    },
+    {
+      "id": "b2c3d4e5-f6a7-8901-bcde-f01234567890",
+      "name": "Flag Fee Mismatch > 10%",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1060,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "c1a2b3d4-e5f6-7890-abcd-ef1234567890",
+              "leftValue": "={{ Math.abs(($json.invoiced_amount - $json.configured_fee) / $json.configured_fee) }}",
+              "rightValue": 0.1,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e5f6a7b8-c9d0-1234-efab-567890123456",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1340,
+        160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#payments-fee-alerts"
+        },
+        "text": "=:rotating_light: *Payment Fee Mismatch Detected*\n\n*Account:* {{ $json.account_name }} (`{{ $json.account_id }}`)\n*Plan:* {{ $json.plan_name }}\n*Configured Fee:* ${{ $json.configured_fee }} {{ $json.uom }}\n*Invoiced (last 30d):* ${{ $json.invoiced_amount }} ({{ $json.invoice_item_count }} items)\n*Deviation:* {{ (Math.abs(($json.invoiced_amount - $json.configured_fee) / $json.configured_fee) * 100).toFixed(1) }}%",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "87t2GgsbEJDItDs7",
+          "name": "Slack ask-pay"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Daily 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "BQ - Product Catalog Fees",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "BQ - Invoiced Amounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ - Product Catalog Fees": {
+      "main": [
+        [
+          {
+            "node": "Merge by Account ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ - Invoiced Amounts": {
+      "main": [
+        [
+          {
+            "node": "Merge by Account ID",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge by Account ID": {
+      "main": [
+        [
+          {
+            "node": "Flag Fee Mismatch > 10%",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flag Fee Mismatch > 10%": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  }
+}

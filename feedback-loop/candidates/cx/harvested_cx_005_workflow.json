@@ -1,0 +1,27 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        640,
+        0
+      ],
+      "id": "e5f6a7b8-c9d0-4e1f-b2a3-4c5d6e7f8a9b",
+      "name": "Get Sheet Tabs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q3XVQiSUNn6QTd3Y",
+          "name": "Google Sheets account 69"
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

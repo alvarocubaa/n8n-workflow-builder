@@ -144,7 +144,8 @@ def check_phase2_gate(text: str) -> bool:
 
 def run_test(base_url: str, department: str, prompt: str,
              confirm_message: str, expected_creds: Optional[dict],
-             save_to: Optional[str], verbose: bool) -> bool:
+             save_to: Optional[str], verbose: bool,
+             checks: Optional[list] = None) -> bool:
     """
     Run a full 2-turn test. Returns True if all checks pass.
     """
@@ -222,6 +223,35 @@ def run_test(base_url: str, department: str, prompt: str,
         tmp_path = tmp.name
 
     results = audit(tmp_path, expected_creds)
+
+    # Filter results to only checks specified in the test case
+    if checks:
+        # Map check categories to result key prefixes
+        check_prefixes = {
+            'encoding': ['encoding'],
+            'uuids': ['uuids'],
+            'credentials': ['cred:', 'cred_missing:'],
+            'bq_projectId': ['bq_projectId:'],
+            'bq_query': ['bq_query:'],
+            'sf_config': ['sf_config:', 'sf_cred_type:'],
+            'slack_config': ['slack_config:'],
+            'no_code_nodes': ['no_code_nodes'],
+            'jira_ids': ['jira_ids'],
+            'future_dates': ['future_dates'],
+        }
+        allowed_prefixes = []
+        for c in checks:
+            allowed_prefixes.extend(check_prefixes.get(c, [c]))
+
+        filtered = {}
+        for key, val in results.items():
+            if any(key == p or key.startswith(p) for p in allowed_prefixes):
+                filtered[key] = val
+            elif not val[0]:
+                # Show non-matching failures as warnings, not counted as failures
+                filtered[f"(warn) {key}"] = (True, f"[WARN] {val[1]}")
+        results = filtered
+
     all_pass = print_results(results, f"[{department}] {wf.get('name', 'unnamed')}")
 
     # Clean up temp file

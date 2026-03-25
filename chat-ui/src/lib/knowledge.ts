@@ -23,6 +23,7 @@ const SKILL_DIR_MAP: Record<string, string> = {
   node_config: 'n8n-node-configuration',
   validation:  'n8n-validation-expert',
   patterns:    'n8n-workflow-patterns',
+  ai_nodes:    'n8n-ai-nodes',
 };
 
 // ─── Company spec map ─────────────────────────────────────────────────────────

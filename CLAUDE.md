@@ -8,13 +8,22 @@ AI-powered chat UI for building production-ready n8n workflows at Guesty. Claude
 
 For project strategy, architecture, and roadmap see `STRATEGY.md`.
 
+## Feedback loop (core process)
+The harvest-test-learn-improve cycle is the primary development process for this project.
+- **Process docs**: `feedback-loop/README.md`
+- **Current state**: `feedback-loop/STATE.md`
+- **At session start**: Read `feedback-loop/STATE.md`. If harvest is overdue (>=5 days since last), flag it to the user.
+- **At session end**: Update `feedback-loop/STATE.md` if any feedback loop work was done this session.
+- **Harvest command**: `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`
+
 ## Folder structure
+- `feedback-loop/` -- Core process: harvest candidates, reviewed cases, learnings from test failures
 - `chat-ui/` -- Next.js app (Claude Sonnet 4.6 via Vertex AI)
 - `n8n-mcp/` -- MCP server exposing n8n workflow tools (search_nodes, validate_node, etc.)
 - `n8n-skills/` -- 7 expert skill guides (expressions, code, validation, patterns, etc.)
 - `specs/` -- 11 company data source specs (Salesforce, Zendesk, Jira, HubSpot, CSM, Zuora, etc.)
 - `bigquery/` -- SQL-first reference docs for manual BigQuery exploration (NOT used by AI at runtime)
-- `tools/` -- Testing automation: audit_workflow.py, test_workflow.py, run_regression.py
+- `tools/` -- Testing automation: audit_workflow.py, test_workflow.py, run_regression.py, harvest_test_cases.ts
 - `examples/` -- Verified workflow JSON outputs from UC testing
 
 ## Key source files

@@ -6,6 +6,8 @@ export interface AttachedFile {
   name: string;
   content: string;
   type: string;
+  encoding: 'text' | 'base64'; // text for .json/.md/.txt/.csv/.yaml, base64 for .pdf
+  mediaType: string;            // MIME type for the API
 }
 
 interface ChatInputProps {
@@ -18,8 +20,8 @@ interface ChatInputProps {
   onRemoveFile?: () => void;
 }
 
-const ACCEPTED_TYPES = '.json,.md,.pdf';
-const MAX_FILE_SIZE = 50 * 1024; // 50KB
+const ACCEPTED_TYPES = '.json,.md,.pdf,.txt,.csv,.yaml,.yml';
+const MAX_FILE_SIZE = 200 * 1024; // 200KB
 
 export default function ChatInput({
   value,
@@ -53,16 +55,31 @@ export default function ChatInput({
     if (!file || !onAttachFile) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      alert(`File too large (${(file.size / 1024).toFixed(0)}KB). Maximum is 50KB.`);
+      alert(`File too large (${(file.size / 1024).toFixed(0)}KB). Maximum is ${MAX_FILE_SIZE / 1024}KB.`);
       return;
     }
 
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+
     const reader = new FileReader();
     reader.onload = () => {
-      const content = reader.result as string;
-      onAttachFile({ name: file.name, content, type: file.type });
+      if (isPdf) {
+        // base64 encode — strip the data URL prefix
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1] ?? '';
+        onAttachFile({ name: file.name, content: base64, type: file.type, encoding: 'base64', mediaType: 'application/pdf' });
+      } else {
+        const content = reader.result as string;
+        const mediaType = file.type || 'text/plain';
+        onAttachFile({ name: file.name, content, type: file.type, encoding: 'text', mediaType });
+      }
     };
-    reader.readAsText(file);
+
+    if (isPdf) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
 
     // Reset input so the same file can be re-selected
     e.target.value = '';
@@ -106,7 +123,7 @@ export default function ChatInput({
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
               className="flex-shrink-0 rounded p-1 text-gray-400 hover:text-gray-600 disabled:opacity-40"
-              title="Attach file (.json, .md, .pdf)"
+              title="Attach file (.json, .md, .pdf, .txt, .csv, .yaml)"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -134,7 +151,7 @@ export default function ChatInput({
         </button>
       </div>
       <p className="mt-1 text-center text-xs text-gray-400">
-        Enter to send · Shift+Enter for newline · Attach .json, .md, or .pdf files
+        Enter to send · Shift+Enter for newline · Attach files (.json, .md, .pdf, .txt, .csv, .yaml)
       </p>
     </div>
   );

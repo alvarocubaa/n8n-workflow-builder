@@ -1,0 +1,505 @@
+{
+  "name": "GUS Upsell Detection & Handoff",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a3f7c821-4d9e-4b2a-8f1c-6e5d3a2b9c0f",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1e2f3a4-5c6d-7e8f-9a0b-1c2d3e4f5a6b",
+              "name": "TEST_MODE",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "c2d3e4f5-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+              "name": "TEST_EMAIL",
+              "value": "gil.almog@guesty.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "projectId": "guesty-data",
+        "dataset": "zendesk_analytics",
+        "table": "tickets_clean",
+        "operation": "executeQuery",
+        "query": "SELECT t.ticket_id, t.account_id, t.account_name, t.subject, t.description, t.requester_email, t.requester_name, t.csm, t.account_segment, t.package, t.sf_account_id FROM `guesty-data.zendesk_analytics.tickets_clean` t WHERE IFNULL(t.gus_ticket, FALSE) = TRUE AND t.ticket_status = 'solved' AND IFNULL(t.deleted, FALSE) = FALSE AND t.updated_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 24 HOUR) ORDER BY t.updated_at DESC LIMIT 100",
+        "options": {}
+      },
+      "id": "e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+      "name": "BQ: GUS Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "vWwsUUkc4EYrtsmN",
+          "name": "Google BigQuery account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f6a7b8c9-0d1e-2f3a-4b5c-6d7e8f9a0b1c",
+      "name": "Loop Over Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://guesty3396.zendesk.com/api/v2/tickets/{{$json.ticket_id}}/comments",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "options": {}
+      },
+      "id": "a7b8c9d0-1e2f-3a4b-5c6d-7e8f9a0b1c2d",
+      "name": "Zendesk: Get Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "zendeskApi": {
+          "id": "PEFCagywCPGDJGjg",
+          "name": "Zendesk sandbox"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const ticketItem = $input.first();\nconst ticketData = ticketItem.json;\n\n// Get comments from Zendesk response\nconst comments = ticketData.comments || [];\nconst commentBodies = comments.map(c => c.body || '').join(' ');\n\n// Build full text block for scanning\nconst fullText = [\n  ticketData.subject || '',\n  ticketData.description || '',\n  commentBodies\n].join(' ').toLowerCase();\n\n// Keyword map\nconst intentMap = [\n  {\n    keywords: ['chargeback', 'fraud', 'payment dispute', '3ds', 'stripe', 'chargeback'],\n    pain_point: 'Risk of fraud and payment disputes',\n    addon: 'Guesty Pay & Guesty Pay Protect (3DS)'\n  },\n  {\n    keywords: ['damage waiver', 'security deposit', 'liability', 'insurance', 'safely', 'truvi', 'shield'],\n    pain_point: 'Friction around insurance and damage protection',\n    addon: 'Guesty Shield'\n  },\n  {\n    keywords: ['lock', 'remotelock', 'lynx', 'operto', 'nuki', 'smart lock', 'keyless'],\n    pain_point: 'High overhead from manual lock workflows',\n    addon: 'Guesty Locks'\n  },\n  {\n    keywords: ['occupancy', 'adr', 'revenue', 'pricing', 'pricelabs', 'beyond', 'wheelhouse', 'dynamic pricing'],\n    pain_point: 'Underperforming revenue and occupancy',\n    addon: 'GPO (Guesty Price Optimizer)'\n  },\n  {\n    keywords: ['review', 'reply', 'messaging', 'guest communication', 'hostai', 'replyai', 'bad review', 'response'],\n    pain_point: 'Low guest engagement and review management',\n    addon: 'GCS / ReplyAI'\n  },\n  {\n    keywords: ['direct reservation', 'direct booking', 'website', 'boostly', 'direct channel'],\n    pain_point: 'Seeking to increase direct bookings',\n    addon: 'Guesty Website'\n  },\n  {\n    keywords: ['hubspot', 'quickbooks', 'integration', 'connect', 'conduit', 'api connect', 'guestyconnect'],\n    pain_point: 'Seeking to connect a 3rd party tool via Guesty',\n    addon: 'GuestyConnect'\n  }\n];\n\n// Find first matching intent\nlet detected = null;\nfor (const intent of intentMap) {\n  for (const kw of intent.keywords) {\n    if (fullText.includes(kw)) {\n      detected = intent;\n      break;\n    }\n  }\n  if (detected) break;\n}\n\n// No match -- skip this ticket\nif (!detected) {\n  return [];\n}\n\n// Return enriched ticket data\nreturn [{\n  json: {\n    ticket_id: ticketData.ticket_id,\n    account_id: ticketData.account_id,\n    account_name: ticketData.account_name,\n    subject: ticketData.subject,\n    description: ticketData.description,\n    requester_email: ticketData.requester_email,\n    requester_name: ticketData.requester_name,\n    csm: ticketData.csm,\n    account_segment: ticketData.account_segment,\n    package: ticketData.package,\n    sf_account_id: ticketData.sf_account_id,\n    detected_pain_point: detected.pain_point,\n    recommended_addon: detected.addon,\n    TEST_MODE: ticketData.TEST_MODE,\n    TEST_EMAIL: ticketData.TEST_EMAIL\n  }\n}];"
+      },
+      "id": "b8c9d0e1-2f3a-4b5c-6d7e-8f9a0b1c2d3e",
+      "name": "Detect Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "account",
+        "operation": "get",
+        "accountId": "={{$json.sf_account_id}}",
+        "additionalFields": {}
+      },
+      "id": "c9d0e1f2-3a4b-5c6d-7e8f-9a0b1c2d3e4f",
+      "name": "SF: Get Account",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        300
+      ],
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "user",
+        "operation": "get",
+        "userId": "={{$json.OwnerId}}",
+        "additionalFields": {}
+      },
+      "id": "d0e1f2a3-4b5c-6d7e-8f9a-0b1c2d3e4f5a",
+      "name": "SF: Get Owner Email",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "projectId": "guesty-data",
+        "dataset": "datalake_glue",
+        "table": "marketplace_integrations",
+        "operation": "executeQuery",
+        "query": "=SELECT mp.name AS partner_name FROM `guesty-data.datalake_glue.marketplace_integrations` mi JOIN `guesty-data.datalake_glue.marketplace_partners` mp ON mi.partnerid = mp._id WHERE mi.accountid = '{{$json.account_id}}' AND mi.active = TRUE AND IFNULL(mp.isdeleted, FALSE) = FALSE AND mp.active = TRUE ORDER BY mp.name",
+        "options": {}
+      },
+      "id": "e1f2a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b",
+      "name": "BQ: Marketplace Integrations",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "vWwsUUkc4EYrtsmN",
+          "name": "Google BigQuery account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Collect all items -- marketplace rows + carry-forward ticket data\nconst allItems = $input.all();\n\n// Partner -> Guesty In-House upsell map\nconst partnerMap = [\n  { partners: ['pricelabs', 'beyond', 'wheelhouse'], guesty: 'GPO (Guesty Price Optimizer)', msg: 'did you know Guesty native GPO could consolidate your pricing workflow and save you fees?' },\n  { partners: ['stripe', 'chargeautomation'], guesty: 'GuestyPay', msg: 'did you know Guesty Pay could simplify your payment stack and reduce transaction fees?' },\n  { partners: ['remotelock', 'lynx', 'operto', 'nuki'], guesty: 'Guesty Locks', msg: 'did you know Guesty Locks integrates natively and removes the need for a 3rd party middleman?' },\n  { partners: ['safely', 'truvi'], guesty: 'Guesty Shield', msg: 'did you know Guesty Shield offers the same protection built right into your dashboard?' },\n  { partners: ['hostai app', 'conduit', 'besty'], guesty: 'ReplyAI', msg: 'did you know Guesty ReplyAI is a native messaging solution that handles this automatically?' },\n  { partners: ['touch stay', 'stayfi', 'enso connect', 'duve', 'hostbuddy ai'], guesty: 'GuestApp', msg: 'did you know Guesty GuestApp covers this natively and keeps everything in one place?' },\n  { partners: ['key data dashboard'], guesty: 'Analytics Add-on', msg: 'did you know Guesty Analytics Add-on provides the same insights built into your account?' },\n  { partners: ['autohost'], guesty: 'GuestVerify', msg: 'did you know Guesty GuestVerify handles guest screening natively?' },\n  { partners: ['chekin'], guesty: 'AutoComply', msg: 'did you know Guesty AutoComply handles compliance check-in natively?' },\n  { partners: ['vrplatform', 'ximplifi'], guesty: 'Guesty Accounting', msg: 'did you know Guesty Accounting covers this natively and syncs in real time?' },\n  { partners: ['boostly'], guesty: 'Advanced Booking Website', msg: 'did you know Guesty offers a native Advanced Booking Website that converts better?' }\n];\n\n// Extract partner names from BQ rows\nconst partnerNames = allItems\n  .map(i => (i.json.partner_name || '').toLowerCase())\n  .filter(p => p.length > 0);\n\n// Find first matching upsell\nlet partnerUpsellLine = '';\nfor (const entry of partnerMap) {\n  const matched = entry.partners.find(p => partnerNames.some(pn => pn.includes(p)));\n  if (matched) {\n    const displayName = matched.charAt(0).toUpperCase() + matched.slice(1);\n    partnerUpsellLine = 'I noticed you are using ' + displayName + ' -- ' + entry.msg;\n    break;\n  }\n}\n\n// Pull ticket context from first item (all rows share same ticket)\nconst ctx = allItems[0].json;\n\n// Close date = today + 30 days\nconst closeDate = new Date();\ncloseDate.setDate(closeDate.getDate() + 30);\nconst closeDateStr = closeDate.toISOString().split('T')[0];\n\n// SF Opportunity details (for test mode Slack display)\nconst oppName = 'GUS Upsell - ' + (ctx.account_name || '') + ' - ' + (ctx.recommended_addon || '');\n\nreturn [{\n  json: {\n    ticket_id: ctx.ticket_id,\n    account_id: ctx.account_id,\n    account_name: ctx.account_name,\n    subject: ctx.subject,\n    requester_email: ctx.requester_email,\n    requester_name: ctx.requester_name,\n    csm: ctx.csm,\n    csm_email: ctx.csm_email || '',\n    sf_owner_id: ctx.sf_owner_id || '',\n    sf_account_id: ctx.sf_account_id,\n    account_segment: ctx.account_segment,\n    detected_pain_point: ctx.detected_pain_point,\n    recommended_addon: ctx.recommended_addon,\n    partner_upsell_line: partnerUpsellLine,\n    opp_name: oppName,\n    opp_close_date: closeDateStr,\n    TEST_MODE: ctx.TEST_MODE,\n    TEST_EMAIL: ctx.TEST_EMAIL\n  }\n}];"
+      },
+      "id": "f2a3b4c5-6d7e-8f9a-0b1c-2d3e4f5a6b7c",
+      "name": "Build Messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-1e2f3a4b5c6d",
+              "leftValue": "={{$json.TEST_MODE}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-upsell-test"
+        },
+        "text": "=:test_tube: *[TEST MODE] GUS Upsell Lead Detected*\n\n*Account:* {{$json.account_name}} ({{$json.account_segment}})\n*Ticket:* #{{$json.ticket_id}} -- {{$json.subject}}\n*Customer:* {{$json.requester_name}} ({{$json.requester_email}})\n*CSM:* {{$json.csm}}\n\n*Pain Point:* {{$json.detected_pain_point}}\n*Recommended Add-on:* {{$json.recommended_addon}}\n{{$json.partner_upsell_line ? $json.partner_upsell_line : ''}}\n\n*[OPPORTUNITY NOT CREATED -- TEST MODE]*\n*Would create SF Opportunity:*\n  - Name: {{$json.opp_name}}\n  - Stage: Prospecting\n  - Close Date: {{$json.opp_close_date}}\n  - Owner: {{$json.csm}} ({{$json.csm_email}})\n  - Description: {{$json.detected_pain_point}} | Ticket #{{$json.ticket_id}}\n\nhttps://guesty3396.zendesk.com/agent/tickets/{{$json.ticket_id}}",
+        "otherOptions": {}
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "Slack: Test Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2420,
+        160
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.TEST_EMAIL}}",
+        "subject": "=[TEST] GUS Upsell Lead -- Customer: {{$json.requester_name}} | CSM: {{$json.csm}}",
+        "emailType": "text",
+        "message": "=[TEST MODE -- This email would normally be sent to: {{$json.requester_name}} ({{$json.requester_email}}) with CC to CSM: {{$json.csm}} ({{$json.csm_email}})]\n\n---\n\nHi {{$json.requester_name}},\n\nThank you for reaching out to Guesty support. Based on our conversation about {{$json.detected_pain_point}}, I truly believe {{$json.recommended_addon}} would be the perfect solution for you.\n\n{{$json.partner_upsell_line}}\n\nI have looped in your dedicated Customer Success Manager, who will be in touch shortly to walk you through the details and answer any questions.\n\nBest,\nThe Guesty Team",
+        "options": {}
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "Gmail: Test Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-upsell-leads"
+        },
+        "text": "=:dart: *GUS Upsell Lead Detected*\n\n*Account:* {{$json.account_name}} ({{$json.account_segment}})\n*Ticket:* #{{$json.ticket_id}} -- {{$json.subject}}\n*Customer:* {{$json.requester_name}} ({{$json.requester_email}})\n*CSM:* {{$json.csm}} ({{$json.csm_email}})\n\n*Pain Point:* {{$json.detected_pain_point}}\n*Recommended Add-on:* {{$json.recommended_addon}}\n{{$json.partner_upsell_line ? $json.partner_upsell_line : ''}}\n\n:white_check_mark: *Salesforce Opportunity Created:* {{$json.opp_name}}\n  - Stage: Prospecting\n  - Close Date: {{$json.opp_close_date}}\n\n*Action:* Please follow up with the customer to close the deal.\nhttps://guesty3396.zendesk.com/agent/tickets/{{$json.ticket_id}}",
+        "otherOptions": {}
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "Slack: Live Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2420,
+        440
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$json.requester_email}}",
+        "subject": "Following up on your Guesty support conversation",
+        "emailType": "text",
+        "message": "=Hi {{$json.requester_name}},\n\nThank you for reaching out to Guesty support. Based on our conversation about {{$json.detected_pain_point}}, I truly believe {{$json.recommended_addon}} would be the perfect solution for you.\n\n{{$json.partner_upsell_line}}\n\nI have looped in your dedicated Customer Success Manager, who will be in touch shortly to walk you through the details and answer any questions.\n\nBest,\nThe Guesty Team",
+        "options": {
+          "ccList": "={{$json.csm_email}}"
+        }
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "Gmail: Live Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        440
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "BQ: GUS Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ: GUS Tickets": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tickets": {
+      "main": [
+        [
+          {
+            "node": "Zendesk: Get Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zendesk: Get Comments": {
+      "main": [
+        [
+          {
+            "node": "Detect Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Intent": {
+      "main": [
+        [
+          {
+            "node": "SF: Get Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SF: Get Account": {
+      "main": [
+        [
+          {
+            "node": "SF: Get Owner Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SF: Get Owner Email": {
+      "main": [
+        [
+          {
+            "node": "BQ: Marketplace Integrations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ: Marketplace Integrations": {
+      "main": [
+        [
+          {
+            "node": "Build Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Messages": {
+      "main": [
+        [
+          {
+            "node": "Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Slack: Test Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: Live Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Test Alert": {
+      "main": [
+        [
+          {
+            "node": "Gmail: Test Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack: Live Alert": {
+      "main": [
+        [
+          {
+            "node": "Gmail: Live Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [],
+  "pinData": {}
+}

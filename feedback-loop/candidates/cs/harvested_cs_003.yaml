@@ -1,0 +1,49 @@
+- name: harvested_cs_003
+  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] HQ Weekly Support Update - Redesigned"
+  department: cs
+  prompt: >
+    evaluate my architrcutre
+    
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "rule": {
+              "interval": [
+                {
+                  "field": "cronExpression",
+                  "expression": "0 9 * * 1"
+                }
+              ]
+            }
+          },
+          "id": "f38065f7-8833-4b92-b5a4-8346743fb8cb",
+          "name": "Every Monday at 9AM",
+          "type": "n8n-nodes-base.scheduleTrigger",
+          "typeVersion": 1.1,
+          "position": [
+            -272,
+            -4848
+          ]
+        },
+        {
+          "paramet...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - set
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: OaVItFDSR6kIHjfWXjYr
+    source_user: roni.shif@guesty.com
+    deployed: true
+    deployed_workflow_id: 1I6CfSGISIXdgkxi
+    workflow_name: "[AI by roni.shif] HQ Weekly Support Update - Redesigned"
+    node_count: 1
+    complexity_score: 4
+    harvested_at: 2026-03-20T12:38:09.958Z
+    confidence: medium
+    workflow_json_file: harvested_cs_003_workflow.json

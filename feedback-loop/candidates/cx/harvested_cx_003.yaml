@@ -1,0 +1,28 @@
+- name: harvested_cx_003
+  description: "Harvested from roni.shif@guesty.com - The cheat sheet workflow is fialing at the same spot ever..."
+  department: cx
+  prompt: >
+    The cheat sheet workflow is fialing at the same spot every time. 
+    
+    The issue: CSM cal is scanned and filters out internal meetings. We get the account using the contact from the meeting in SF. As the attenddee can be anyone assosieted to the acconunt we must search through all the contacts. 
+    
+    I added a code node to match between the contact  lists and the attenddeess and output the user's name. Right now if there is no match it outputs fallback responses which ten is passed to the query which...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - if
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: ICroRQq0YOYJWY40fZ9P
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "The cheat sheet workflow is fialing at the same spot ever..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.957Z
+    confidence: medium
+    workflow_json_file: harvested_cx_003_workflow.json

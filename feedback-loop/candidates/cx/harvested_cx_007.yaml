@@ -1,0 +1,50 @@
+- name: harvested_cx_007
+  description: "Harvested from roni.shif@guesty.com - Accounting 
+
+THis workfow has got an error as it was trig..."
+  department: cx
+  prompt: >
+    Accounting 
+    
+    THis workfow has got an error as it was triggered when a new row was added but the LLM has recived too many requests 
+    
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "pollTimes": {
+              "item": [
+                {
+                  "mode": "everyMinute"
+                }
+              ]
+            },
+            "documentId": {
+              "__rl": true,
+              "mode": "id",
+              "value": "1KpiafhwJem-R1Z6pOblFRfu1B2u9CKpKpVfmCHf3azU"
+            },
+            "sheetName": {
+              "__rl": tr...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - @n8n/n8n-nodes-langchain.lmChatOpenAi
+  expected_creds:
+    openAiApi: sibRkht3HDN1V5lW
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: dj4u2WHcZejD0jY26iA3
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Accounting 
+
+THis workfow has got an error as it was trig..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.958Z
+    confidence: medium
+    workflow_json_file: harvested_cx_007_workflow.json

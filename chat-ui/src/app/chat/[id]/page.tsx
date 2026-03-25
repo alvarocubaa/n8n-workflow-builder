@@ -30,6 +30,7 @@ export default async function ExistingChatPage({ params }: Props) {
       conversationId={id}
       initialMessages={initialMessages}
       initialDepartmentId={conversation.departmentId}
+      initialMode={conversation.mode}
     />
   );
 }

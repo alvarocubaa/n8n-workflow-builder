@@ -1,0 +1,189 @@
+{
+  "name": "Daily CS Churn Report - cs-churn-alerts",
+  "nodes": [
+    {
+      "id": "a3f7c2d1-84e6-4b19-9c3a-f1e2d5b6c7a8",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b8d4e9f2-31c7-4a56-8e0b-2c3d4e5f6a7b",
+      "name": "BQ - Churn Last 30 Days",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  c.account_id,\n  c.account_name,\n  c.from_date,\n  c.churn_reason,\n  c.churn_reason_modified,\n  c.customer_churn_reason,\n  c.churn_type,\n  c.csm,\n  c.avg_mrr,\n  c.account_segmentation,\n  c.geo_area,\n  c.months_in_guesty,\n  c.etf\nFROM `guesty-data.csm.csm_churn_report` c\nWHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nORDER BY c.from_date DESC\nLIMIT 100",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read"
+        }
+      }
+    },
+    {
+      "id": "c9e5f0a3-42d8-4b67-9f1c-3d4e5f6a7b8c",
+      "name": "Build SOQL IN Clause",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) {\n  return [{ json: { accountIds: '', churnRows: [] } }];\n}\nconst ids = items.map(i => i.json.account_id).filter(Boolean);\nconst uniqueIds = [...new Set(ids)];\nconst inClause = uniqueIds.map(id => `'${id}'`).join(', ');\nconst churnRows = items.map(i => i.json);\nreturn [{ json: { accountIds: inClause, churnRows } }];"
+      }
+    },
+    {
+      "id": "d0f6a1b4-53e9-4c78-a02d-4e5f6a7b8c9d",
+      "name": "SF - Get Account Owners",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "={{ 'SELECT Id, Name, Owner.Name, Guesty_Admin_ID__c FROM Account WHERE Guesty_Admin_ID__c IN (' + $json.accountIds + ')' }}"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "aBjJNGRAjYF66z5F",
+          "name": "Salesforce Partial Sandbox"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e1a7b2c5-64fa-4d89-b13e-5f6a7b8c9d0e",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst sfRecords = items.map(i => i.json).filter(i => i && i.Guesty_Admin_ID__c);\nconst ownerMap = {};\nfor (const rec of sfRecords) {\n  ownerMap[rec.Guesty_Admin_ID__c] = (rec.Owner && rec.Owner.Name) ? rec.Owner.Name : 'N/A';\n}\nconst prevData = $('Build SOQL IN Clause').first().json;\nconst churnRows = prevData.churnRows || [];\nif (churnRows.length === 0) {\n  return [{ json: { message: ':white_check_mark: *Daily Churn Report* -- No churned accounts in the last 30 days.' } }];\n}\nconst totalMrr = churnRows.reduce((sum, r) => sum + (r.avg_mrr || 0), 0);\nconst top20 = churnRows.slice(0, 20);\nconst today = new Date().toISOString().slice(0, 10);\nconst lines = [];\nlines.push(':rotating_light: *Daily Churn Report* -- Last 30 Days (' + today + ')');\nlines.push('*Total churned accounts:* ' + churnRows.length + '  |  *Total avg MRR lost:* $' + Math.round(totalMrr).toLocaleString());\nlines.push('');\nlines.push('*Account* | Churn Date | Reason | CSM | SF Owner | MRR | Segment | Geo');\nlines.push('---');\nfor (const r of top20) {\n  const owner = ownerMap[r.account_id] || 'N/A';\n  const mrr = r.avg_mrr ? '$' + Math.round(r.avg_mrr).toLocaleString() : 'N/A';\n  const reason = r.churn_reason_modified || r.churn_reason || 'N/A';\n  lines.push('*' + r.account_name + '* | ' + r.from_date + ' | ' + reason + ' | ' + (r.csm || 'N/A') + ' | ' + owner + ' | ' + mrr + ' | ' + (r.account_segmentation || 'N/A') + ' | ' + (r.geo_area || 'N/A'));\n}\nif (churnRows.length > 20) {\n  lines.push('_...and ' + (churnRows.length - 20) + ' more accounts. Showing top 20 by churn date._');\n}\nreturn [{ json: { message: lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "f2b8c3d6-75ab-4e9a-c24f-6a7b8c9d0e1f",
+      "name": "Slack - Post to cs-churn-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-churn-alerts"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "BQ - Churn Last 30 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ - Churn Last 30 Days": {
+      "main": [
+        [
+          {
+            "node": "Build SOQL IN Clause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SOQL IN Clause": {
+      "main": [
+        [
+          {
+            "node": "SF - Get Account Owners",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SF - Get Account Owners": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Slack - Post to cs-churn-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

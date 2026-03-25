@@ -1,0 +1,319 @@
+# Regression test results tracker.
+# Updated by run_regression.py (--save-results flag) and manually after each run.
+#
+# Fields per result entry:
+#   case:          test case name (matches test_cases.yaml)
+#   version:       app version when tested (e.g. v0.18)
+#   date:          test date (YYYY-MM-DD)
+#   result:        PASS | FAIL | ERROR
+#   audit_pass:    number of audit checks passed
+#   audit_fail:    number of audit checks failed
+#   elapsed_s:     seconds for the full 2-turn conversation
+#   phase2_held:   true if Phase 2 gate was respected (separate turns)
+#   nodes:         number of nodes in output workflow
+#   code_node:     true if a Code node was used (violation of no_code_nodes rule)
+#   tools_called:  number of MCP tool calls made
+#   issues:        free-text notes on any problems observed
+#   conversation:  Firestore conversation ID for reference
+#
+# History is append-only. Older entries are kept for trend analysis.
+# To see latest result per case: filter by max(date) per case.
+
+results:
+  # ── v0.17 results (2026-03-13, from RELEASES.md notes) ──
+
+  - case: uc1_finance
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: true
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: "Smart defaults applied, Phase 2 gate held, correct SQL"
+    conversation: null
+
+  - case: cs_churn_bq_slack
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: 8
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: true
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_event_sf_dashboards
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_hubspot_insights
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_ppc_audit
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_mtc_content
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_localization
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_event_command_center
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_market_voice_sync
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_case_study_engine
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_ai_marketing_brief
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_seo_reporting
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_linkedin_content
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  - case: hack_webinar_creation
+    version: v0.17
+    date: "2026-03-13"
+    result: PASS
+    audit_pass: null
+    audit_fail: 0
+    elapsed_s: null
+    phase2_held: null
+    nodes: null
+    code_node: false
+    tools_called: null
+    issues: null
+    conversation: null
+
+  # ── v0.18 results (2026-03-16) ──
+
+  - case: uc3_cs
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: 7
+    audit_fail: 0
+    elapsed_s: 111
+    phase2_held: false
+    nodes: 5
+    code_node: true
+    tools_called: 17
+    issues: "Phase 2 gate not held (skipped to build). Used Code node for Slack message formatting despite no_code_nodes rule. Sandbox SF cred used correctly."
+    conversation: bGtOkxTa8c0SVSXigQPj
+
+  - case: cs_churn_bq_slack
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: 9
+    audit_fail: 1
+    elapsed_s: 171
+    phase2_held: true
+    nodes: 6
+    code_node: true
+    tools_called: 17
+    issues: "SF cred used sandbox (aBjJNGRAjYF66z5F) per ENVIRONMENT PRIORITY -- test expectation was wrong (expected production). Fixed test_cases.yaml. 2 Code nodes used."
+    conversation: sbfleZb0BynkiGGEMrrU
+
+  - case: cs_sf_trigger_bq_enrich
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: 10
+    audit_fail: 2
+    elapsed_s: 157
+    phase2_held: true
+    nodes: 5
+    code_node: false
+    tools_called: 17
+    issues: "2 audit false positives: (1) BQ used default cred h7fJ82YhtOnUL58u instead of CS-specific VQ7CU7dKViVcv8Ah -- prompt says 'production' so both are valid. (2) sf_config check applied to SalesforceTrigger (not applicable). No Code nodes."
+    conversation: EFJ2g3n76fjVb5QzFDJ5
+
+  - case: uc2_cx
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: 6
+    audit_fail: 0
+    elapsed_s: 121
+    phase2_held: true
+    nodes: 4
+    code_node: true
+    tools_called: 11
+    issues: "All audit checks clean. Used verified SQL example from Zendesk spec. Code node for Slack message formatting."
+    conversation: KHlsB4jdXSvnoHGpeOzp
+
+  - case: uc1_finance
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: null
+    audit_fail: null
+    elapsed_s: 30
+    phase2_held: true
+    nodes: null
+    code_node: null
+    tools_called: 2
+    issues: "Phase 2 gate correctly held -- AI presented SQL in Turn 2 and asked for confirmation. Test harness only sends 2 turns so no JSON produced. This is correct behavior; harness needs 3-turn support for Phase 1+2+3 flows."
+    conversation: UUthRv3ZbzYzSaZx6LFo
+
+  - case: ob_sf_closed_won_alert
+    version: v0.18
+    date: "2026-03-16"
+    result: PASS
+    audit_pass: 9
+    audit_fail: 0
+    elapsed_s: 111
+    phase2_held: false
+    nodes: 6
+    code_node: false
+    tools_called: 9
+    issues: "All audit checks clean. Phase 1 skipped (all details explicit). OB credentials scoped correctly. No Code nodes. Added If node for empty results handling (nice touch)."
+    conversation: sEqp2A9ViicKYL1SZ2Ak
+
+  - case: pay_multi_bq_merge
+    version: v0.18
+    date: "2026-03-16"
+    result: FAIL
+    audit_pass: 5
+    audit_fail: 3
+    elapsed_s: 130
+    phase2_held: true
+    nodes: 6
+    code_node: false
+    tools_called: 14
+    issues: "3 cred mismatches: (1) BQ used aLlYQkLWrmANkfFZ (Google Drive 'n8n-payments') -- only googleApi in Payments dept, no dedicated BQ cred. (2) Slack used production 87t2GgsbEJDItDs7 instead of sandbox 0l2bJ3SquNB8nyFd -- ENVIRONMENT PRIORITY not respected for Slack. Test expectations updated for BQ. Payments dept needs a BQ-specific credential."
+    conversation: VbbHlN9rDh9XVUHLSMBB

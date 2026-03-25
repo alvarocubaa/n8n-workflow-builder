@@ -1,0 +1,34 @@
+- name: harvested_cs_002
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery csm_churn_r..."
+  department: cs
+  prompt: >
+    Create a daily workflow that queries BigQuery csm_churn_report for accounts with recent churn. Include the account owner from Salesforce. Post summary to #cs-churn-alerts in Slack. Run at 9am UTC daily.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - code
+    - salesforce
+    - slack
+  expected_creds:
+    googleApi: VQ7CU7dKViVcv8Ah
+    salesforceOAuth2Api: aBjJNGRAjYF66z5F
+    slackApi: 7H6auF31TpX7Wk7M
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
+  _metadata:
+    source_conversation: sbfleZb0BynkiGGEMrrU
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a daily workflow that queries BigQuery csm_churn_r..."
+    node_count: 6
+    complexity_score: 1
+    harvested_at: 2026-03-20T12:38:09.955Z
+    confidence: high
+    workflow_json_file: harvested_cs_002_workflow.json
