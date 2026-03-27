@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>n8n Workflow Builder — v0.22 Performance Update</title>
+  <style>
+    :root {
+      --guesty: #0D2B4E;
+      --guesty-light: #1a4a7a;
+      --guesty-accent: #3B82F6;
+      --guesty-glow: #60A5FA;
+      --surface: #0f172a;
+      --surface-2: #1e293b;
+      --surface-3: #334155;
+      --text: #f1f5f9;
+      --text-dim: #94a3b8;
+      --green: #22c55e;
+      --green-dim: #15803d;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --purple: #a78bfa;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Hero Section */
+    .hero {
+      background: linear-gradient(135deg, var(--guesty) 0%, #0a1628 50%, var(--surface) 100%);
+      padding: 60px 24px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(59,130,246,0.08) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 30%, rgba(167,139,250,0.06) 0%, transparent 40%);
+      animation: float 20s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-2%, 2%); }
+    }
+
+    .hero-content { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--green);
+      margin-bottom: 24px;
+    }
+
+    .badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .hero h1 {
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 0%, var(--guesty-glow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero .subtitle {
+      font-size: 18px;
+      color: var(--text-dim);
+      max-width: 600px;
+      margin: 0 auto 32px;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+
+    .hero-stat {
+      text-align: center;
+    }
+
+    .hero-stat .value {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--guesty-glow);
+    }
+
+    .hero-stat .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Tabs */
+    .tabs-container {
+      max-width: 1100px;
+      margin: -40px auto 0;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface-2);
+      padding: 4px;
+      border-radius: 16px;
+      border: 1px solid var(--surface-3);
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 12px 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 12px;
+      transition: all 0.3s ease;
+    }
+
+    .tab:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+    .tab.active {
+      background: var(--guesty-accent);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+    }
+
+    .tab-content { display: none; animation: fadeIn 0.4s ease; }
+    .tab-content.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface-2);
+      border: 1px solid var(--surface-3);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 20px;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      border-color: rgba(59,130,246,0.3);
+      box-shadow: 0 0 30px rgba(59,130,246,0.05);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* Before/After Comparison */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .comparison-box {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .comparison-box.before {
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+
+    .comparison-box.after {
+      border: 1px solid rgba(34,197,94,0.3);
+    }
+
+    .comparison-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .comparison-box.before .comparison-label { color: var(--red); }
+    .comparison-box.after .comparison-label { color: var(--green); }
+
+    .comparison-value {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .comparison-box.before .comparison-value { color: var(--red); }
+    .comparison-box.after .comparison-value { color: var(--green); }
+
+    .comparison-detail {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .arrow {
+      font-size: 24px;
+      color: var(--guesty-accent);
+    }
+
+    /* Animated Bar */
+    .bar-container {
+      margin: 16px 0;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .bar-track {
+      height: 10px;
+      background: var(--surface);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .bar-fill::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 20px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
+      border-radius: 999px;
+    }
+
+    /* Impact Metric */
+    .impact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .impact-item {
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border: 1px solid var(--surface-3);
+    }
+
+    .impact-value {
+      font-size: 32px;
+      font-weight: 800;
+    }
+
+    .impact-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+    }
+
+    .impact-sublabel {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    /* Timeline */
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--guesty-accent), var(--purple), var(--surface-3));
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 28px;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: -28px;
+      top: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 3px solid;
+    }
+
+    .timeline-item.done .timeline-dot {
+      background: var(--green);
+      border-color: var(--green);
+      box-shadow: 0 0 12px rgba(34,197,94,0.4);
+    }
+
+    .timeline-item.current .timeline-dot {
+      background: var(--guesty-accent);
+      border-color: var(--guesty-accent);
+      box-shadow: 0 0 12px rgba(59,130,246,0.4);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .timeline-item.upcoming .timeline-dot {
+      background: var(--surface);
+      border-color: var(--surface-3);
+    }
+
+    .timeline-date {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .timeline-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .timeline-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    /* Status Tags */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tag.green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .tag.amber { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .tag.blue { background: rgba(59,130,246,0.15); color: var(--guesty-accent); }
+    .tag.purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+    /* Grid layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid var(--surface-3);
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(51,65,85,0.5);
+    }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    code {
+      background: var(--surface);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: var(--guesty-glow);
+    }
+
+    /* Collapsible */
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 12px 0;
+      user-select: none;
+    }
+
+    .collapsible-header:hover { opacity: 0.8; }
+
+    .collapsible-chevron {
+      transition: transform 0.3s;
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .collapsible-chevron.open { transform: rotate(180deg); }
+
+    .collapsible-body {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease;
+    }
+
+    .collapsible-body.open { max-height: 2000px; }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .footer a { color: var(--guesty-accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .comparison { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); text-align: center; }
+      .hero-stats { gap: 24px; }
+      .tabs { flex-wrap: wrap; }
+    }
+
+    /* Scroll animations */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-content">
+      <div class="badge"><span class="dot"></span> Deployed to Production — March 27, 2026</div>
+      <h1>n8n Workflow Builder v0.22</h1>
+      <p class="subtitle">Context window expanded 10x, typing lag eliminated, output capacity doubled, and full Guesty rebrand. The biggest release since launch.</p>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="value">800K</div>
+          <div class="label">Context Tokens</div>
+        </div>
+        <div class="hero-stat">
+          <div class="value">65K</div>
+          <div class="label">Output Tokens</div>
+        </div>
+        <div class="hero-stat">
+          <div class="value">0ms</div>
+          <div class="label">Typing Lag</div>
+        </div>
+        <div class="hero-stat">
+          <div class="value">6</div>
+          <div class="label">Departments Live</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tabs -->
+  <div class="tabs-container">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('changes')">What Changed</button>
+      <button class="tab" onclick="switchTab('results')">Results & Impact</button>
+      <button class="tab" onclick="switchTab('roadmap')">Roadmap</button>
+      <button class="tab" onclick="switchTab('tech')">Technical Details</button>
+    </div>
+
+    <!-- TAB 1: What Changed -->
+    <div id="tab-changes" class="tab-content active">
+
+      <!-- Guesty Rebrand -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(20,102,95,0.15);">🎨</div>
+          <div>
+            <div class="card-title">Guesty Design System — Full Rebrand</div>
+            <div class="card-subtitle">Every screen redesigned with the official Guesty teal palette, Figtree font, and warm neutrals</div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 16px;">
+          <div style="background: var(--surface); border-radius: 12px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+              <div style="width: 24px; height: 24px; border-radius: 6px; background: #14665F;"></div>
+              <div style="width: 24px; height: 24px; border-radius: 6px; background: #072C23;"></div>
+              <div style="width: 24px; height: 24px; border-radius: 6px; background: #BCE5E5;"></div>
+              <div style="width: 24px; height: 24px; border-radius: 6px; background: #EEFAD0;"></div>
+            </div>
+            <div style="font-size: 13px; font-weight: 600;">Guesty Teal Palette</div>
+            <div style="font-size: 12px; color: var(--text-dim);">Primary brand colors across all UI</div>
+          </div>
+          <div style="background: var(--surface); border-radius: 12px; padding: 16px;">
+            <div style="font-size: 18px; font-weight: 700; font-family: 'Figtree', sans-serif; margin-bottom: 4px; color: var(--green);">Figtree</div>
+            <div style="font-size: 13px; font-weight: 600;">Typography</div>
+            <div style="font-size: 12px; color: var(--text-dim);">Clean, modern sans-serif font</div>
+          </div>
+          <div style="background: var(--surface); border-radius: 12px; padding: 16px;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(20,102,95,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #14665F;">G</div>
+              <span style="font-size: 12px; color: var(--text-dim);">AI Avatar</span>
+            </div>
+            <div style="font-size: 13px; font-weight: 600;">New UI Elements</div>
+            <div style="font-size: 12px; color: var(--text-dim);">Avatar, typing dots, code headers</div>
+          </div>
+          <div style="background: var(--surface); border-radius: 12px; padding: 16px;">
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">20 Components</div>
+            <div style="font-size: 12px; color: var(--text-dim);">All chat, analytics, sidebar, and input components restyled</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Context Window -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(59,130,246,0.15);">🧠</div>
+          <div>
+            <div class="card-title">Context Window — 10x Increase</div>
+            <div class="card-subtitle">Conversations can now be 10x longer before context windowing kicks in</div>
+          </div>
+        </div>
+        <div class="comparison">
+          <div class="comparison-box before">
+            <div class="comparison-label">Before</div>
+            <div class="comparison-value">80K</div>
+            <div class="comparison-detail">tokens before windowing</div>
+            <div class="comparison-detail" style="margin-top:4px">8% of available context</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="comparison-box after">
+            <div class="comparison-label">After</div>
+            <div class="comparison-value">800K</div>
+            <div class="comparison-detail">tokens before windowing</div>
+            <div class="comparison-detail" style="margin-top:4px">80% of available context</div>
+          </div>
+        </div>
+        <div class="bar-container" style="margin-top: 24px;">
+          <div class="bar-label">
+            <span>Context utilization</span>
+            <span style="color: var(--green)">800K / 1M available</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 0%; background: linear-gradient(90deg, var(--guesty-accent), var(--green));" data-width="80"></div>
+          </div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label">
+            <span>Previous utilization</span>
+            <span style="color: var(--red)">80K / 1M available</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width: 0%; background: var(--red); opacity: 0.5;" data-width="8"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Output Tokens -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(167,139,250,0.15);">📤</div>
+          <div>
+            <div class="card-title">Output Capacity — Doubled</div>
+            <div class="card-subtitle">Longer workflow JSONs and more detailed explanations without truncation</div>
+          </div>
+        </div>
+        <div class="comparison">
+          <div class="comparison-box before">
+            <div class="comparison-label">Before</div>
+            <div class="comparison-value">32K</div>
+            <div class="comparison-detail">max output tokens per turn</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="comparison-box after">
+            <div class="comparison-label">After</div>
+            <div class="comparison-value">65K</div>
+            <div class="comparison-detail">max output tokens per turn</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typing Performance -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(34,197,94,0.15);">⚡</div>
+          <div>
+            <div class="card-title">Typing Lag — Eliminated</div>
+            <div class="card-subtitle">User-reported issue: "takes almost a minute to show what I'm typing" in long conversations</div>
+          </div>
+        </div>
+        <div class="comparison">
+          <div class="comparison-box before">
+            <div class="comparison-label">Before</div>
+            <div class="comparison-value">~60s</div>
+            <div class="comparison-detail">input lag in long conversations</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="comparison-box after">
+            <div class="comparison-label">After</div>
+            <div class="comparison-value">Instant</div>
+            <div class="comparison-detail">typing response at any conversation length</div>
+          </div>
+        </div>
+        <div style="margin-top: 20px;">
+          <div class="collapsible-header" onclick="toggleCollapsible(this)">
+            <span style="font-weight: 600; font-size: 14px;">Root cause & fix details</span>
+            <span class="collapsible-chevron">▼</span>
+          </div>
+          <div class="collapsible-body">
+            <div style="background: var(--surface); border-radius: 12px; padding: 16px; font-size: 13px; margin-top: 8px;">
+              <p style="margin-bottom: 12px;"><strong>Root cause:</strong> Every keystroke triggered a React re-render of ALL message bubbles. Each bubble contains heavy Markdown + Prism syntax highlighting — in a 30+ message conversation, that's 30+ expensive re-renders per character typed.</p>
+              <p style="margin-bottom: 12px;"><strong>3 fixes applied:</strong></p>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; gap: 8px; align-items: start;">
+                  <span class="tag green">Fix 1</span>
+                  <span><code>React.memo</code> on MessageBubble — skips re-render unless content actually changed</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: start;">
+                  <span class="tag green">Fix 2</span>
+                  <span>Memoized <code>MessageList</code> wrapper — isolates input state from message rendering tree</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: start;">
+                  <span class="tag green">Fix 3</span>
+                  <span>Stable message keys via <code>crypto.randomUUID()</code> — proper React reconciliation</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Window Size -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(245,158,11,0.15);">🪟</div>
+          <div>
+            <div class="card-title">Sliding Window — Wider</div>
+            <div class="card-subtitle">When context windowing activates, more recent messages are preserved</div>
+          </div>
+        </div>
+        <div class="comparison">
+          <div class="comparison-box before">
+            <div class="comparison-label">Before</div>
+            <div class="comparison-value">12</div>
+            <div class="comparison-detail">recent messages kept</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="comparison-box after">
+            <div class="comparison-label">After</div>
+            <div class="comparison-value">20</div>
+            <div class="comparison-detail">recent messages kept</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Results & Impact -->
+    <div id="tab-results" class="tab-content">
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(34,197,94,0.15);">📊</div>
+          <div>
+            <div class="card-title">Impact at a Glance</div>
+            <div class="card-subtitle">What these changes mean for users and the business</div>
+          </div>
+        </div>
+        <div class="impact-grid">
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--green);">10x</div>
+            <div class="impact-label">Longer Conversations</div>
+            <div class="impact-sublabel">Before context gets trimmed</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--guesty-accent);">2x</div>
+            <div class="impact-label">Output Capacity</div>
+            <div class="impact-sublabel">Bigger workflows, less truncation</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--purple);">0</div>
+            <div class="impact-label">UI Re-renders</div>
+            <div class="impact-sublabel">Per keystroke (was 30+)</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--amber);">3</div>
+            <div class="impact-label">Files Changed</div>
+            <div class="impact-sublabel">Surgical, low-risk update</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card reveal">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(34,197,94,0.15);">👤</div>
+            <div>
+              <div class="card-title">User Experience</div>
+            </div>
+          </div>
+          <ul style="list-style: none; font-size: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <li style="display: flex; gap: 8px;">
+              <span style="color: var(--green);">✓</span>
+              <span>Typing is instant regardless of conversation length</span>
+            </li>
+            <li style="display: flex; gap: 8px;">
+              <span style="color: var(--green);">✓</span>
+              <span>Multi-day conversations retain full context</span>
+            </li>
+            <li style="display: flex; gap: 8px;">
+              <span style="color: var(--green);">✓</span>
+              <span>Complex workflows output completely (no truncation)</span>
+            </li>
+            <li style="display: flex; gap: 8px;">
+              <span style="color: var(--green);">✓</span>
+              <span>Streaming still works — only active message re-renders</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="card reveal">
+          <div class="card-header">
+            <div class="card-icon" style="background: rgba(59,130,246,0.15);">🔬</div>
+            <div>
+              <div class="card-title">Verified Limits</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <tr>
+                <td style="color: var(--text-dim);">Model</td>
+                <td>Claude Sonnet 4.6</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">Platform</td>
+                <td>Vertex AI (GA)</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">Max Input</td>
+                <td><strong>1,000,000</strong> tokens</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">Max Output</td>
+                <td><strong>128,000</strong> tokens</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">Region</td>
+                <td>us-east5 (1500 QPM)</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">Beta Header</td>
+                <td><span class="tag green">Not required</span></td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(245,158,11,0.15);">🧮</div>
+          <div>
+            <div class="card-title">Token Budget Breakdown</div>
+            <div class="card-subtitle">How we allocate the 1M token context window</div>
+          </div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label"><span>Conversation history</span><span>800,000</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: 0%; background: var(--guesty-accent);" data-width="80"></div></div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label"><span>Output reserve (max_tokens)</span><span>65,536</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: 0%; background: var(--purple);" data-width="6.5"></div></div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label"><span>Safety margin</span><span>~118,000</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: 0%; background: var(--amber);" data-width="11.8"></div></div>
+        </div>
+        <div class="bar-container">
+          <div class="bar-label"><span>System prompt + tools</span><span>~6,500</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width: 0%; background: var(--text-dim);" data-width="0.65"></div></div>
+        </div>
+      </div>
+
+      <!-- Overall Platform Stats -->
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(167,139,250,0.15);">🏢</div>
+          <div>
+            <div class="card-title">Platform Overview (as of v0.22)</div>
+          </div>
+        </div>
+        <div class="impact-grid">
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--guesty-glow);">6</div>
+            <div class="impact-label">Departments</div>
+            <div class="impact-sublabel">Marketing, CS, CX, OB, Payments, Finance</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--purple);">11</div>
+            <div class="impact-label">Data Source Specs</div>
+            <div class="impact-sublabel">Salesforce, Zendesk, Jira, HubSpot...</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--amber);">85+</div>
+            <div class="impact-label">Conversations</div>
+            <div class="impact-sublabel">Across 6 active users</div>
+          </div>
+          <div class="impact-item">
+            <div class="impact-value" style="color: var(--green);">26</div>
+            <div class="impact-label">Regression Tests</div>
+            <div class="impact-sublabel">Covering all departments</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Roadmap -->
+    <div id="tab-roadmap" class="tab-content">
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(59,130,246,0.15);">🗺️</div>
+          <div>
+            <div class="card-title">Release Timeline</div>
+            <div class="card-subtitle">Past milestones and what's coming next</div>
+          </div>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-item done">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">March 9</div>
+            <div class="timeline-title">v0.19 — Analytics Dashboard</div>
+            <div class="timeline-desc">Firestore analytics, ROI calculator, deploy tracker, feedback system. 85 conversations seeded.</div>
+          </div>
+          <div class="timeline-item done">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">March 13</div>
+            <div class="timeline-title">v0.19.1 — Smart Defaults + Credential Ordering</div>
+            <div class="timeline-desc">Reduced Phase 1 questions for non-technical users. Dept-specific credentials prioritized.</div>
+          </div>
+          <div class="timeline-item done">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">March 24</div>
+            <div class="timeline-title">v0.20 — Context Degradation Fix</div>
+            <div class="timeline-desc">Token monitoring, context windowing (80K), tool context persistence, truncation detection.</div>
+          </div>
+          <div class="timeline-item done">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">March 25</div>
+            <div class="timeline-title">v0.21 — Data Consultant Mode</div>
+            <div class="timeline-desc">Dual-mode assistant (Builder + Data), feedback loop harvester, AI nodes skill, 26-test regression suite.</div>
+          </div>
+          <div class="timeline-item current">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">March 26</div>
+            <div class="timeline-title">v0.22 — Performance & Context Expansion</div>
+            <div class="timeline-desc">Context 80K→800K, output 32K→65K, typing lag eliminated via React memoization.</div>
+          </div>
+          <div class="timeline-item upcoming">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Next</div>
+            <div class="timeline-title">Regression Fixes (5 failing cases)</div>
+            <div class="timeline-desc">CX BigQuery confusion (2), Marketing multi-user creds (2), Zuora-Salesforce reconciliation (1).</div>
+          </div>
+          <div class="timeline-item upcoming">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Next</div>
+            <div class="timeline-title">Spec Enrichment — CSM, Zuora, AdminData</div>
+            <div class="timeline-desc">Add verified SQL examples to underperforming specs. Target: 10 SQL examples per spec.</div>
+          </div>
+          <div class="timeline-item upcoming">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Q2 Target</div>
+            <div class="timeline-title">15 Data Source Specs + 99% Regression Pass</div>
+            <div class="timeline-desc">Full data coverage across all Guesty systems. Near-zero workflow generation errors.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(245,158,11,0.15);">🎯</div>
+          <div>
+            <div class="card-title">Immediate Priorities</div>
+            <div class="card-subtitle">Next session action items</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Priority</th>
+                <th>Task</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="tag" style="background: rgba(239,68,68,0.15); color: var(--red);">P0</span></td>
+                <td>Deploy v0.22 to Cloud Run + smoke test</td>
+                <td><span class="tag blue">Ready</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag" style="background: rgba(239,68,68,0.15); color: var(--red);">P0</span></td>
+                <td>Run feedback harvester (overdue 6 days)</td>
+                <td><span class="tag amber">Overdue</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag amber">P1</span></td>
+                <td>Fix 5 regression failures from Session G</td>
+                <td><span class="tag purple">Carried</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag amber">P1</span></td>
+                <td>Monitor token analytics (inputTokens, truncation events)</td>
+                <td><span class="tag blue">Ready</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag blue">P2</span></td>
+                <td>Share performance improvements with Gil and Roni</td>
+                <td><span class="tag blue">Ready</span></td>
+              </tr>
+              <tr>
+                <td><span class="tag blue">P2</span></td>
+                <td>Enrich CSM, Zuora, AdminData specs with SQL examples</td>
+                <td><span class="tag purple">Planned</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: Technical Details -->
+    <div id="tab-tech" class="tab-content">
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(59,130,246,0.15);">📁</div>
+          <div>
+            <div class="card-title">Files Modified</div>
+            <div class="card-subtitle">25 files changed — backend, performance, and full UI rebrand</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Changes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>chat-ui/src/lib/claude.ts</code></td>
+                <td>
+                  <code>CONTEXT_TOKEN_THRESHOLD</code> 80K → 800K<br>
+                  <code>RECENT_WINDOW_SIZE</code> 12 → 20<br>
+                  <code>max_tokens</code> 32768 → 65536
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-ui/src/components/MessageBubble.tsx</code></td>
+                <td>
+                  Added <code>id</code> to Message interface<br>
+                  Wrapped in <code>React.memo</code> with custom comparator<br>
+                  Checks: content, isStreaming, toolCalls, conversationId, departmentId, mode
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-ui/src/components/ChatWindow.tsx</code></td>
+                <td>
+                  Messages get <code>crypto.randomUUID()</code> at creation<br>
+                  Stable keys: <code>key={msg.id ?? i}</code><br>
+                  Extracted memoized <code>MessageList</code> component
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-ui/tailwind.config.ts</code></td>
+                <td>
+                  Guesty teal palette (50–400), navy, coral, warm neutrals<br>
+                  Figtree font family
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-ui/src/app/globals.css</code></td>
+                <td>CSS variables, fadeIn/slideIn animations</td>
+              </tr>
+              <tr>
+                <td style="color: var(--text-dim);">+ 20 more components</td>
+                <td>
+                  ChatInput, ConversationList, DepartmentSelector, ModeSelector,<br>
+                  SidebarToggle, FeedbackButtons, Toast (new), all 5 analytics components,<br>
+                  3 layout files, guesty-logo.png
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(34,197,94,0.15);">🔄</div>
+          <div>
+            <div class="card-title">How Context Windowing Works</div>
+            <div class="card-subtitle">Strategy for managing long conversations</div>
+          </div>
+        </div>
+        <div style="background: var(--surface); border-radius: 12px; padding: 20px; font-size: 13px; font-family: 'JetBrains Mono', monospace; line-height: 1.8;">
+          <div style="color: var(--text-dim);">// Conversation with 50 messages, 850K tokens</div>
+          <div style="margin-top: 8px;">
+            <span style="color: var(--green);">PINNED</span>  <span style="color: var(--text-dim);">│</span> msg[0-1]  <span style="color: var(--text-dim);">← Phase 1 context (always kept)</span>
+          </div>
+          <div style="color: var(--red); opacity: 0.6;">
+            DROPPED <span style="color: var(--text-dim);">│</span> msg[2-29] <span style="color: var(--text-dim);">← Middle messages trimmed</span>
+          </div>
+          <div>
+            <span style="color: var(--guesty-accent);">RECENT</span>  <span style="color: var(--text-dim);">│</span> msg[30-49] <span style="color: var(--text-dim);">← Last 20 messages (sliding window)</span>
+          </div>
+          <div style="margin-top: 12px; color: var(--text-dim);">
+            // Note injected: "[Note: 28 earlier messages were trimmed...]"
+          </div>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(167,139,250,0.15);">⚙️</div>
+          <div>
+            <div class="card-title">Architecture Stack</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Layer</th><th>Technology</th><th>Details</th></tr></thead>
+            <tbody>
+              <tr><td>Frontend</td><td>Next.js + React</td><td>Memoized components, SSE streaming</td></tr>
+              <tr><td>AI Model</td><td>Claude Sonnet 4.6</td><td>Vertex AI, us-east5, 1M context</td></tr>
+              <tr><td>Tools</td><td>n8n MCP Server</td><td>search_nodes, validate_workflow, etc.</td></tr>
+              <tr><td>Knowledge</td><td>4-layer system</td><td>System prompt → Dept → Specs → Skills</td></tr>
+              <tr><td>Persistence</td><td>Firestore</td><td>Conversations, analytics, feedback</td></tr>
+              <tr><td>Deploy</td><td>Cloud Run (IAP)</td><td>europe-west1, auto-scaling</td></tr>
+              <tr><td>Auth</td><td>Google IAP</td><td>Guesty SSO, email-based identity</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card reveal">
+        <div class="card-header">
+          <div class="card-icon" style="background: rgba(245,158,11,0.15);">🚀</div>
+          <div>
+            <div class="card-title">Deployment Info</div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-3);">
+            <span style="color: var(--text-dim);">GCP Project</span>
+            <span><code>agentic-workflows-485210</code></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-3);">
+            <span style="color: var(--text-dim);">Cloud Run Service</span>
+            <span><code>n8n-chat-ui</code></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-3);">
+            <span style="color: var(--text-dim);">Current Revision</span>
+            <span><code>n8n-chat-ui-00026-qf5</code> (v0.22) <span style="color: var(--green);">● LIVE</span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-3);">
+            <span style="color: var(--text-dim);">Deploy Command</span>
+            <span><code>./deploy-cloudrun.sh --ui-only</code></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--surface-3);">
+            <span style="color: var(--text-dim);">Rollback Target</span>
+            <span><code>n8n-chat-ui-00024-6sm</code> (v0.21)</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+            <span style="color: var(--text-dim);">Production URL</span>
+            <span><a href="https://n8n-chat-ui-535171325336.europe-west1.run.app" style="color: var(--guesty-accent);" target="_blank">n8n-chat-ui-535171325336.europe-west1.run.app</a></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>n8n Workflow Builder — Guesty AI Team</p>
+    <p style="margin-top: 4px;">Built with Claude Sonnet 4.6 on Vertex AI · <a href="https://guesty.app.n8n.cloud" target="_blank">n8n Instance</a></p>
+    <p style="margin-top: 12px; font-size: 11px; opacity: 0.5;">Deployed March 27, 2026 · Revision n8n-chat-ui-00026-qf5</p>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      event.target.classList.add('active');
+      // Re-trigger bar animations for newly visible tab
+      setTimeout(animateBars, 100);
+      setTimeout(revealCards, 100);
+    }
+
+    // Collapsible sections
+    function toggleCollapsible(header) {
+      const body = header.nextElementSibling;
+      const chevron = header.querySelector('.collapsible-chevron');
+      body.classList.toggle('open');
+      chevron.classList.toggle('open');
+    }
+
+    // Animated bars
+    function animateBars() {
+      document.querySelectorAll('.bar-fill').forEach(bar => {
+        const target = bar.getAttribute('data-width');
+        if (target && bar.closest('.tab-content.active')) {
+          bar.style.width = target + '%';
+        }
+      });
+    }
+
+    // Scroll reveal
+    function revealCards() {
+      const cards = document.querySelectorAll('.reveal');
+      cards.forEach(card => {
+        const rect = card.getBoundingClientRect();
+        if (rect.top < window.innerHeight - 60) {
+          card.classList.add('visible');
+        }
+      });
+    }
+
+    // Init
+    window.addEventListener('scroll', revealCards);
+    window.addEventListener('load', () => {
+      setTimeout(revealCards, 100);
+      setTimeout(animateBars, 400);
+    });
+  </script>
+</body>
+</html>
