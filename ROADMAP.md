@@ -91,19 +91,15 @@
 - [x] **Verified deployment**: Replayed both reported conversations (Gil 12 turns, Roni 9 turns) — 0 truncation, token monitoring active, tool context persisted.
 - [x] **Confirmed Claude-only**: Investigated model usage — no Gemini fallback anywhere. Stale references in README only.
 
-## Completed (Mar 25, 2026 — Session I, planning)
+## Completed (Mar 25, 2026 — Session I)
 
-- [x] **Data Consultant mode designed and implemented**: New assistant mode for schema exploration, SQL generation, AI agent planning. ModeSelector UI (card selector), mode-aware system prompt routing, tool filtering, department context. All code on `feature/data-consultant` branch (uncommitted).
+- [x] **Data Consultant mode designed and implemented**: New assistant mode for schema exploration, SQL generation, AI agent planning. ModeSelector UI (card selector), mode-aware system prompt routing, tool filtering, department context.
 - [x] **Architecture audit passed**: 4 audit issues identified, all 4 already fixed in current code. Builder mode performance verified: zero overhead (3 if-checks per request).
-- [x] **Deployment plan written**: Full 6-step plan at `.claude/plans/floating-jingling-noodle.md` — local verify, git, deploy, smoke test, rollback, docs. Ready for fresh session execution.
+- [x] **v0.21 deployed to production**: Cloud Run revision `n8n-chat-ui-00024-6sm`. PR #1 merged to main. All verification gates passed (tsc, build, docker, health check). Rollback target: `n8n-chat-ui-00023-z2c`.
 
-## Action Items (Next Session — Session I)
+## Action Items (Next Session — Session J)
 
-### PRIORITY: Deploy v0.21 to Production
-- [ ] **Deploy v0.21 Data Consultant mode** — Full plan at `.claude/plans/floating-jingling-noodle.md`. Code complete, audited, TypeScript passes. Steps: local verify → git commit → `./deploy-cloudrun.sh --ui-only` → production smoke tests → documentation updates.
-- [ ] **Rollback plan ready**: `gcloud run services update-traffic n8n-chat-ui --to-revisions=n8n-chat-ui-00023-z2c=100 --region=europe-west1 --project=agentic-workflows-485210`
-
-### Carried from Session H
+### HIGH PRIORITY
 - [ ] **Monitor v0.20 token analytics (HIGH)**: Check Firestore analytics_events for inputTokens trends, any truncated=true, context windowing triggers (>80K tokens). First real data from Roni/Gil.
 - [ ] **Share feedback with Gil and Roni**: Truncation fixed, tool context persists across turns, file uploads work natively.
 - [ ] **Fix remaining 5 regression failures** (carried from Session G): CX BQ confusion (2), Marketing multi-user creds (2), pay_zuora (1).

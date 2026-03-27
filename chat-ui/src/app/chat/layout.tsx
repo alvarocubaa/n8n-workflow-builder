@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import Image from 'next/image';
 import Link from 'next/link';
 import ConversationList from '@/components/ConversationList';
 import SidebarToggle from '@/components/SidebarToggle';
@@ -22,22 +23,30 @@ export default async function ChatLayout({
   const displayName = email.split('@')[0];
 
   return (
-    <div className="flex h-screen flex-col bg-gray-100">
+    <div className="flex h-screen flex-col bg-warm-50">
       {/* Top header */}
-      <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-base font-bold text-gray-900">n8n Builder</span>
-          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+      <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-warm-100 bg-white px-4 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <Image
+            src="/guesty-logo.png"
+            alt="Guesty"
+            width={80}
+            height={24}
+            className="h-6 w-auto"
+            priority
+          />
+          <span className="text-sm font-semibold text-guesty-400">Workflow Builder</span>
+          <span className="rounded-full bg-guesty-100 px-2 py-0.5 text-xs font-semibold text-guesty-300">
             AI
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-gray-600">
           {isAdmin(email) && (
-            <Link href="/analytics" className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200 hover:text-gray-800">
+            <Link href="/analytics" className="rounded-lg bg-warm-50 px-2.5 py-1 text-xs font-medium text-guesty-400 hover:bg-guesty-100 hover:text-guesty-300 transition">
               Analytics
             </Link>
           )}
-          <span className="h-7 w-7 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
+          <span className="h-7 w-7 rounded-full bg-guesty-300 flex items-center justify-center text-xs font-bold text-white">
             {displayName[0]?.toUpperCase() ?? '?'}
           </span>
           <span className="hidden sm:inline">{email}</span>

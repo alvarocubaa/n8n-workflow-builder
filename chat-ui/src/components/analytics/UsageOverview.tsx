@@ -8,12 +8,12 @@ interface Props {
 }
 
 const DEPT_COLORS: Record<string, string> = {
-  cs: '#3B82F6',
-  cx: '#8B5CF6',
-  marketing: '#F59E0B',
-  finance: '#10B981',
-  payments: '#EF4444',
-  ob: '#6366F1',
+  cs: '#14665F',      // guesty-300
+  cx: '#5071E6',      // navy-200
+  marketing: '#FA877D', // coral-200
+  finance: '#8CBEBE',  // guesty-200
+  payments: '#5F1632',  // coral-300
+  ob: '#0E0740',       // navy-300
 };
 
 export default function UsageOverview({ events }: Props) {
@@ -37,8 +37,8 @@ export default function UsageOverview({ events }: Props) {
     .map(([date, count]) => ({ date: date.slice(5), count })); // MM-DD
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">Usage by Department</h3>
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-sm font-semibold text-guesty-400">Usage by Department</h3>
 
       {deptData.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">No sessions recorded yet</p>
@@ -58,7 +58,7 @@ export default function UsageOverview({ events }: Props) {
         </ResponsiveContainer>
       )}
 
-      <h3 className="mb-4 mt-6 text-sm font-semibold text-gray-700">Daily Activity</h3>
+      <h3 className="mb-4 mt-6 text-sm font-semibold text-guesty-400">Daily Activity</h3>
       {dailyData.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">No data yet</p>
       ) : (
@@ -68,7 +68,7 @@ export default function UsageOverview({ events }: Props) {
             <XAxis dataKey="date" tick={{ fontSize: 10 }} />
             <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
             <Tooltip />
-            <Bar dataKey="count" name="Sessions" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="count" name="Sessions" fill="#14665F" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       )}

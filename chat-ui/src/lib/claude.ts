@@ -131,12 +131,14 @@ function getClient(): AnthropicVertex {
 
 // ─── Context window management ───────────────────────────────────────────────
 
-/** Threshold (in tokens) above which we apply context windowing. */
-const CONTEXT_TOKEN_THRESHOLD = 80_000;
+/** Threshold (in tokens) above which we apply context windowing.
+ *  Vertex AI supports 1M input tokens for Sonnet 4.6 (GA). We use 800K
+ *  leaving ~200K margin for system prompt, tools, output, and safety. */
+const CONTEXT_TOKEN_THRESHOLD = 800_000;
 /** Minimum history length before we even check tokens (skip overhead for short convos). */
 const MIN_HISTORY_FOR_WINDOWING = 16;
 /** Number of recent messages to keep in the sliding window. */
-const RECENT_WINDOW_SIZE = 12;
+const RECENT_WINDOW_SIZE = 20;
 /** Number of messages to pin from the start (Phase 1 context). */
 const PINNED_START_SIZE = 2;
 
@@ -332,7 +334,7 @@ export async function* streamWorkflowChat(
   while (true) {
     const stream = await client.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 32768,
+      max_tokens: 65536,
       temperature: 0.1,
       system: [
         {

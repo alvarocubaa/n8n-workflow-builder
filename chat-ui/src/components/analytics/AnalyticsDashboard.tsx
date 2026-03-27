@@ -23,7 +23,7 @@ export default function AnalyticsDashboard({ events, deploys, feedback, dateRang
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <h1 className="text-2xl font-bold text-guesty-400">Analytics Dashboard</h1>
           <p className="text-sm text-gray-500">
             {fromDate} &ndash; {toDate} &middot; {events.length} sessions &middot; {deploys.length} deploys
           </p>
@@ -70,9 +70,9 @@ export default function AnalyticsDashboard({ events, deploys, feedback, dateRang
 
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm border-t-2 border-t-guesty-200">
       <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+      <p className="mt-1 text-2xl font-bold text-guesty-400">{value.toLocaleString()}</p>
     </div>
   );
 }

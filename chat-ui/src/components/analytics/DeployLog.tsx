@@ -8,8 +8,8 @@ interface Props {
 
 export default function DeployLog({ deploys }: Props) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">Deployed Workflows</h3>
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-sm font-semibold text-guesty-400">Deployed Workflows</h3>
 
       {deploys.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">No workflows deployed yet</p>
@@ -47,7 +47,7 @@ export default function DeployLog({ deploys }: Props) {
                       href={d.workflowUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+                      className="text-guesty-300 hover:underline"
                     >
                       {d.workflowName || d.workflowId}
                     </a>
@@ -56,10 +56,10 @@ export default function DeployLog({ deploys }: Props) {
                   <td className="py-2 pr-3 text-right">
                     <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
                       d.complexityScore >= 4
-                        ? 'bg-purple-100 text-purple-700'
+                        ? 'bg-guesty-100 text-guesty-400'
                         : d.complexityScore >= 2
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-gray-100 text-gray-600'
+                          ? 'bg-navy-50 text-navy-200'
+                          : 'bg-warm-50 text-gray-600'
                     }`}>
                       {d.complexityScore}/5
                     </span>

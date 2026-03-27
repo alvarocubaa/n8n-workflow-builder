@@ -31,8 +31,8 @@ export default function QualityMetrics({ events, deploys, feedback }: Props) {
     : 'N/A';
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">Quality Metrics</h3>
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-sm font-semibold text-guesty-400">Quality Metrics</h3>
 
       <div className="grid grid-cols-2 gap-4">
         <MetricCard
@@ -73,12 +73,12 @@ function MetricCard({ label, value, detail, color }: {
   const colorMap = {
     green: 'text-green-600',
     yellow: 'text-yellow-600',
-    red: 'text-red-600',
-    blue: 'text-blue-600',
+    red: 'text-coral-200',
+    blue: 'text-guesty-300',
   };
 
   return (
-    <div className="rounded-lg bg-gray-50 p-3">
+    <div className="rounded-lg bg-warm-50 p-3">
       <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</p>
       <p className={`mt-1 text-xl font-bold ${colorMap[color]}`}>{value}</p>
       <p className="text-xs text-gray-400">{detail}</p>

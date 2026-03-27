@@ -1,12 +1,40 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
 import type { AssistantMode } from '@/lib/types';
+
+/** Memoized message list — prevents re-rendering all messages when input state changes. */
+const MessageList = memo(function MessageList({
+  messages,
+  conversationId,
+  departmentId,
+  mode,
+}: {
+  messages: Message[];
+  conversationId?: string;
+  departmentId: string;
+  mode: AssistantMode;
+}) {
+  return (
+    <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
+      {messages.map((msg, i) => (
+        <MessageBubble
+          key={msg.id ?? i}
+          message={msg}
+          conversationId={conversationId}
+          departmentId={departmentId}
+          messageIndex={i}
+          mode={mode}
+        />
+      ))}
+    </div>
+  );
+});
 
 interface ChatWindowProps {
   conversationId?: string;
@@ -50,11 +78,12 @@ export default function ChatWindow({
     setStreaming(true);
 
     // Append user message immediately (show original text, not file content)
-    const userMsg: Message = { role: 'user', content: fileToSend ? `[${fileToSend.name}] ${text}` : text };
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: fileToSend ? `[${fileToSend.name}] ${text}` : text };
     setMessages(prev => [...prev, userMsg]);
 
     // Prepare a placeholder for the assistant response
     const assistantMsg: Message = {
+      id: crypto.randomUUID(),
       role: 'model',
       content: '',
       toolCalls: [],
@@ -207,16 +236,27 @@ export default function ChatWindow({
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <h2 className="text-lg font-semibold text-gray-800">
-              n8n Workflow Assistant
-            </h2>
-            <p className="mt-1 max-w-sm text-sm text-gray-500">
-              Choose how you want to work, then select your department.
-            </p>
+          <div className="flex h-full flex-col items-center justify-center text-center px-4">
+            {/* Welcome hero */}
+            <div className="mb-6">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-guesty-100">
+                <svg className="h-6 w-6 text-guesty-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-guesty-400">
+                {mode === 'data' ? 'What data would you like to explore?' : 'What would you like to build?'}
+              </h2>
+              <p className="mt-2 max-w-md text-sm text-gray-500">
+                {mode === 'data'
+                  ? 'Discover data sources, write queries, and plan AI agent architectures across Guesty systems.'
+                  : 'Describe your automation in plain language and get a production-ready n8n workflow in minutes.'}
+              </p>
+            </div>
 
             {/* Mode selector */}
-            <div className="mt-5 mb-4">
+            <div className="mb-5">
               <ModeSelector
                 value={mode}
                 onChange={setMode}
@@ -225,7 +265,7 @@ export default function ChatWindow({
             </div>
 
             {/* Department selector */}
-            <div className="mb-4">
+            <div className="mb-6">
               <DepartmentSelector
                 value={departmentId}
                 onChange={setDepartmentId}
@@ -233,44 +273,43 @@ export default function ChatWindow({
               />
             </div>
 
-            {/* Mode-specific example prompts */}
-            <div className="mt-2 grid max-w-md gap-2 text-sm">
-              {(mode === 'data'
-                ? [
-                    'Where does customer churn data live?',
-                    'How do I join Zendesk tickets to Salesforce accounts?',
-                    'Help me plan data sources for an AI agent that detects upsell opportunities',
-                  ]
-                : [
-                    'Post a Slack message when a webhook is received',
-                    'Send a daily report email with data from Google Sheets',
-                    'Create a Jira ticket when a GitHub issue is opened',
-                  ]
-              ).map(example => (
-                <button
-                  key={example}
-                  onClick={() => setInput(example)}
-                  className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-left text-gray-600 transition hover:border-blue-300 hover:text-blue-600"
-                >
-                  {example}
-                </button>
-              ))}
+            {/* Example prompts as styled chips */}
+            <div className="max-w-lg">
+              <p className="mb-2.5 text-xs font-medium uppercase tracking-wide text-gray-400">Try an example</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {(mode === 'data'
+                  ? [
+                      'Where does customer churn data live?',
+                      'Join Zendesk tickets to Salesforce accounts',
+                      'Plan data sources for an upsell AI agent',
+                    ]
+                  : [
+                      'Post a Slack message on webhook',
+                      'Daily report email from Google Sheets',
+                      'Create Jira ticket from GitHub issue',
+                    ]
+                ).map(example => (
+                  <button
+                    key={example}
+                    onClick={() => setInput(example)}
+                    className="rounded-full border border-guesty-200/60 bg-white px-4 py-2 text-sm text-gray-600 transition hover:border-guesty-300 hover:bg-guesty-100/20 hover:text-guesty-400"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
-            {messages.map((msg, i) => (
-              <MessageBubble
-                key={i}
-                message={msg}
-                conversationId={currentConvId.current}
-                departmentId={departmentId}
-                messageIndex={i}
-                mode={mode}
-              />
-            ))}
+          <>
+            <MessageList
+              messages={messages}
+              conversationId={currentConvId.current}
+              departmentId={departmentId}
+              mode={mode}
+            />
             <div ref={bottomRef} />
-          </div>
+          </>
         )}
       </div>
 
@@ -283,6 +322,7 @@ export default function ChatWindow({
         attachedFile={attachedFile}
         onAttachFile={setAttachedFile}
         onRemoveFile={() => setAttachedFile(null)}
+        mode={mode}
       />
     </div>
   );

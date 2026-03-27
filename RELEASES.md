@@ -1,6 +1,37 @@
 # n8n Workflow Builder -- Release History
 
-## v0.20 -- 2026-03-24 (deployed, revision n8n-chat-ui-00023-z2c)
+## v0.21 -- 2026-03-25 (deployed, revision n8n-chat-ui-00024-6sm)
+### Changes
+- **Data Consultant mode**: New dual-mode assistant — Builder (existing workflow builder) + Data Consultant for schema exploration, SQL generation, and AI agent planning. ModeSelector card UI on landing page, mode-aware system prompt routing, tool filtering (no workflow tools in data mode), credential stripping in data mode. Mode persisted in Firestore conversations + analytics. Builder mode has zero overhead (3 if-checks per request).
+- **Feedback loop process**: New harvest-test-learn-improve cycle as core development process. Harvester tool (`tools/harvest_test_cases.ts`) extracts test candidates from Firestore conversations. First harvest: 54 candidates from 140 conversations across CS, CX, Payments departments.
+- **AI nodes skill**: New `n8n-ai-nodes` skill guide for AI Agent, LLM Chain, and tool nodes configuration.
+- **Expanded regression suite**: 26 test cases (up from ~10), covering all 6 departments.
+
+### Files changed
+- chat-ui/src/components/ModeSelector.tsx (new — mode selection cards)
+- chat-ui/src/lib/system-prompt-data.ts (new — data consultant system prompt)
+- chat-ui/src/lib/claude.ts (mode-aware tool filtering, credential stripping)
+- chat-ui/src/app/api/chat/route.ts (mode routing, context management)
+- chat-ui/src/components/ChatWindow.tsx (mode selector integration)
+- chat-ui/src/components/ChatInput.tsx (mode-specific example prompts)
+- chat-ui/src/components/MessageBubble.tsx (data mode message styling)
+- chat-ui/src/lib/departments.ts (department context for data mode)
+- chat-ui/src/lib/firestore.ts (mode field on conversations)
+- chat-ui/src/lib/types.ts (AssistantMode type, mode fields)
+- chat-ui/src/lib/system-prompt.ts (mode-aware prompt selection)
+- feedback-loop/ (new — process docs, candidates, learnings)
+- n8n-skills/skills/n8n-ai-nodes/SKILL.md (new — AI nodes skill)
+- tools/harvest_test_cases.ts (new — conversation harvester)
+- tools/test_cases.yaml (expanded to 26 cases)
+
+### Verification
+- TypeScript compiles clean, Next.js build passes, Docker build succeeds
+- Cloud Run revision n8n-chat-ui-00024-6sm healthy (1.44s startup)
+- Rollback target: n8n-chat-ui-00023-z2c
+
+---
+
+## v0.20 -- 2026-03-24 (superseded by v0.21, revision n8n-chat-ui-00023-z2c)
 ### Changes
 - **Output truncation fix**: max_tokens 16384 -> 32768. Claude Sonnet 4.6 supports 64K; 32K gives 2x headroom for complex workflows. Adds stop_reason detection — user sees visible warning if output is still truncated.
 - **Token monitoring**: Extracts input_tokens, output_tokens, cache_read/write_tokens from streaming events. Logged to Firestore analytics_events on every turn. Enables data-driven context management.

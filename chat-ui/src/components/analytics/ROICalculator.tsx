@@ -16,11 +16,11 @@ const COMPLEXITY_LABELS: Record<number, string> = {
 };
 
 const COMPLEXITY_COLORS: Record<number, string> = {
-  1: '#94A3B8',
-  2: '#3B82F6',
-  3: '#8B5CF6',
-  4: '#F59E0B',
-  5: '#EF4444',
+  1: '#E9E2D5',   // warm-100
+  2: '#8CBEBE',   // guesty-200
+  3: '#14665F',   // guesty-300
+  4: '#5071E6',   // navy-200
+  5: '#072C23',   // guesty-400
 };
 
 export default function ROICalculator({ deploys }: Props) {
@@ -40,8 +40,8 @@ export default function ROICalculator({ deploys }: Props) {
   }));
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">ROI Estimate</h3>
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm">
+      <h3 className="mb-4 text-sm font-semibold text-guesty-400">ROI Estimate</h3>
 
       {/* Big numbers */}
       <div className="mb-6 grid grid-cols-3 gap-4">
@@ -50,7 +50,7 @@ export default function ROICalculator({ deploys }: Props) {
           <p className="text-xs text-gray-500">Workflows Deployed</p>
         </div>
         <div className="text-center">
-          <p className="text-3xl font-bold text-blue-600">{totalHours.toFixed(0)}h</p>
+          <p className="text-3xl font-bold text-guesty-300">{totalHours.toFixed(0)}h</p>
           <p className="text-xs text-gray-500">Hours Saved</p>
         </div>
         <div className="text-center">
@@ -60,7 +60,7 @@ export default function ROICalculator({ deploys }: Props) {
       </div>
 
       {/* Process comparison */}
-      <div className="mb-6 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+      <div className="mb-6 rounded-lg bg-warm-50 p-3 text-xs text-gray-600">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="font-semibold text-red-600">Old Process</p>

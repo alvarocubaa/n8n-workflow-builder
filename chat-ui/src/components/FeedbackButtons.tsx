@@ -92,12 +92,12 @@ export default function FeedbackButtons({ conversationId, messageIndex }: Feedba
             value={comment}
             onChange={e => setComment(e.target.value)}
             placeholder={rating === 'down' ? 'What could be better?' : 'What went well?'}
-            className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-blue-300 focus:outline-none"
+            className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-700 placeholder:text-gray-400 focus:border-guesty-200 focus:outline-none"
             onKeyDown={e => e.key === 'Enter' && handleSubmitComment()}
           />
           <button
             onClick={handleSubmitComment}
-            className="rounded bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600"
+            className="rounded bg-guesty-300 px-2 py-1 text-xs text-white hover:bg-guesty-400"
           >
             Send
           </button>

@@ -124,11 +124,11 @@ Scanned 33 workflows across 5 n8n projects via MCP API. Updated `departments.ts`
 
 ## Session I Notes (Mar 25, 2026)
 
-- No feedback loop work this session (focus was Data Consultant mode + deployment planning)
-- Harvest still due ~Mar 27 (5 days since last harvest on Mar 20)
+- No feedback loop work this session (focus was v0.21 deployment)
+- Harvest overdue — 5 days since last harvest on Mar 20. Due NOW.
 - 13 candidates still pending review from Mar 20 harvest
 
-## Next Actions (Session I)
+## Next Actions (Session J)
 
 - [ ] **Fix remaining 5 regression failures** (carried from Session G):
   - CX BQ confusion (uc2_cx, cx_loop_zendesk_comment): Add wrong-cred example to CX promptRules

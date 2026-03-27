@@ -15,9 +15,9 @@ export default function FeedbackLog({ feedback }: Props) {
     : feedback.filter(f => f.rating === filter);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-lg border border-warm-100 bg-white p-4 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">Recent Feedback</h3>
+        <h3 className="text-sm font-semibold text-guesty-400">Recent Feedback</h3>
         <div className="flex gap-1">
           {(['all', 'up', 'down'] as const).map(f => (
             <button
@@ -25,8 +25,8 @@ export default function FeedbackLog({ feedback }: Props) {
               onClick={() => setFilter(f)}
               className={`rounded px-2 py-1 text-xs ${
                 filter === f
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'text-gray-500 hover:bg-gray-100'
+                  ? 'bg-guesty-100/40 text-guesty-400'
+                  : 'text-gray-500 hover:bg-warm-50'
               }`}
             >
               {f === 'all' ? 'All' : f === 'up' ? 'Positive' : 'Negative'}

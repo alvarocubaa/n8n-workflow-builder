@@ -26,7 +26,7 @@ export default function SidebarToggle({ children, sidebar }: SidebarToggleProps)
     <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
       <div
-        className={`flex-shrink-0 transition-all duration-200 ${
+        className={`flex-shrink-0 transition-all duration-300 ease-in-out ${
           collapsed ? 'w-0 overflow-hidden' : 'w-64'
         }`}
       >
@@ -36,7 +36,7 @@ export default function SidebarToggle({ children, sidebar }: SidebarToggleProps)
       {/* Toggle button */}
       <button
         onClick={toggle}
-        className="flex h-full w-5 flex-shrink-0 items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        className="flex h-full w-5 flex-shrink-0 items-center justify-center border-r border-warm-100 bg-warm-50 text-gray-400 hover:bg-guesty-100/30 hover:text-guesty-300 transition"
         title={collapsed ? 'Show history' : 'Hide history'}
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
