@@ -1,16 +1,18 @@
 - name: harvested_cx_001
-  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery for Zendesk ..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow at 8am UTC. Query BigQuery zendes..."
   department: cx
   prompt: >
-    Build a daily workflow that queries BigQuery for Zendesk tickets that are open or pending and older than 7 days. Group them by account_name, show the count and oldest ticket per account. Post a summary to #cx-aging-tickets. Run daily at 9am UTC.
+    Create a daily workflow at 8am UTC. Query BigQuery zendesk_analytics.tickets_clean for tickets where status = 'open' and updated_at is older than 14 days. For each ticket in the results, use the native Zendesk node to add an internal comment saying 'Auto-reminder: This ticket has been open for 14+ days. Please review and update.' After processing all tickets, post a summary count of tickets commented on to #cx-ticket-hygiene in Slack.
   confirm_message: "Looks good, build it"
   expected_nodes:
     - scheduleTrigger
     - googleBigQuery
-    - code
+    - zendesk
+    - aggregate
     - slack
   expected_creds:
-    googleApi: vWwsUUkc4EYrtsmN
+    googleApi: PAAimNTryrvB72dp
+    zendeskApi: OTFp18SnDgGUSn9u
     slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
@@ -19,13 +21,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: KHlsB4jdXSvnoHGpeOzp
+    source_conversation: 5594tQLIYki2hUjCJcZ5
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Build a daily workflow that queries BigQuery for Zendesk ..."
-    node_count: 4
+    workflow_name: "Create a daily workflow at 8am UTC. Query BigQuery zendes..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.955Z
-    confidence: medium
+    harvested_at: 2026-04-01T09:38:06.208Z
+    confidence: high
     workflow_json_file: harvested_cx_001_workflow.json

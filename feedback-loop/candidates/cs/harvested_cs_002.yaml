@@ -1,18 +1,18 @@
 - name: harvested_cs_002
-  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery csm_churn_r..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a workflow triggered by Salesforce when an Opportu..."
   department: cs
   prompt: >
-    Create a daily workflow that queries BigQuery csm_churn_report for accounts with recent churn. Include the account owner from Salesforce. Post summary to #cs-churn-alerts in Slack. Run at 9am UTC daily.
+    Create a workflow triggered by Salesforce when an Opportunity is updated. Query the updated Opportunity for RecordType.Name, StageName, Account.Name, and Account.Guesty_Admin_ID__c. Use a Filter node to keep only opportunities where RecordType.Name = 'Renewal'. Query BigQuery csm.csm_churn_report using the Guesty_Admin_ID__c to get max_paid_listings and churn_reason. Post a renewal status update to #cs-renewals in Slack. Use production credentials.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - scheduleTrigger
-    - googleBigQuery
-    - code
+    - salesforceTrigger
     - salesforce
+    - filter
+    - googleBigQuery
     - slack
   expected_creds:
-    googleApi: VQ7CU7dKViVcv8Ah
-    salesforceOAuth2Api: aBjJNGRAjYF66z5F
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    googleApi: h7fJ82YhtOnUL58u
     slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
@@ -22,13 +22,13 @@
     - sf_config
     - slack_config
   _metadata:
-    source_conversation: sbfleZb0BynkiGGEMrrU
+    source_conversation: 1t7QPwD7InUf7Gg7otMT
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a daily workflow that queries BigQuery csm_churn_r..."
-    node_count: 6
+    workflow_name: "Create a workflow triggered by Salesforce when an Opportu..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.955Z
+    harvested_at: 2026-04-01T09:38:06.208Z
     confidence: high
     workflow_json_file: harvested_cs_002_workflow.json

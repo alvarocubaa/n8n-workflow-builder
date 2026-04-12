@@ -1,0 +1,37 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://guesty3396.zendesk.com/api/v2/search.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=type:ticket organization:{{ $json.results[0].id }} -status:solved -status:closed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f27deab5-a93f-4431-b437-b175171cf32a",
+      "name": "Get Zendesk Open Tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        -7584
+      ],
+      "credentials": {
+        "zendeskApi": {
+          "id": "OTFp18SnDgGUSn9u",
+          "name": "Zendesk Sandbox - Info@guesty"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {}
+}

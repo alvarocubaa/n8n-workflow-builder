@@ -1,13 +1,13 @@
 {
-  "name": "Payment Fee Mismatch - Daily Alert",
+  "name": "GuestyPay Inactive Accounts - Monthly Automation",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Daily 8am UTC",
+      "id": "a1f3e2d4-7b6c-4e8a-9f0d-2c3b4a5e6f7d",
+      "name": "Schedule Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        240,
+        0,
         300
       ],
       "parameters": {
@@ -15,81 +15,78 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 8 * * *"
+              "expression": "0 9 1 * *"
             }
           ]
         }
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "BQ - Product Catalog Fees",
-      "type": "n8n-nodes-base.googleBigQuery",
-      "typeVersion": 2.1,
+      "id": "b2e4f1c3-8a7d-4f9b-0e1c-3d4c5b6a7e8f",
+      "name": "Read Sub Account Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
       "position": [
-        500,
-        160
+        220,
+        200
       ],
       "parameters": {
-        "operation": "executeQuery",
-        "sqlQuery": "SELECT\n  account_id,\n  account_name,\n  plan_name,\n  plan_value        AS configured_fee,\n  charge_model,\n  uom\nFROM `guesty-data.zuora_analytics.product_catalog`\nWHERE LOWER(plan_name) LIKE '%payment gateway%'\n  AND effective_end_date > CURRENT_DATE()",
-        "projectId": "guesty-data",
+        "operation": "read",
+        "documentId": {
+          "mode": "id",
+          "value": "1hjsf0PwV7iWpeU5v-bWkF02CpZwmRW3Aix8z3S_PvzU"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sub Account"
+        },
+        "range": "A:Z",
         "options": {}
       },
       "credentials": {
-        "googleApi": {
-          "id": "aLlYQkLWrmANkfFZ",
-          "name": "n8n-payments"
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "W6Zn2BYAkgmc1t8W",
+          "name": "Google Sheets Elena Chechik"
         }
       }
     },
     {
-      "id": "3d594a2e-1b8f-4c6d-9e3a-5f7b2c8d1e4f",
-      "name": "BQ - Invoiced Amounts",
-      "type": "n8n-nodes-base.googleBigQuery",
-      "typeVersion": 2.1,
+      "id": "c3f5a2b4-9b8e-4a0c-1f2d-4e5d6c7b8f9a",
+      "name": "Read UW Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
       "position": [
-        500,
-        440
+        220,
+        420
       ],
       "parameters": {
-        "operation": "executeQuery",
-        "sqlQuery": "SELECT\n  mongo_account_id  AS account_id,\n  SUM(amount)       AS invoiced_amount,\n  COUNT(*)          AS invoice_item_count\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE LOWER(product_name) LIKE '%payment gateway%'\n  AND invoiceitem_servicestartdate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nGROUP BY mongo_account_id",
-        "projectId": "guesty-data",
+        "operation": "read",
+        "documentId": {
+          "mode": "id",
+          "value": "1hjsf0PwV7iWpeU5v-bWkF02CpZwmRW3Aix8z3S_PvzU"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "UW"
+        },
+        "range": "A:Z",
         "options": {}
       },
       "credentials": {
-        "googleApi": {
-          "id": "aLlYQkLWrmANkfFZ",
-          "name": "n8n-payments"
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "W6Zn2BYAkgmc1t8W",
+          "name": "Google Sheets Elena Chechik"
         }
       }
     },
     {
-      "id": "9a1b2c3d-4e5f-6789-abcd-ef0123456789",
-      "name": "Merge by Account ID",
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3.2,
-      "position": [
-        780,
-        300
-      ],
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByFields",
-        "fieldsToMatchString": "account_id",
-        "joinMode": "keepMatches",
-        "outputDataFrom": "both"
-      }
-    },
-    {
-      "id": "b2c3d4e5-f6a7-8901-bcde-f01234567890",
-      "name": "Flag Fee Mismatch > 10%",
-      "type": "n8n-nodes-base.if",
+      "id": "d4a6b3c5-0c9f-4b1d-2a3e-5f6e7d8c9a0b",
+      "name": "Filter Eligible Accounts",
+      "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
       "position": [
-        1060,
-        300
+        440,
+        200
       ],
       "parameters": {
         "conditions": {
@@ -99,110 +96,589 @@
           "combinator": "and",
           "conditions": [
             {
-              "id": "c1a2b3d4-e5f6-7890-abcd-ef1234567890",
-              "leftValue": "={{ Math.abs(($json.invoiced_amount - $json.configured_fee) / $json.configured_fee) }}",
-              "rightValue": 0.1,
+              "id": "e5b7c4d6-1d0a-4c2e-3b4f-6a7f8e9d0b1c",
+              "leftValue": "={{$json['Sub-Account Status']}}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": "Disabled"
+            },
+            {
+              "id": "f6c8d5e7-2e1b-4d3f-4c5a-7b8a9f0e1c2d",
+              "leftValue": "={{$json['Months from Last Transaction']}}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "-"
+            },
+            {
+              "id": "a7d9e6f8-3f2c-4e4a-5d6b-8c9b0a1f2d3e",
+              "leftValue": "={{Number($json['Months Connected'])}}",
               "operator": {
                 "type": "number",
-                "operation": "gt"
-              }
+                "operation": "gte"
+              },
+              "rightValue": 3
             }
           ]
         }
       }
     },
     {
-      "id": "e5f6a7b8-c9d0-1234-efab-567890123456",
-      "name": "Post to Slack",
-      "type": "n8n-nodes-base.slack",
-      "typeVersion": 2.4,
+      "id": "b8e0f7a9-4a3d-4f5b-6e7c-9d0c1b2a3e4f",
+      "name": "Join with UW Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        1340,
-        160
+        660,
+        200
       ],
       "parameters": {
-        "resource": "message",
-        "operation": "post",
-        "select": "channel",
-        "channelId": {
-          "mode": "name",
-          "value": "#payments-fee-alerts"
+        "mode": "runOnceForAllItems",
+        "jsCode": "const subAccounts = $input.all();\nconst uwItems = $('Read UW Sheet').all();\n\nconst uwMap = {};\nfor (const item of uwItems) {\n  const id = item.json['Account ID'];\n  if (id) uwMap[id] = item.json['Email for Notices'];\n}\n\nreturn subAccounts.map(item => {\n  const accountId = item.json['Account ID'];\n  const csmName = (item.json['CSM'] || '').trim();\n  const nameParts = csmName.split(' ');\n  const firstName = (nameParts[0] || '').toLowerCase();\n  const lastName = (nameParts.slice(1).join(' ') || '').toLowerCase().replace(/ /g, '.');\n  const csmEmail = firstName && lastName ? firstName + '.' + lastName + '@guesty.com' : '';\n\n  return {\n    json: {\n      ...item.json,\n      emailForNotices: uwMap[accountId] || '',\n      csmEmail: csmEmail\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "c9f1a8b0-5b4e-4a6c-7f8d-0e1d2c3b4f5a",
+      "name": "Route by UI Status and Month",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        200
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d0a2b9c1-6c5f-4b7d-8a9e-1f2e3d4c5a6b",
+                    "leftValue": "={{$json['GuestyPay Status']}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "DELETED"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "DELETED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "e1b3c0d2-7d6a-4c8e-9b0f-2a3f4e5d6b7c",
+                    "leftValue": "={{Number($json['Months Connected'])}}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 3
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Month3"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "f2c4d1e3-8e7b-4d9f-0c1a-3b4a5f6e7c8d",
+                    "leftValue": "={{Number($json['Months Connected'])}}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 5
+                  },
+                  {
+                    "id": "a3d5e2f4-9f8c-4e0a-1d2b-4c5b6a7f8d9e",
+                    "leftValue": "={{$json['Segment']}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    },
+                    "rightValue": "Enterprise"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Month5NonEnterprise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "b4e6f3a5-0a9d-4f1b-2e3c-5d6c7b8a9e0f",
+                    "leftValue": "={{Number($json['Months Connected'])}}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 5
+                  },
+                  {
+                    "id": "c5f7a4b6-1b0e-4a2c-3f4d-6e7d8c9b0f1a",
+                    "leftValue": "={{$json['Segment']}}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Enterprise"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Month5Enterprise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d6a8b5c7-2c1f-4b3d-4a5e-7f8e9d0c1a2b",
+                    "leftValue": "={{Number($json['Months Connected'])}}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    },
+                    "rightValue": 9
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "Over9Months"
+            }
+          ]
         },
-        "text": "=:rotating_light: *Payment Fee Mismatch Detected*\n\n*Account:* {{ $json.account_name }} (`{{ $json.account_id }}`)\n*Plan:* {{ $json.plan_name }}\n*Configured Fee:* ${{ $json.configured_fee }} {{ $json.uom }}\n*Invoiced (last 30d):* ${{ $json.invoiced_amount }} ({{ $json.invoice_item_count }} items)\n*Deviation:* {{ (Math.abs(($json.invoiced_amount - $json.configured_fee) / $json.configured_fee) * 100).toFixed(1) }}%",
-        "otherOptions": {}
-      },
-      "credentials": {
-        "slackApi": {
-          "id": "87t2GgsbEJDItDs7",
-          "name": "Slack ask-pay"
+        "options": {}
+      }
+    },
+    {
+      "id": "e7b9c6d8-3d2a-4c4e-5b6f-8a9f0e1d2b3c",
+      "name": "Aggregate DELETED Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        60
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "Platform Name"
+            },
+            {
+              "fieldName": "Account Name"
+            },
+            {
+              "fieldName": "Processors"
+            },
+            {
+              "fieldName": "Sub-Accounts"
+            },
+            {
+              "fieldName": "Account Balance"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f8c0d7e9-4e3b-4d5f-6c7a-9b0a1f2e3c4d",
+      "name": "Email Ops - DELETED Accounts",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        60
+      ],
+      "parameters": {
+        "fromEmail": "payments@guesty.com",
+        "toEmail": "elena.chechik@guesty.com",
+        "subject": "[TEST] Action Required: DELETED GuestyPay Sub-Accounts - Disable and Cancel Fees",
+        "emailType": "html",
+        "message": "=<p><strong>[TEST MODE - Real recipient: ops_payments@guesty.com]</strong></p><p>Hi Payments Ops Team,</p><p>The following GuestyPay sub-accounts have a <strong>DELETED</strong> UI status but have not yet been disabled. Please proceed with sub-account disablement and cancel/offset any posted scheduled fees.</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%\"><thead><tr style=\"background:#f2f2f2\"><th>Platform Name</th><th>Account Name</th><th>Processors</th><th>Sub-Accounts</th><th>Account Balance</th></tr></thead><tbody>{{ $json.accounts.map(a => '<tr><td>' + (a['Platform Name']||'') + '</td><td>' + (a['Account Name']||'') + '</td><td>' + (a['Processors']||'') + '</td><td>' + (a['Sub-Accounts']||'') + '</td><td>' + (a['Account Balance']||'') + '</td></tr>').join('') }}</tbody></table><p>Regards,<br>Payments Automation</p>"
+      }
+    },
+    {
+      "id": "a9d1e8f0-5f4c-4e6a-7d8b-0c1b2a3f4d5e",
+      "name": "Create ZD Ticket - Month 3 Warning",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        220
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "description": "=[TEST MODE - Real notices email: {{ $json.emailForNotices }}]\n\nDear GuestyPay User,\n\nWe noticed that your GuestyPay account ({{ $json['Account Name'] }}) has not processed any payments in the past 3 months.\n\nPlease be aware:\n- Service fees may still apply even without processing activity.\n- If your account remains inactive for 5 months, it may be subject to disablement.\n\nIf you have any questions or need assistance, please reply to this ticket.\n\nBest regards,\nGuesty Payments Team",
+        "additionalFields": {
+          "subject": "=[TEST] GuestyPay Account Inactivity Notice - {{ $json['Account Name'] }}",
+          "status": "new",
+          "recipient": "elena.chechik@guesty.com",
+          "group": "GFP: Biz",
+          "type": "question"
         }
       },
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 3000
+      "credentials": {
+        "zendeskApi": {
+          "id": "cFdFPhADfsxMmPFC",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "b0e2f9a1-6a5d-4f7b-8e9c-1d2c3b4a5e6f",
+      "name": "Create ZD Ticket - Month 5 Non-Enterprise",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        380
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "description": "=[TEST MODE - Real notices email: {{ $json.emailForNotices }}]\n\nDear GuestyPay User,\n\nWe are writing to inform you that your GuestyPay account ({{ $json['Account Name'] }}) has been inactive for 5 months with no payment processing activity.\n\nAs a result, your account is scheduled to be disabled within the next 30 days.\n\nIf you wish to keep your account active, please begin processing payments or contact us by replying to this ticket.\n\nBest regards,\nGuesty Payments Team",
+        "additionalFields": {
+          "subject": "=[TEST] GuestyPay Account Disablement Notice - {{ $json['Account Name'] }}",
+          "status": "new",
+          "recipient": "elena.chechik@guesty.com",
+          "group": "GFP: Biz",
+          "type": "question"
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "cFdFPhADfsxMmPFC",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "c1f3a0b2-7b6e-4a8c-9f0d-2e3d4c5b6f7a",
+      "name": "Aggregate Month5 Non-Ent Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        520
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "Platform Name"
+            },
+            {
+              "fieldName": "Account Name"
+            },
+            {
+              "fieldName": "Processors"
+            },
+            {
+              "fieldName": "Sub-Accounts"
+            },
+            {
+              "fieldName": "Account Balance"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d2a4b1c3-8c7f-4b9d-0a1e-3f4e5d6c7a8b",
+      "name": "Email Ops - Month 5 Non-Enterprise",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        520
+      ],
+      "parameters": {
+        "fromEmail": "payments@guesty.com",
+        "toEmail": "elena.chechik@guesty.com",
+        "subject": "[TEST] Action Required: 5-Month Inactive GuestyPay Sub-Accounts - Proceed with Disablement",
+        "emailType": "html",
+        "message": "=<p><strong>[TEST MODE - Real recipient: ops_payments@guesty.com]</strong></p><p>Hi Payments Ops Team,</p><p>The following GuestyPay sub-accounts have been inactive for <strong>5 months</strong>. Please proceed with disablement and cancel/offset any posted scheduled fees.</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%\"><thead><tr style=\"background:#f2f2f2\"><th>Platform Name</th><th>Account Name</th><th>Processors</th><th>Sub-Accounts</th><th>Account Balance</th></tr></thead><tbody>{{ $json.accounts.map(a => '<tr><td>' + (a['Platform Name']||'') + '</td><td>' + (a['Account Name']||'') + '</td><td>' + (a['Processors']||'') + '</td><td>' + (a['Sub-Accounts']||'') + '</td><td>' + (a['Account Balance']||'') + '</td></tr>').join('') }}</tbody></table><p>Regards,<br>Payments Automation</p>"
+      }
+    },
+    {
+      "id": "e3b5c2d4-9d8a-4c0e-1b2f-4a5f6e7d8b9c",
+      "name": "Aggregate Month5 Enterprise Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        660
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "Platform Name"
+            },
+            {
+              "fieldName": "Account Name"
+            },
+            {
+              "fieldName": "Processors"
+            },
+            {
+              "fieldName": "Sub-Accounts"
+            },
+            {
+              "fieldName": "Account Balance"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f4c6d3e5-0e9b-4d1f-2c3a-5b6a7f8e9c0d",
+      "name": "Email Ops - Month 5 Enterprise Approval",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        660
+      ],
+      "parameters": {
+        "fromEmail": "payments@guesty.com",
+        "toEmail": "elena.chechik@guesty.com",
+        "ccEmail": "elena.chechik@guesty.com",
+        "subject": "[TEST] Approval Required: Disable Inactive Enterprise GuestyPay Sub-Accounts",
+        "emailType": "html",
+        "message": "=<p><strong>[TEST MODE - Real recipient: ops_payments@guesty.com, CC: tal.sossover@guesty.com]</strong></p><p>Hi Payments Ops Team,</p><p>We are requesting approval to disable the following <strong>Enterprise</strong> GuestyPay sub-accounts that have been inactive for 5 months. Please confirm approval to proceed with disablement and ensure all associated fees are canceled.</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%\"><thead><tr style=\"background:#f2f2f2\"><th>Platform Name</th><th>Account Name</th><th>Processors</th><th>Sub-Accounts</th><th>Account Balance</th></tr></thead><tbody>{{ $json.accounts.map(a => '<tr><td>' + (a['Platform Name']||'') + '</td><td>' + (a['Account Name']||'') + '</td><td>' + (a['Processors']||'') + '</td><td>' + (a['Sub-Accounts']||'') + '</td><td>' + (a['Account Balance']||'') + '</td></tr>').join('') }}</tbody></table><p>Regards,<br>Payments Automation</p>"
+      }
+    },
+    {
+      "id": "a5d7e4f6-1f0c-4e2a-3d4b-6c7b8a9f0d1e",
+      "name": "Aggregate Over9 Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        800
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "Platform Name"
+            },
+            {
+              "fieldName": "Account Name"
+            },
+            {
+              "fieldName": "Processors"
+            },
+            {
+              "fieldName": "Sub-Accounts"
+            },
+            {
+              "fieldName": "Account Balance"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b6e8f5a7-2a1d-4f3b-4e5c-7d8c9b0a1e2f",
+      "name": "Email Ops - Over 9 Months Follow-up",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        800
+      ],
+      "parameters": {
+        "fromEmail": "payments@guesty.com",
+        "toEmail": "elena.chechik@guesty.com",
+        "subject": "[TEST] Follow-up: Long-Term Inactive GuestyPay Sub-Accounts (9+ Months)",
+        "emailType": "html",
+        "message": "=<p><strong>[TEST MODE - Real recipient: ops_payments@guesty.com]</strong></p><p>Hi Payments Ops Team,</p><p>The following GuestyPay sub-accounts have been inactive for <strong>more than 9 months</strong>. Please review and proceed with disabling them if applicable.</p><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse;width:100%\"><thead><tr style=\"background:#f2f2f2\"><th>Platform Name</th><th>Account Name</th><th>Processors</th><th>Sub-Accounts</th><th>Account Balance</th></tr></thead><tbody>{{ $json.accounts.map(a => '<tr><td>' + (a['Platform Name']||'') + '</td><td>' + (a['Account Name']||'') + '</td><td>' + (a['Processors']||'') + '</td><td>' + (a['Sub-Accounts']||'') + '</td><td>' + (a['Account Balance']||'') + '</td></tr>').join('') }}</tbody></table><p>Regards,<br>Payments Automation</p>"
+      }
     }
   ],
   "connections": {
-    "Daily 8am UTC": {
+    "Schedule Trigger": {
       "main": [
         [
           {
-            "node": "BQ - Product Catalog Fees",
+            "node": "Read Sub Account Sheet",
             "type": "main",
             "index": 0
           },
           {
-            "node": "BQ - Invoiced Amounts",
+            "node": "Read UW Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BQ - Product Catalog Fees": {
+    "Read Sub Account Sheet": {
       "main": [
         [
           {
-            "node": "Merge by Account ID",
+            "node": "Filter Eligible Accounts",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BQ - Invoiced Amounts": {
+    "Filter Eligible Accounts": {
       "main": [
         [
           {
-            "node": "Merge by Account ID",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge by Account ID": {
-      "main": [
-        [
-          {
-            "node": "Flag Fee Mismatch > 10%",
+            "node": "Join with UW Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Flag Fee Mismatch > 10%": {
+    "Join with UW Data": {
       "main": [
         [
           {
-            "node": "Post to Slack",
+            "node": "Route by UI Status and Month",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by UI Status and Month": {
+      "main": [
+        [
+          {
+            "node": "Aggregate DELETED Accounts",
             "type": "main",
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Create ZD Ticket - Month 3 Warning",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create ZD Ticket - Month 5 Non-Enterprise",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate Month5 Non-Ent Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Month5 Enterprise Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Over9 Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate DELETED Accounts": {
+      "main": [
+        [
+          {
+            "node": "Email Ops - DELETED Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month5 Non-Ent Accounts": {
+      "main": [
+        [
+          {
+            "node": "Email Ops - Month 5 Non-Enterprise",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month5 Enterprise Accounts": {
+      "main": [
+        [
+          {
+            "node": "Email Ops - Month 5 Enterprise Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Over9 Accounts": {
+      "main": [
+        [
+          {
+            "node": "Email Ops - Over 9 Months Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

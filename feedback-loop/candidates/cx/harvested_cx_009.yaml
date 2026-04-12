@@ -1,0 +1,28 @@
+- name: harvested_cx_009
+  description: "Harvested from roni.shif@guesty.com - im building a slack app and I need help in configuring th..."
+  department: cx
+  prompt: >
+    im building a slack app and I need help in configuring the trigger node 
+    
+    I want the slack app to be triggered only from /commands - which node should I use and what do I need to share with Slack from N8n or the opposite
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - webhook
+    - switch
+    - executeWorkflow
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: 5zkJht1DU05QlWPg7Tom
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "im building a slack app and I need help in configuring th..."
+    node_count: 4
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cx_009_workflow.json

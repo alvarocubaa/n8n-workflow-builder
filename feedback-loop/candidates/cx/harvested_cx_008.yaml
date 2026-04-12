@@ -1,0 +1,36 @@
+- name: harvested_cx_008
+  description: "Harvested from roni.shif@guesty.com - Invoice Email & ZD Ticket Automation — Requirements Doc
+T..."
+  department: cx
+  prompt: >
+    Invoice Email & ZD Ticket Automation — Requirements Doc
+    This canvas was generated using AI, which can produce inaccurate or harmful responses. Review for accuracy and safety before using.
+    
+    Overview
+    
+    This automation sends monthly invoice emails to Guesty Pro (GFP) customers and creates corresponding Zendesk tickets. The flow is split into two workflows to allow human review before sending.
+    
+    Scope & Account Types
+    
+    Accounts included in the automation are all accounts listed in the manual billing...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - googleSheets
+  expected_creds:
+    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: 2Gno8oBT0rz13Jc4YrDj
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Invoice Email & ZD Ticket Automation — Requirements Doc
+T..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.211Z
+    confidence: medium
+    workflow_json_file: harvested_cx_008_workflow.json

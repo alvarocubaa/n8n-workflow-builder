@@ -1,0 +1,31 @@
+- name: harvested_cs_006
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery zendesk_anal..."
+  department: cs
+  prompt: >
+    Build a daily workflow that queries BigQuery zendesk_analytics.tickets_clean for Zendesk tickets where status is 'open' or 'pending' and the ticket is older than 7 days. Group by account_name and show count and oldest ticket date per account. Post the aging report to #cs-ticket-aging in Slack. Run daily at 9am UTC.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - code
+    - slack
+  expected_creds:
+    googleApi: VQ7CU7dKViVcv8Ah
+    slackApi: 7H6auF31TpX7Wk7M
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: ebJS8LVcuSzkxWE6gqDa
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a daily workflow that queries BigQuery zendesk_anal..."
+    node_count: 4
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.210Z
+    confidence: high
+    workflow_json_file: harvested_cs_006_workflow.json

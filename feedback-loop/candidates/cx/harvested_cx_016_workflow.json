@@ -1,0 +1,19 @@
+{
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Remove row_number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n\nreturn items.map(item => {\n  const { row_number, ...rest } = item.json;\n  return { json: rest };\n});"
+      }
+    }
+  ],
+  "connections": {}
+}

@@ -1,0 +1,33 @@
+- name: harvested_payments_005
+  description: "Harvested from alvaro.cuba@guesty.com - Create a weekly workflow running Monday at 7am UTC. Query..."
+  department: payments
+  prompt: >
+    Create a weekly workflow running Monday at 7am UTC. Query BigQuery zuora_analytics.invoices for total invoice amounts grouped by mongo_account_id for the past month. Then query Salesforce for the matching Account records to get Account.Name and Account.Account_Owner_F__c. Use a Set node to format a reconciliation report with account name, owner, and total invoiced amount. Post to #payments-reconciliation in Slack.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - if
+    - set
+    - aggregate
+    - slack
+  expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    slackApi: 87t2GgsbEJDItDs7
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: nhnFdxhuGHQ6Skgxrmaq
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a weekly workflow running Monday at 7am UTC. Query..."
+    node_count: 8
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.210Z
+    confidence: high
+    workflow_json_file: harvested_payments_005_workflow.json

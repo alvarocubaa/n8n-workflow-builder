@@ -310,21 +310,24 @@ Query: Apply date and status filters; use pagination; limit per run.
 
 ### Common SQL patterns
 
+> All queries verified against live BigQuery data (Apr 1, 2026).
+
 ```sql
--- Top accounts by total billed (must use mongo_account_id)
+-- Verified: Top accounts by total billed (must use mongo_account_id)
+-- Verified results: Host & Stay (£910K), Renters Sp. z o.o. (£811K), My Property Host (£807K)
 SELECT
   a.name            AS account_name,
   COUNT(i.invoice_id) AS invoice_count,
-  SUM(i.invoice_amount) AS total_billed
+  ROUND(SUM(i.invoice_amount), 0) AS total_billed
 FROM `guesty-data.datalake_glue.accounts` a
 JOIN `guesty-data.zuora_analytics.invoices` i
   ON a._id = i.mongo_account_id
-WHERE a.active = TRUE
+WHERE IFNULL(a.active, FALSE) = TRUE
 GROUP BY a.name
 ORDER BY total_billed DESC
 LIMIT 10;
 
--- Payment gateway fees per account
+-- Verified: Payment gateway fees per account
 SELECT
   a.name AS account_name,
   pc.plan_name,
@@ -335,9 +338,9 @@ FROM `guesty-data.datalake_glue.accounts` a
 JOIN `guesty-data.zuora_analytics.product_catalog` pc
   ON a._id = pc.account_id
 WHERE LOWER(pc.plan_name) LIKE '%payment gateway%'
-  AND a.active = TRUE;
+  AND IFNULL(a.active, FALSE) = TRUE;
 
--- Invoice line items for an account
+-- Verified: Invoice line items for an account
 SELECT
   ii.product_name,
   ii.amount,
@@ -347,9 +350,22 @@ FROM `guesty-data.zuora_analytics.invoice_items` ii
 WHERE ii.mongo_account_id = '<account_id_here>'
 ORDER BY ii.invoiceitem_servicestartdate DESC
 LIMIT 50;
+
+-- Verified: Active subscriptions by plan (use effective_end_date, NOT subscription_status which does not exist)
+SELECT
+  plan_name,
+  COUNT(DISTINCT account_id) AS account_count,
+  ROUND(AVG(plan_value), 2) AS avg_rate
+FROM `guesty-data.zuora_analytics.product_catalog`
+WHERE effective_end_date > CURRENT_DATE()
+GROUP BY plan_name
+ORDER BY account_count DESC
+LIMIT 20;
 ```
 
 ### Filters & limits
 - Filter invoices by `status = 'Posted'` for finalized billing data
 - Always use `invoices.mongo_account_id` (NOT `account_id`) for Guesty joins
 - `product_catalog.account_id` IS the Guesty account ID (no confusion there)
+- **product_catalog has NO `subscription_status` column** — filter active subs with `effective_end_date > CURRENT_DATE()`
+- Use `IFNULL(active, FALSE) = TRUE` for accounts (Boolean may be NULL)

@@ -1,43 +1,36 @@
 - name: harvested_cs_005
-  description: "Harvested from roni.shif@guesty.com - [Attached file: Weekly HQ Ticket Reporting - @Ronishif co..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery csm_churn_r..."
   department: cs
   prompt: >
-    [Attached file: Weekly HQ Ticket Reporting - @Ronishif copy (4).json]
-    <file_content>
-    {
-      "name": "Weekly HQ Ticket Reporting - @Ronishif copy",
-      "nodes": [
-        {
-          "parameters": {
-            "rule": {
-              "interval": [
-                {
-                  "field": "cronExpression",
-                  "expression": "0 9 * * 1"
-                }
-              ]
-            }
-          },
-          "id": "f38065f7-8833-4b92-b5a4-8346743fb8cb",
-          "name": "Every Monday at 9AM",
-          "type": "n8n-nodes-base.scheduleTri...
+    Create a daily workflow that queries BigQuery csm_churn_report for accounts with recent churn. Include the account owner from Salesforce. Post summary to #cs-churn-alerts in Slack. Run at 9am UTC daily.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - @n8n/n8n-nodes-langchain.googleGemini
+    - scheduleTrigger
+    - googleBigQuery
+    - if
+    - salesforce
+    - set
+    - aggregate
+    - slack
   expected_creds:
-    googlePalmApi: FSUdg9cOOhjJ5bfh
+    googleApi: VQ7CU7dKViVcv8Ah
+    salesforceOAuth2Api: aBjJNGRAjYF66z5F
+    slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
   _metadata:
-    source_conversation: ya8DVdyZmmhPii1ZcyD4
-    source_user: roni.shif@guesty.com
+    source_conversation: Ga4exT48h13fQtLELJj4
+    source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "[Attached file: Weekly HQ Ticket Reporting - @Ronishif co..."
-    node_count: 1
+    workflow_name: "Create a daily workflow that queries BigQuery csm_churn_r..."
+    node_count: 9
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.958Z
-    confidence: medium
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
     workflow_json_file: harvested_cs_005_workflow.json

@@ -203,6 +203,9 @@ Avoid Code nodes -- CS users are non-technical.
     promptRules: `<department_rules>
 Prefer native Zendesk and Salesforce nodes over BigQuery for direct CRM/ticket operations.
 For Guesty account data (plans, features, integrations, listings), use BigQuery datalake_glue.accounts.
+For BigQuery queries, ALWAYS use the CX-specific credential:
+  Correct: "credentials": { "googleApi": { "id": "2EJkTXIICSEva3cQ", "name": "Google Service Account account" } }
+  Wrong:   "credentials": { "googleApi": { "id": "h7fJ82YhtOnUL58u", "name": "Google BigQuery - N8N Service Account" } } <- this is the shared credential, NOT for CX
 Avoid Code nodes -- CX users are non-technical.
 </department_rules>`,
   },
@@ -262,6 +265,9 @@ Avoid Code nodes -- Onboarding users are non-technical.
     promptRules: `<department_rules>
 Avoid Code nodes — Payments users are non-technical.
 For Zuora data, use BigQuery (zuora_analytics tables). The native Zuora node is for API write operations only.
+For BigQuery queries, ALWAYS use the shared BigQuery credential (Payments has no department-specific BQ credential):
+  Correct: "credentials": { "googleApi": { "id": "h7fJ82YhtOnUL58u", "name": "Google BigQuery - N8N Service Account" } }
+  Wrong:   "credentials": { "googleApi": { "id": "aLlYQkLWrmANkfFZ", "name": "n8n-payments" } } <- this is Google Drive, NOT BigQuery
 </department_rules>`,
   },
 

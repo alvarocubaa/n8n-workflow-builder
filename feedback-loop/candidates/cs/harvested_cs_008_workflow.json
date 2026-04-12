@@ -1,0 +1,171 @@
+{
+  "name": "Salesforce Renewal Opportunity - Slack Alert",
+  "nodes": [
+    {
+      "id": "a3f7c2d1-84e6-4b19-9f3a-1c2d3e4f5a6b",
+      "name": "Salesforce Trigger",
+      "type": "n8n-nodes-base.salesforceTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "object": "Opportunity",
+        "event": "updated"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "b4e8d3f2-95f7-4c2a-af4b-2d3e4f5a6b7c",
+      "name": "Get Opportunity Details",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "SELECT Id, Name, StageName, RecordType.Name, Account.Name, Account.Guesty_Admin_ID__c FROM Opportunity WHERE Id = '={{ $json.Id }}'"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "c5f9e4a3-a6b8-4d3b-b05c-3e4f5a6b7c8d",
+      "name": "Filter: Renewal Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d6a0f5b4-b7c9-4e4c-c16d-4f5a6b7c8d9e",
+              "leftValue": "={{ $json.records[0].RecordType.Name }}",
+              "rightValue": "Renewal",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e7b1a6c5-c8da-4f5d-d27e-5a6b7c8d9e0f",
+      "name": "BigQuery: Churn Report",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT account_id, account_name, max_paid_listings, churn_reason FROM `guesty-data.csm.csm_churn_report` WHERE account_id = '={{ $node['Get Opportunity Details'].json.records[0].Account.Guesty_Admin_ID__c }}' LIMIT 1"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read"
+        }
+      }
+    },
+    {
+      "id": "f8c2b7d6-d9eb-4a6e-e38f-6b7c8d9e0f1a",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-renewals"
+        },
+        "text": "*Renewal Opportunity Updated* :arrows_counterclockwise:\n*Account:* {{ $node['Get Opportunity Details'].json.records[0].Account.Name }}\n*Stage:* {{ $node['Get Opportunity Details'].json.records[0].StageName }}\n*Guesty ID:* {{ $node['Get Opportunity Details'].json.records[0].Account.Guesty_Admin_ID__c }}\n*Max Paid Listings:* {{ $json.rows[0].max_paid_listings }}\n*Churn Reason:* {{ $json.rows[0].churn_reason }}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Salesforce Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Opportunity Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Opportunity Details": {
+      "main": [
+        [
+          {
+            "node": "Filter: Renewal Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Renewal Only": {
+      "main": [
+        [
+          {
+            "node": "BigQuery: Churn Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BigQuery: Churn Report": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

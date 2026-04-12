@@ -1,0 +1,45 @@
+- name: harvested_cx_016
+  description: "Harvested from roni.shif@guesty.com - [
+  {
+    \"row_number\": 9492,
+    \"account\": \"1703de57-6b..."
+  department: cx
+  prompt: >
+    [
+      {
+        "row_number": 9492,
+        "account": "1703de57-6b98-4e39-80c5-da98296ce61b",
+        "Batch": "",
+        "Account Name": "Surftides Plaza Rentals",
+        "Item Name ": "Locks Manager",
+        "item": "8a3699dd8990514f0189913044712581",
+        "UOM": "Locks Manager",
+        "UOM_Id": "8a3699dd8990514f0189913044712581",
+        "description": "February 2026 Addons Import",
+        "amount": 153,
+        "invoicedate": "2026-02-28",
+        "duedate": "2026-02-28",
+        "Service Start Date": "2026-02-01",
+        "Service End...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - code
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: ozba5RK7ZQDnFormlIfP
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "[
+  {
+    \"row_number\": 9492,
+    \"account\": \"1703de57-6b..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.213Z
+    confidence: medium
+    workflow_json_file: harvested_cx_016_workflow.json

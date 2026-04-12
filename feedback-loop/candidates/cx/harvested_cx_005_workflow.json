@@ -1,27 +1,170 @@
 {
+  "name": "Daily Ticket Hygiene -- Auto-Reminder for Stale Open Tickets",
   "nodes": [
     {
-      "parameters": {
-        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.id }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "googleSheetsOAuth2Api",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Every Day at 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
       "position": [
-        640,
-        0
+        240,
+        300
       ],
-      "id": "e5f6a7b8-c9d0-4e1f-b2a3-4c5d6e7f8a9b",
-      "name": "Get Sheet Tabs",
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "q3XVQiSUNn6QTd3Y",
-          "name": "Google Sheets account 69"
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
         }
       }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Get Stale Open Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  ticket_id,\n  subject,\n  assignee_email,\n  assignee_name,\n  updated_at,\n  account_name\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status = 'open'\n  AND updated_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\nORDER BY updated_at ASC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "vWwsUUkc4EYrtsmN",
+          "name": "Google BigQuery account 3"
+        }
+      }
+    },
+    {
+      "id": "3d594a8e-1b2f-4c6d-9e0a-7f8b5c2d1e4f",
+      "name": "Loop Over Tickets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Add Internal Comment",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        900,
+        160
+      ],
+      "parameters": {
+        "authentication": "apiToken",
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.ticket_id }}",
+        "updateFields": {
+          "internalNote": "Auto-reminder: This ticket has been open for 14+ days. Please review and update."
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "PEFCagywCPGDJGjg",
+          "name": "Zendesk sandbox"
+        }
+      }
+    },
+    {
+      "id": "b5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e",
+      "name": "Post Slack Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-ticket-hygiene"
+        },
+        "text": "={{ '*Daily Ticket Hygiene Report -- ' + new Date().toISOString().split('T')[0] + '*\\n\\n:ticket: *' + $('Loop Over Tickets').context.currentRunIndex + '* ticket(s) have been open for 14+ days and received an auto-reminder comment today.' }}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     }
   ],
-  "connections": {}
+  "connections": {
+    "Every Day at 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "Get Stale Open Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Stale Open Tickets": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tickets": {
+      "main": [
+        [
+          {
+            "node": "Add Internal Comment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Slack Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Internal Comment": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

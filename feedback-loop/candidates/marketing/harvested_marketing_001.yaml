@@ -1,0 +1,37 @@
+- name: harvested_marketing_001
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that runs at 8am UTC. Query BigQue..."
+  department: marketing
+  prompt: >
+    Build a daily workflow that runs at 8am UTC. Query BigQuery marketing_data tables for HubSpot email campaign performance from the past 7 days. Include campaign name, emails sent, opens, clicks, and unsubscribes. Use the Google Gemini node to generate a 3-bullet insight summary highlighting top and underperforming campaigns. Post the summary to #marketing-insights in Slack. Write the raw metrics to a Google Sheet.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - aggregate
+    - @n8n/n8n-nodes-langchain.chainLlm
+    - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
+    - slack
+    - splitOut
+    - googleSheets
+  expected_creds:
+    googleApi: Cr2rXAGCh1K5pJop
+    googlePalmApi: LL8fLgZSrUn8oZtV
+    slackOAuth2Api: MkMAiC1ecfpYtIz1
+    googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: 37uQYSW5gk0KAnmOBN1v
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a daily workflow that runs at 8am UTC. Query BigQue..."
+    node_count: 8
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.208Z
+    confidence: medium
+    workflow_json_file: harvested_marketing_001_workflow.json

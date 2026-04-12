@@ -1,0 +1,126 @@
+{
+  "name": "CS Ticket Aging Report - Daily Slack",
+  "nodes": [
+    {
+      "id": "a3f1c2d4-9e8b-4a7c-b6d5-1e2f3a4b5c6d",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b7e2d3f5-0a9c-4b8d-c7e6-2f3a4b5c6d7e",
+      "name": "Query Aging Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  account_name,\n  COUNT(ticket_id)                          AS open_ticket_count,\n  MIN(created_at)                           AS oldest_ticket_date,\n  COUNTIF(status = 'open')                  AS open_count,\n  COUNTIF(status = 'pending')               AS pending_count\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE status IN ('open', 'pending')\n  AND created_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)\n  AND account_name IS NOT NULL\nGROUP BY account_name\nORDER BY open_ticket_count DESC"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read"
+        }
+      }
+    },
+    {
+      "id": "c8f3e4a6-1b0d-4c9e-d8f7-3a4b5c6d7e8f",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst today = DateTime.now().toFormat('yyyy-MM-dd');\n\nif (!items || items.length === 0) {\n  return [{\n    json: {\n      message: ':white_check_mark: *CS Ticket Aging Report -- ' + today + '*\\nNo accounts with aging open/pending tickets today. Great work!'\n    }\n  }];\n}\n\nconst lines = items.map(function(item) {\n  const t = item.json;\n  const oldest = t.oldest_ticket_date ? String(t.oldest_ticket_date).substring(0, 10) : 'N/A';\n  const total = Number(t.open_ticket_count) || 0;\n  const ticketWord = total === 1 ? 'ticket' : 'tickets';\n  return '*' + t.account_name + '* -- ' + total + ' ' + ticketWord + ' | Oldest: ' + oldest + ' | open: ' + (Number(t.open_count) || 0) + ', pending: ' + (Number(t.pending_count) || 0);\n});\n\nconst message =\n  ':ticket: *CS Ticket Aging Report -- ' + today + '*\\n' +\n  'Accounts with open/pending tickets older than 7 days:\\n\\n' +\n  lines.join('\\n') +\n  '\\n\\n_Total accounts affected: ' + items.length + '_';\n\nreturn [{ json: { message: message } }];"
+      }
+    },
+    {
+      "id": "d9a4f5b7-2c1e-4d0f-e9a8-4b5c6d7e8f9a",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-ticket-aging"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query Aging Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Aging Tickets": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

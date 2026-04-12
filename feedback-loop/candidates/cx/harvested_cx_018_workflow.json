@@ -1,0 +1,661 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        -224
+      ],
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Execute Workflow Trigger"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Find Manual Billing File').item.json.id }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $json.sheets.properties.sheetId }}",
+          "mode": "id"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "account",
+              "lookupValue": "={{ $('Set Month Variables1').item.json.Account }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        800,
+        -224
+      ],
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-5e6f7a8b9c0d",
+      "name": "Read Manual Billing Sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b8c9d0e1-f2a3-4b4c-5d6e-8b9c0d1e2f3a",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1264,
+        -160
+      ],
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-9c0d1e2f3a4b",
+      "name": "Rows Found?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d0e1f2a3-b4c5-4d6e-7f8a-0d1e2f3a4b5c",
+              "name": "manual_billing_sheet_url",
+              "value": "NO MANUAL BILLING FOUND",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        912,
+        112
+      ],
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-1e2f3a4b5c6d",
+      "name": "Return No Rows Found"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet').first().json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet').first().json.sheets[0].properties.sheetId }}\n",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2416,
+        -224
+      ],
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-4b5c6d7e8f9a",
+      "name": "Write Rows to New Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RPi7Ecm1B3utIhYr",
+          "name": "Google Sheets - Roni Shif"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c5d6e7f8-a9b0-4c1d-2e3f-5c6d7e8f9a0b",
+              "name": "manual_billing_sheet_url",
+              "value": "=https://docs.google.com/spreadsheets/d/{{ $('Create spreadsheet').item.json.spreadsheetId }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2960,
+        -224
+      ],
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-6d7e8f9a0b1c",
+      "name": "Return Sheet URL"
+    },
+    {
+      "parameters": {
+        "content": "monthfolder\n{{ $now.toFormat('MMMM') + ' ' + $now.toFormat('yyyy') }}"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -688,
+        64
+      ],
+      "typeVersion": 1,
+      "id": "1fdbb76b-b168-430c-9ff5-134f3520d288",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+              "name": "monthFolder",
+              "value": "=February 2026",
+              "type": "string"
+            },
+            {
+              "id": "a3f8d2e1-9b4c-4f7a-8e6d-2c1b0a9f8e7d",
+              "name": "year",
+              "value": "={{ $now.toFormat('yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "b5c7e3f2-1d8a-4b9c-9e7f-3d2c1b0a9f8e",
+              "name": "tabName",
+              "value": "={{ 'To Upload GFP - ' + $now.toFormat('MMMM') + ' ' + $now.toFormat('yyyy') }}",
+              "type": "string"
+            },
+            {
+              "id": "c6d8f4a3-2e9b-4c0d-a1f0-4e3d2c1b0a9f",
+              "name": "Account",
+              "value": "=1703de57-6b98-4e39-80c5-da98296ce61b",
+              "type": "string"
+            },
+            {
+              "id": "50e1cc31-fcb3-4163-a8f1-ec481b92147c",
+              "name": "accountname",
+              "value": "Multiporpoise Management LLC",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        -224
+      ],
+      "id": "b7aedc4f-b017-4ba2-bc44-94e4da3c166f",
+      "name": "Set Month Variables1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "fileFolder",
+        "queryString": "={{ $json.monthFolder }}",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1474IlMrz3OD6bXwSSlQH1GTbvfc_gKLz",
+            "mode": "id"
+          },
+          "whatToSearch": "folders"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -320,
+        -224
+      ],
+      "id": "3129a4a1-d214-49b0-beec-6569b5e89c5c",
+      "name": "Find Year Folder",
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "name contains 'Manual Billing' and not name contains 'Copy of'",
+        "limit": 5,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          },
+          "whatToSearch": "files",
+          "fileTypes": [
+            "application/vnd.google-apps.spreadsheet"
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -96,
+        -224
+      ],
+      "id": "73b248a2-209b-4540-ad94-b496d3f73592",
+      "name": "Find Manual Billing File",
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        128,
+        -224
+      ],
+      "id": "bd8e4f3a-31df-4d8c-a0fe-4e2cbb24b393",
+      "name": "Get Sheet Tabs",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "24b87bab-9f81-495f-989a-b9a401375b6e",
+              "leftValue": "={{ $json.sheets.properties.title }}",
+              "rightValue": "to upload gfp",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        576,
+        -224
+      ],
+      "id": "b82180f5-b75d-4047-84e1-ba4ea05974ee",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "sheets",
+        "options": {
+          "destinationFieldName": "sheets"
+        }
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -224
+      ],
+      "id": "f0753647-a86d-41b8-a49a-7bceca86d595",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "={{ $('Set Month Variables1').item.json.accountname }} Add-Ons {{ $('Set Month Variables1').item.json.monthFolder }}",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "Sheet 1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1712,
+        -160
+      ],
+      "id": "baf81175-851f-4e6d-b62b-64b9f9101715",
+      "name": "Create spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "RPi7Ecm1B3utIhYr",
+          "name": "Google Sheets - Roni Shif"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet').item.json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1aJ5n39BpjYIMV779QWC4yOtXiQS1Y6WU",
+          "mode": "id"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2544,
+        -320
+      ],
+      "id": "ad44d698-b9a1-48f9-a506-89db06ce76e7",
+      "name": "Move file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "buZzVXa0qB706qpQ",
+          "name": "Google Drive - @ronishif - CS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1488,
+        -208
+      ],
+      "id": "d1a1ed89-4754-49bc-981d-4dff39d8360f",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Aggregate').first().json.data.map(row => {\n  const { row_number, ...rest } = row;\n  return { json: rest };\n});"
+      },
+      "id": "fc6d511a-c058-4e06-a52f-5b5f9a7b096e",
+      "name": "Remove row_number1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1968,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://docs.google.com/spreadsheets/d/{{ $('Create spreadsheet').item.json.spreadsheetId }}/export?format=xlsx",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2736,
+        -320
+      ],
+      "id": "a2f4c6e8-b0d2-4f6a-8c0e-2a4f6c8e0b2d",
+      "name": "Export Sheet as Binary"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Month Variables1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Manual Billing Sheet": {
+      "main": [
+        [
+          {
+            "node": "Rows Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rows Found?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return No Rows Found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Rows to New Sheet": {
+      "main": [
+        [
+          {
+            "node": "Move file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Month Variables1": {
+      "main": [
+        [
+          {
+            "node": "Find Year Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Year Folder": {
+      "main": [
+        [
+          {
+            "node": "Find Manual Billing File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Manual Billing File": {
+      "main": [
+        [
+          {
+            "node": "Get Sheet Tabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sheet Tabs": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Read Manual Billing Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Remove row_number1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move file": {
+      "main": [
+        [
+          {
+            "node": "Export Sheet as Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Create spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove row_number1": {
+      "main": [
+        [
+          {
+            "node": "Write Rows to New Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Sheet as Binary": {
+      "main": [
+        [
+          {
+            "node": "Return Sheet URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

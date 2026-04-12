@@ -1,53 +1,382 @@
 {
+  "name": "Daily Churn Report - cs-churn-alerts",
   "nodes": [
     {
+      "id": "a3f1c2d4-8e5b-4a7c-9f0d-1b2e3c4d5e6f",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
       "parameters": {
-        "modelId": {
-          "__rl": true,
-          "value": "models/gemini-2.5-flash",
-          "mode": "list",
-          "cachedResultName": "models/gemini-2.5-flash"
-        },
-        "messages": {
-          "values": [
+        "rule": {
+          "interval": [
             {
-              "content": "Role: You are a Senior Customer Success Manager at Guesty. You are writing a direct, high-level operational briefing for an HQ Executive.\n\nTask:\nGenerate 2 to 4 concise, fact-based bullet points. Use internal logs to understand the \"story,\" but translate it into a natural, client-facing update.\n\nCRITICAL READING INSTRUCTION:\nThe thread history is provided in REVERSE CHRONOLOGICAL ORDER - the FIRST comment you see is the MOST RECENT update. Always base the current status and next steps on the first comment in the thread. Older context follows after. Do NOT average the thread - the most recent comment is the ground truth for current state.\n\nSTRICT Content Filters (NEVER INCLUDE):\n1. NO INTERNAL IDs: Never show Jira Keys (e.g., T3-123, FIN-456), Incident IDs, Account IDs, or Listing IDs.\n2. NO ROBOTIC OPENERS: Never start sentences with \"The issue is...\", \"The client reported...\", \"The Guesty CX team...\"\n3. NO INTERNAL JARGON: Do not mention \"Tier 3,\" \"LDS,\" or specific department names. Use \"Engineering\" instead.\n\nTone & Phrasing Rules (CRITICAL):\n1. START WITH THE NOUN: Begin bullets directly with the subject (e.g., \"A guest...\", \"Reservation 123...\", \"Owner names...\").\n2. BE NATURAL & DIRECT: Write like a human talking to a peer.\n   - INSTEAD OF: \"The issue immediately escalated to Guesty Development.\"\n   - USE: \"Escalated to engineering and identified as a system bug.\"\n3. KEEP HARD PROOF: Include Reservation Numbers and exact Dollar Amounts where relevant.\n4. CALL TO ACTION: If client input is needed, ask directly.\n   - USE: \"Please flag immediately if you observe this behavior again.\"\n\nOutput Structure (RAW JSON ONLY - no markdown, no code fences, no backticks):\n{\n  \"ticket_metadata\": {\n    \"id\": \"[Use EXACTLY the Ticket ID from Input Data - do not modify]\",\n    \"status\": \"[Use EXACTLY the Ticket Status from Input Data - do NOT rephrase, invent, or infer a new status from the thread]\",\n    \"sub_account\": \"[Use EXACTLY the Sub-Account from Input Data - do NOT infer from ticket content]\",\n    \"created_by\": \"[Name from Created By field in Input Data]\",\n    \"link\": \"[Use EXACTLY the link from Input Data]\",\n    \"subject\": \"[3 to 5 word professional title summarizing the core issue. NO questions, NO IDs, NO dates. Do NOT use the words 'Support Update'. Example: 'Payout Calculation Discrepancy']\"\n  },\n  \"bullet_points\": [\n    \"Bullet 1: Current state of the ticket based on the MOST RECENT comment.\",\n    \"Bullet 2: Background context - what the issue is and what was investigated.\",\n    \"Bullet 3: Guesty action taken or current blocker.\",\n    \"Bullet 4: Optional - next steps or client ask.\"\n  ]\n}",
-              "role": "model"
-            },
-            {
-              "content": "=Input Data:\n\nTicket ID: {{ $json.ticket_id }}\nTicket Status: {{ $json.status }}\nTicket Subject: {{ $json.summary }}\nSub-Account: {{ $json.sub_account }}\nCreated By: {{ $json.created_by }}\nCreated At: {{ $json.createdAt }}\nLink: {{ $json.link }}\n\nThread History (MOST RECENT FIRST):\n{{ $json.thread_history }}\n"
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
             }
           ]
-        },
-        "builtInTools": {},
-        "options": {}
-      },
-      "id": "fa33bd72-e7d6-45e9-9b5d-14f34fcfda97",
-      "name": "Gemini: Summarize & Format",
-      "type": "@n8n/n8n-nodes-langchain.googleGemini",
-      "typeVersion": 1.1,
-      "position": [
-        2528,
-        -7280
-      ],
-      "credentials": {
-        "googlePalmApi": {
-          "id": "FSUdg9cOOhjJ5bfh",
-          "name": "Gemini - AI Team - Cross Dept"
         }
       }
+    },
+    {
+      "id": "b4e2d3f5-9f6c-4b8d-a0e1-2c3d4e5f6a7b",
+      "name": "Get Churned Accounts (BQ)",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  c.account_id,\n  c.account_name,\n  c.from_date AS churn_date,\n  c.churn_reason,\n  c.churn_reason_modified,\n  c.customer_churn_reason,\n  c.churn_type,\n  c.csm,\n  c.avg_mrr,\n  c.account_segmentation,\n  c.geo_area,\n  c.months_in_guesty,\n  c.etf,\n  da.sf_account_id\nFROM `guesty-data.csm.csm_churn_report` c\nLEFT JOIN `guesty-data.guesty_analytics.dim_accounts` da\n  ON c.account_id = da.account_id\nWHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nORDER BY c.from_date DESC\nLIMIT 100",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read"
+        }
+      }
+    },
+    {
+      "id": "c5f3e4a6-0a7d-4c9e-b1f2-3d4e5f6a7b8c",
+      "name": "Check If Any Results",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d6a4b5c7-1b8e-4d0f-c2a3-4e5f6a7b8c9d",
+              "leftValue": "={{ $json.account_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e7b5c6d8-2c9f-4e1a-d3b4-5f6a7b8c9d0e",
+      "name": "Get SF Account Owner",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        900,
+        180
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "={{ 'SELECT Id, Name, Owner.Name FROM Account WHERE Id = \\'' + $json.sf_account_id + '\\'' }}"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "aBjJNGRAjYF66z5F",
+          "name": "Salesforce Partial Sandbox"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f8c6d7e9-3d0a-4f2b-e4c5-6a7b8c9d0e1f",
+      "name": "Merge Owner Into Account",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        180
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a9d7e8f0-4e1b-4a3c-f5d6-7b8c9d0e1f2a",
+              "name": "account_id",
+              "value": "={{ $json.account_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b0e8f9a1-5f2c-4b4d-a6e7-8c9d0e1f2a3b",
+              "name": "account_name",
+              "value": "={{ $json.account_name }}",
+              "type": "string"
+            },
+            {
+              "id": "c1f9a0b2-6a3d-4c5e-b7f8-9d0e1f2a3b4c",
+              "name": "churn_date",
+              "value": "={{ $json.churn_date }}",
+              "type": "string"
+            },
+            {
+              "id": "d2a0b1c3-7b4e-4d6f-c8a9-0e1f2a3b4c5d",
+              "name": "churn_reason",
+              "value": "={{ $json.churn_reason }}",
+              "type": "string"
+            },
+            {
+              "id": "e3b1c2d4-8c5f-4e7a-d9b0-1f2a3b4c5d6e",
+              "name": "churn_reason_modified",
+              "value": "={{ $json.churn_reason_modified }}",
+              "type": "string"
+            },
+            {
+              "id": "f4c2d3e5-9d6a-4f8b-e0c1-2a3b4c5d6e7f",
+              "name": "churn_type",
+              "value": "={{ $json.churn_type }}",
+              "type": "string"
+            },
+            {
+              "id": "a5d3e4f6-0e7b-4c9d-f1d2-3b4c5d6e7f8a",
+              "name": "csm",
+              "value": "={{ $json.csm }}",
+              "type": "string"
+            },
+            {
+              "id": "b6e4f5a7-1f8c-4d0e-a2e3-4c5d6e7f8a9b",
+              "name": "avg_mrr",
+              "value": "={{ $json.avg_mrr }}",
+              "type": "number"
+            },
+            {
+              "id": "c7f5a6b8-2a9d-4e1f-b3f4-5d6e7f8a9b0c",
+              "name": "account_segmentation",
+              "value": "={{ $json.account_segmentation }}",
+              "type": "string"
+            },
+            {
+              "id": "d8a6b7c9-3b0e-4f2a-c4a5-6e7f8a9b0c1d",
+              "name": "geo_area",
+              "value": "={{ $json.geo_area }}",
+              "type": "string"
+            },
+            {
+              "id": "e9b7c8d0-4c1f-4a3b-d5b6-7f8a9b0c1d2e",
+              "name": "months_in_guesty",
+              "value": "={{ $json.months_in_guesty }}",
+              "type": "number"
+            },
+            {
+              "id": "f0c8d9e1-5d2a-4b4c-e6c7-8a9b0c1d2e3f",
+              "name": "etf",
+              "value": "={{ $json.etf }}",
+              "type": "number"
+            },
+            {
+              "id": "a1d9e0f2-6e3b-4c5d-f7d8-9b0c1d2e3f4a",
+              "name": "sf_owner_name",
+              "value": "={{ $json.records && $json.records[0] && $json.records[0].Owner ? $json.records[0].Owner.Name : 'N/A' }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a0e8f9a1-5f2c-4b4d-a6e7-8c9d0e1f2a3b",
+      "name": "Aggregate All Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        180
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "b1f9a0b2-6a3d-4c5e-b7f8-9d0e1f2a3b4c",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        180
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2a0b1c3-7b4e-4d6f-c8a9-0e1f2a3b4c5d",
+              "name": "slackMessage",
+              "value": "={{ ':rotating_light: *Daily Churn Report -- Last 30 Days*\\nRun date: ' + $now.toFormat('yyyy-MM-dd') + '\\nTotal churned accounts: *' + $json.accounts.length + '*\\n\\n' + $json.accounts.map(function(a) { return '- *' + a.account_name + '* | CSM: ' + (a.csm || 'N/A') + ' | Owner: ' + (a.sf_owner_name || 'N/A') + ' | MRR: $' + (a.avg_mrr ? Math.round(a.avg_mrr) : 0) + ' | Reason: ' + (a.churn_reason_modified || a.churn_reason || 'N/A') + ' | Segment: ' + (a.account_segmentation || 'N/A') + ' | Geo: ' + (a.geo_area || 'N/A') + ' | Date: ' + a.churn_date; }).join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c3b1c2d4-8c5f-4e7a-d9b0-1f2a3b4c5d6e",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1780,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-churn-alerts"
+        },
+        "text": "={{ $json.slackMessage }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "d4c2d3e5-9d6a-4f8b-e0c1-2a3b4c5d6e7f",
+      "name": "No Churn - Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cs-churn-alerts"
+        },
+        "text": "={{ ':white_check_mark: *Daily Churn Report -- ' + $now.toFormat('yyyy-MM-dd') + '*\\nNo churned accounts in the last 30 days.' }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "7H6auF31TpX7Wk7M",
+          "name": "Slack account 77"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     }
   ],
   "connections": {
-    "Gemini: Summarize & Format": {
+    "Daily 9am UTC": {
       "main": [
-        []
+        [
+          {
+            "node": "Get Churned Accounts (BQ)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Churned Accounts (BQ)": {
+      "main": [
+        [
+          {
+            "node": "Check If Any Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Any Results": {
+      "main": [
+        [
+          {
+            "node": "Get SF Account Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Churn - Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get SF Account Owner": {
+      "main": [
+        [
+          {
+            "node": "Merge Owner Into Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Owner Into Account": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Accounts": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "pinData": {},
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  "settings": {
+    "executionOrder": "v1"
   }
 }

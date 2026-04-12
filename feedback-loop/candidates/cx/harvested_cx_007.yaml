@@ -1,50 +1,25 @@
 - name: harvested_cx_007
-  description: "Harvested from roni.shif@guesty.com - Accounting 
-
-THis workfow has got an error as it was trig..."
+  description: "Harvested from roni.shif@guesty.com - From the following GSheet I want to create an automation ..."
   department: cx
   prompt: >
-    Accounting 
-    
-    THis workfow has got an error as it was triggered when a new row was added but the LLM has recived too many requests 
-    
-    {
-      "nodes": [
-        {
-          "parameters": {
-            "pollTimes": {
-              "item": [
-                {
-                  "mode": "everyMinute"
-                }
-              ]
-            },
-            "documentId": {
-              "__rl": true,
-              "mode": "id",
-              "value": "1KpiafhwJem-R1Z6pOblFRfu1B2u9CKpKpVfmCHf3azU"
-            },
-            "sheetName": {
-              "__rl": tr...
+    "id":8665992190493,"type":"tagger","title":"All brands: Issue type","raw_title":"All brands: Issue type","description":"","raw_description":"","position":9999,"active":true,"required":true,"collapsed_for_agents":false,"regexp_for_validation":null,"title_in_portal":"All brands: Issue type","raw_title_in_portal":"All brands: Issue type","visible_in_portal":false,"editable_in_portal":false,"required_in_portal":false,"agent_can_edit":true,"tag":null,"created_at":"2023-01-08T16:57:19Z","updated_at...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - @n8n/n8n-nodes-langchain.lmChatOpenAi
+    - httpRequest
   expected_creds:
-    openAiApi: sibRkht3HDN1V5lW
+    zendeskApi: 4zfIc5d8uJMBSFo2
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: dj4u2WHcZejD0jY26iA3
+    source_conversation: 0EBrXZgaP3evDcTJZytG
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Accounting 
-
-THis workfow has got an error as it was trig..."
+    workflow_name: "From the following GSheet I want to create an automation ..."
     node_count: 1
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.958Z
+    harvested_at: 2026-04-01T09:38:06.211Z
     confidence: medium
     workflow_json_file: harvested_cx_007_workflow.json

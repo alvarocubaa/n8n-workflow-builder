@@ -75,23 +75,25 @@ cases:
   # ═══════════════════════════════════════════════════════════════════════════
 
   - name: cs_churn_bq_slack
-    description: "CS regression: BQ churn query + Slack alert — tests projectId format and credential types"
+    description: "CS regression: BQ churn query + Slack alert. Tests CSM lookup rule — `csm.csm_churn_report` already has a `csm` column, so the AI should NOT make a SF round-trip even when the user mentions 'account owner'. See specs/02_SRC_CSM_Spec.md 'CSM / Account Owner Lookup Rule'. Reproduces harvested_cs_005 bug from Apr 2026."
     department: cs
     prompt: >
       Create a daily workflow that queries BigQuery csm_churn_report for accounts
-      with recent churn. Include the account owner from Salesforce. Post summary
+      with recent churn. Include the account owner. Post summary
       to #cs-churn-alerts in Slack. Run at 9am UTC daily.
     confirm_message: "Looks good, build it"
     expected_nodes:
       - googleBigQuery
       - slack
+    # NOTE: Salesforce should NOT be in expected_creds. csm.csm_churn_report already
+    # has a `csm` column — the AI should use it directly and skip the SF round-trip.
     expected_creds:
       googleApi: VQ7CU7dKViVcv8Ah
-      salesforceOAuth2Api: aBjJNGRAjYF66z5F  # sandbox (ENVIRONMENT PRIORITY)
       slackApi: 7H6auF31TpX7Wk7M
     checks:
       - encoding
       - uuids
+      - csm_no_sf_roundtrip
       - credentials
       - bq_projectId
 
@@ -175,7 +177,7 @@ cases:
       googleApi: h7fJ82YhtOnUL58u
       googlePalmApi: LL8fLgZSrUn8oZtV
       googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -273,7 +275,7 @@ cases:
       googleApi: h7fJ82YhtOnUL58u
       googlePalmApi: LL8fLgZSrUn8oZtV
       googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids

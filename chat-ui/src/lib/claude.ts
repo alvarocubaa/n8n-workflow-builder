@@ -140,11 +140,11 @@ const MIN_HISTORY_FOR_WINDOWING = 16;
 /** Number of recent messages to keep in the sliding window. */
 const RECENT_WINDOW_SIZE = 20;
 /** Number of messages to pin from the start (Phase 1 context). */
-const PINNED_START_SIZE = 2;
+const PINNED_START_SIZE = 4;
 
 /**
  * Manages context window for long conversations.
- * Strategy: Pin first 2 messages (Phase 1 user request + AI plan) + keep last 12 messages.
+ * Strategy: Pin first 4 messages (Phase 1 + Phase 2 context) + keep last 20 messages.
  * Only activates when history exceeds MIN_HISTORY_FOR_WINDOWING messages AND
  * token count exceeds CONTEXT_TOKEN_THRESHOLD.
  *
@@ -389,7 +389,7 @@ export async function* streamWorkflowChat(
 
     if (toolUses.length === 0) {
       if (turnTruncated) {
-        yield { type: 'text_chunk', text: '\n\n---\n**Note:** This response was truncated due to length limits. Ask me to continue if the output is incomplete.' };
+        yield { type: 'text_chunk', text: '\n\n---\nThis workflow is extensive. Use the **Download** button below to get the full JSON file for import into n8n.' };
       }
       const toolSummary = buildToolSummary(turnToolCalls);
       yield { type: 'done', usage: turnUsage, truncated: turnTruncated, toolSummary: toolSummary || undefined };

@@ -1,0 +1,29 @@
+- name: harvested_cs_009
+  description: "Harvested from alvaro.cuba@guesty.com - Here is the high-level guideline document you can hand of..."
+  department: cs
+  prompt: >
+    Here is the high-level guideline document you can hand off to your n8n builder. It explains exactly how to refactor the existing workflow into the scalable, modular architecture required for both HQ and Non-HQ clients.
+    
+    ***
+    
+    # Builder Guidelines: Universal Client Reporting Automation
+    **Objective:** Refactor the existing monolithic HQ reporting workflow into a "Core Engine" (Sub-workflow) powered by dynamic "Sourcing Triggers." This ensures we can process both HQ (Many-to-One) and Non-HQ/At-Ri...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - set
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: xf5HHGXXBNZZo8XByqLW
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Here is the high-level guideline document you can hand of..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.210Z
+    confidence: medium
+    workflow_json_file: harvested_cs_009_workflow.json

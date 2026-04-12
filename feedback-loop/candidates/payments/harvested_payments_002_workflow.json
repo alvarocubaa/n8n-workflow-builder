@@ -1,0 +1,203 @@
+{
+  "name": "Weekly Invoice Reconciliation Report",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Every Monday 7am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Query Zuora + SF via BigQuery",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  i.mongo_account_id,\n  sf.Name                          AS account_name,\n  u.Name                           AS account_owner,\n  ROUND(SUM(i.invoice_amount), 2)  AS total_invoiced_usd,\n  COUNT(i.invoice_id)              AS invoice_count\nFROM `guesty-data.zuora_analytics.invoices` i\nJOIN `guesty-data.guesty_analytics.dim_accounts` da\n  ON i.mongo_account_id = da.account_id\nJOIN `guesty-data.salesforce.sf_account` sf\n  ON da.sf_account_id = sf.Id\nLEFT JOIN `guesty-data.salesforce.sf_users` u\n  ON sf.OwnerId = u.Id\nWHERE i.invoice_date >= TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH))\n  AND i.invoice_date <  TIMESTAMP(DATE_TRUNC(CURRENT_DATE(), MONTH))\n  AND i.status = 'Posted'\nGROUP BY\n  i.mongo_account_id,\n  sf.Name,\n  u.Name\nORDER BY total_invoiced_usd DESC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "aLlYQkLWrmANkfFZ",
+          "name": "n8n-payments"
+        }
+      }
+    },
+    {
+      "id": "3d8b1e2f-9a4c-4f7d-b6e5-8c2a1f0e9d3b",
+      "name": "Format Reconciliation Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a3f1c2d4-8b7e-4b2e-9c3f-1a2b3c4d5e6f",
+              "name": "account_name",
+              "value": "={{ $json.account_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b4e2d3c5-9c8f-4c3f-8d4e-2b3c4d5e6f7a",
+              "name": "account_owner",
+              "value": "={{ $json.account_owner }}",
+              "type": "string"
+            },
+            {
+              "id": "c5f3e4d6-0d9a-4d4a-7e5f-3c4d5e6f7a8b",
+              "name": "total_invoiced_usd",
+              "value": "={{ $json.total_invoiced_usd }}",
+              "type": "number"
+            },
+            {
+              "id": "d6a4f5e7-1e0b-4e5b-6f6a-4d5e6f7a8b9c",
+              "name": "invoice_count",
+              "value": "={{ $json.invoice_count }}",
+              "type": "number"
+            },
+            {
+              "id": "e7b5a6f8-2f1c-4f6c-5a7b-5e6f7a8b9c0d",
+              "name": "mongo_account_id",
+              "value": "={{ $json.mongo_account_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f8c6b7a9-3a2d-4a7d-4b8c-6f7a8b9c0d1e",
+              "name": "slack_line",
+              "value": "=*Account:* {{ $json.account_name }}\n*Owner:* {{ $json.account_owner ?? 'Unassigned' }}\n*Total Invoiced (USD):* ${{ $json.total_invoiced_usd }}\n*Invoice Count:* {{ $json.invoice_count }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Aggregate Report Lines",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "rows",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "slack_line"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#payments-reconciliation"
+        },
+        "text": "=:bar_chart: *Weekly Invoice Reconciliation Report*\n_Period: {{ $now.minus({months:1}).startOf('month').toFormat('MMMM yyyy') }}_\n\n{{ $json.rows.map(r => r.slack_line).join('\n\n') }}\n\n_Total accounts: {{ $json.rows.length }} | Generated {{ $now.toFormat('ccc dd MMM yyyy, HH:mm') }} UTC_",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "0l2bJ3SquNB8nyFd",
+          "name": "Slack ask-pay-test"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Every Monday 7am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query Zuora + SF via BigQuery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Zuora + SF via BigQuery": {
+      "main": [
+        [
+          {
+            "node": "Format Reconciliation Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Reconciliation Row": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Report Lines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Report Lines": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

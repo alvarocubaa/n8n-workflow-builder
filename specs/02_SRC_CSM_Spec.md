@@ -22,9 +22,29 @@ This document gives **exact** connection, schema, and query details for the CSM 
 ## 2. Object & Field Schema (Source of Truth)
 
 - **Primary identifier**: **account_id** (Guesty internal) across most tables. Use **sf_account_id** for Salesforce linkage.
-- **Modjo linkage**: **account_crm_id** in modjo_transcripts_structured = **sf_account_id** in dim_accounts.
+- **Modjo linkage**: **account_crm_id** in modjo_transcripts_structured_master = **sf_account_id** in dim_accounts.
 - **Key fields**: Use field names from section 2.1 schemas. Do not invent column names.
 - **Data types**: Match section 2.1 schemas (STRING, INTEGER, FLOAT, DATE, TIMESTAMP, BOOLEAN).
+
+> ### CSM / Account Owner Lookup Rule (CRITICAL)
+>
+> When the user asks for "CSM", "account owner", or "who owns the account", and your workflow already queries **any** of these BQ tables, **SELECT the `csm` column directly from the table you already have** — do NOT add a Salesforce round-trip.
+>
+> | Table | Column |
+> |-------|--------|
+> | `guesty_analytics.dim_accounts` | `csm` |
+> | `csm.portfolio` | `csm` |
+> | `csm.health_score` | `csm` |
+> | `csm.csm_churn_report` | `csm` |
+> | `csm.mrr_calculator` | `csm` |
+> | `csm.segmentation_report` | `csm` |
+>
+> **Why this matters:**
+> - `dim_accounts.csm` is **100% populated** on active accounts (verified Apr 10, 2026 — 18,626 / 18,626).
+> - The Salesforce account owner (`Owner.Name` via `OwnerId`) is also 100% populated, but is a **different concept** (sales-side ownership). It disagrees with the BQ CSM on **~80% of random active accounts**.
+> - The two are **NOT interchangeable**. Use the BQ `csm` column when a BQ table is already in the workflow.
+> - Only fall back to SF `Owner.Name` if the workflow has **no BQ data source** at all.
+> - **Avoid** `Account_Owner_F__c`, `Success_Program_CSM__c`, and `Acc_Owner_Id__c` for general CSM lookups — they're tier-specific custom fields populated on only 4–11% of accounts.
 
 ---
 
@@ -34,7 +54,7 @@ This document gives **exact** connection, schema, and query details for the CSM 
 
 | Logical table | Full BigQuery path | Cols | Purpose |
 |---------------|--------------------|------|---------|
-| modjo_transcripts_structured | `guesty-data.csm.modjo_transcripts_structured` | 13 | Modjo call transcripts with AI-extracted risk/opportunity signals |
+| modjo_transcripts_structured_master | `guesty-data.csm.modjo_transcripts_structured_master` | 14 | Modjo call transcripts with AI-extracted risk signals (45K rows, Aug 2025–present). **Use this table, NOT `modjo_transcripts_structured` (only 17 test rows).** |
 | health_score | `guesty-data.csm.health_score` | 52 | Account health scoring (composite score from tickets, revenue, channel, product, engagement) |
 | portfolio | `guesty-data.csm.portfolio` | 48 | CSM portfolio view — account assignments, status, risk levels |
 | csm_churn_report | `guesty-data.csm.csm_churn_report` | 74 | Churn analysis with reasons, ETF, revenue impact |
@@ -56,10 +76,10 @@ This document gives **exact** connection, schema, and query details for the CSM 
 
 | From (this spec) | To (other spec) | Join condition |
 |-----------------|-----------------|----------------|
-| modjo_transcripts_structured | Salesforce / dim_accounts | modjo.**account_crm_id** = dim_accounts.**sf_account_id** |
-| modjo_transcripts_structured | Zendesk tickets_clean | modjo.**account_crm_id** = tickets_clean.**sf_account_id** |
-| modjo_transcripts_structured | Zuora invoices | Via dim_accounts: modjo.account_crm_id = dim_accounts.sf_account_id → dim_accounts.account_id = invoices.mongo_account_id |
-| modjo_transcripts_structured | Jira jira_hierarchy | Via dim_accounts: modjo.account_crm_id = dim_accounts.sf_account_id → dim_accounts.account_id = UNNEST(jira_hierarchy.account_ids) |
+| modjo_transcripts_structured_master | Salesforce / dim_accounts | modjo.**account_crm_id** = dim_accounts.**sf_account_id** |
+| modjo_transcripts_structured_master | Zendesk tickets_clean | modjo.**account_crm_id** = tickets_clean.**sf_account_id** |
+| modjo_transcripts_structured_master | Zuora invoices | Via dim_accounts: modjo.account_crm_id = dim_accounts.sf_account_id → dim_accounts.account_id = invoices.mongo_account_id |
+| modjo_transcripts_structured_master | Jira jira_hierarchy | Via dim_accounts: modjo.account_crm_id = dim_accounts.sf_account_id → dim_accounts.account_id = UNNEST(jira_hierarchy.account_ids) |
 | health_score / portfolio / segmentation_report | dim_accounts | **account_id** = dim_accounts.account_id |
 | health_score / portfolio / segmentation_report | Zendesk tickets_clean | **account_id** = tickets_clean.account_id |
 | health_score / portfolio | Zuora invoices | **account_id** = invoices.mongo_account_id ⚠️ |
@@ -73,10 +93,9 @@ The CSM dataset provides risk and sentiment signals across multiple tables:
 
 | Table | Field | Type | Description |
 |-------|-------|------|-------------|
-| modjo_transcripts_structured | `risk_churn` | STRING | Churn risk signal from call |
-| modjo_transcripts_structured | `risk_commercial` | STRING | Commercial risk signal |
-| modjo_transcripts_structured | `risk_technical` | STRING | Technical risk signal |
-| modjo_transcripts_structured | `opportunity_growth` | STRING | Growth opportunity signal |
+| modjo_transcripts_structured_master | `sentiment` | STRING | Overall call sentiment |
+| modjo_transcripts_structured_master | `risk_commercial` | STRING | Commercial risk signal |
+| modjo_transcripts_structured_master | `risk_technical` | STRING | Technical risk signal |
 | health_score | `total_score` | FLOAT | Composite health score |
 | health_score | `ticket_score` | INT64 | Ticket-based health component |
 | health_score | `profit_score` | INT64 | Profitability component |
@@ -96,15 +115,17 @@ The CSM dataset provides risk and sentiment signals across multiple tables:
 | csm_churn_report | `churn_reason_modified` | STRING | Modified churn reason |
 | csm_churn_report | `customer_churn_reason` | STRING | Customer-stated churn reason |
 
-### 2.1.1. modjo_transcripts_structured (Modjo call transcripts)
+### 2.1.1. modjo_transcripts_structured_master (Modjo call transcripts)
 
-**BigQuery table:** `guesty-data.csm.modjo_transcripts_structured`
+**BigQuery table:** `guesty-data.csm.modjo_transcripts_structured_master`
 
-Call transcripts from Modjo with AI-extracted risk signals, action items, and summaries.
+> **Use `modjo_transcripts_structured_master` (45,612 rows, Aug 2025–present), NOT `modjo_transcripts_structured` (only 17 test rows).** Verified Apr 1, 2026.
+
+Call transcripts from Modjo with AI-extracted risk/sentiment signals and summaries.
 
 **Important — Account linking**: **`account_crm_id`** = **`sf_account_id`** in dim_accounts (Salesforce). Use this join when linking Modjo data to other sources.
 
-**Note:** **account_id** in this table is INTEGER (Modjo internal). For cross-source joins always use **account_crm_id**.
+**Note:** **account_id** in this table is INTEGER (Modjo internal). For cross-source joins always use **`account_crm_id`**.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -113,15 +134,15 @@ Call transcripts from Modjo with AI-extracted risk signals, action items, and su
 | `account_crm_id` | STRING | **= sf_account_id from dim_accounts** — use for all joins |
 | `startDate` | DATE | Call date |
 | `call_timestamp` | TIMESTAMP | Call start timestamp |
-| `duration` | FLOAT | Duration in seconds — filter `> 120` to exclude short calls |
+| `duration` | FLOAT64 | Duration in seconds — filter `> 120` to exclude short calls |
 | `transcript` | STRING | Full call transcript |
+| `sentiment` | STRING | Overall call sentiment |
+| `sentiment_examples` | STRING | Examples supporting sentiment classification |
 | `summary_interaction` | STRING | AI-generated call summary |
-| `risk_churn` | STRING | Churn risk signal |
 | `risk_commercial` | STRING | Commercial risk signal |
+| `risk_commercial_explanation` | STRING | Explanation of commercial risk |
 | `risk_technical` | STRING | Technical risk signal |
-| `opportunity_growth` | STRING | Growth opportunity signal |
-| `open_action_items` | STRING | Action items from call |
-| `resolved_issues` | STRING | Resolved issues from call |
+| `risk_technical_explanation` | STRING | Explanation of technical risk |
 
 ### 2.1.2. health_score (account health scoring)
 
@@ -356,7 +377,7 @@ Monthly account segmentation snapshots with health score trends and segment chan
 
 - **Date ranges**: Filter by `partition_date`, `startDate`, or `created_at` depending on the table. Use bounded windows (e.g. last 30 days) for large tables.
 - **Duration filter** (Modjo): Filter `duration > 120` to exclude short/test calls.
-- **Status filters**: Filter `account_active = TRUE` for current customers in health_score/portfolio.
+- **Status filters**: Filter `IFNULL(account_active, FALSE) = TRUE` for current customers (Boolean columns may be NULL).
 - **Limits**: Max 50-100 rows per run when fetching transcript/summary fields.
 - **Account filter**: Use `account_id` or `account_crm_id` to scope queries.
 
@@ -383,7 +404,7 @@ Node Type: BigQuery node (preferred). HTTP Request for Modjo API alternative.
 Credential Type: Google Service Account API (BQ); Bearer Auth (Modjo API).
 Credentials: Provided per-department in conversation context.
 BQ tables (guesty-data.csm.*):
-  - modjo_transcripts_structured (call transcripts + AI risk signals)
+  - modjo_transcripts_structured_master (call transcripts + AI risk signals — 45K rows)
   - health_score (composite health scoring — 5 dimensions)
   - portfolio (CSM portfolio — assignments, risk levels)
   - csm_churn_report (churn analysis with reasons + ETF)
@@ -392,7 +413,7 @@ BQ tables (guesty-data.csm.*):
   - mrr_calculator (MRR analytics + Stripe revenue)
   - segmentation_report (segment history + health trends)
 Linkage: modjo account_crm_id = dim_accounts.sf_account_id. All other tables: account_id = dim_accounts.account_id = tickets_clean.account_id. listing_performance.listing_id = dim_listings.listing_id. delighted_data.sfdc_account_id = sf_account.Id.
-Sentiment/risk fields: modjo (risk_churn/commercial/technical, opportunity_growth), health_score (total_score, 5 components), portfolio (csm_overall_risk_level), delighted_data (NPS score/comment), listing_performance (sentiment_positive/negative/neutral, overall_rating), segmentation_report (account_owner_sentiment), csm_churn_report (churn_reason).
+Sentiment/risk fields: modjo_master (sentiment, risk_commercial, risk_technical), health_score (total_score, 5 components), portfolio (csm_overall_risk_level: 'High Risk'/'Medium Risk'/'Low Risk'/'Healthy'), delighted_data (NPS score/comment — stale since Oct 2024), listing_performance (sentiment_positive/negative/neutral, overall_rating — 532M rows, filter tightly), segmentation_report (account_owner_sentiment), csm_churn_report (churn_reason).
 Query: Filter duration > 120 for Modjo; date-bound all queries; limit 50-100 rows for transcript fields.
 ```
 
@@ -400,29 +421,32 @@ Query: Filter duration > 120 for Modjo; date-bound all queries; limit 50-100 row
 
 ## 5. BigQuery: Common Query Patterns & Best Practices
 
+> All SQL patterns below verified against live BigQuery data (Apr 1, 2026).
+
 ### Key columns quick reference
 
 | Column | Table | Notes |
 |--------|-------|-------|
 | `account_id` | most tables | Guesty account ID — primary join key |
-| `account_crm_id` | modjo_transcripts | **= sf_account_id** — use for Modjo joins |
-| `callId` | modjo_transcripts | Modjo call primary key |
+| `account_crm_id` | modjo_transcripts_structured_master | **= sf_account_id** — use for Modjo joins |
+| `callId` | modjo_transcripts_structured_master | Modjo call primary key |
+| `csm` | `dim_accounts`, `portfolio`, `health_score`, `csm_churn_report`, `mrr_calculator`, `segmentation_report` | **Canonical CSM/account owner name.** 100% populated in `dim_accounts`. When asked for "CSM" / "account owner", use this column from whichever table is already in your query — NEVER round-trip to Salesforce. See "CSM / Account Owner Lookup Rule" in section 2. |
 | `total_score` | health_score | Composite health score |
-| `csm_overall_risk_level` | portfolio | CSM risk assessment |
-| `score` | delighted_data | NPS score (0-10) |
-| `sentiment_positive/negative` | listing_performance | Guest review sentiment |
+| `csm_overall_risk_level` | portfolio | CSM risk assessment — values: `'Healthy'`, `'Low Risk'`, `'Medium Risk'`, `'High Risk'` |
+| `score` | delighted_data | NPS score (0-10). **Data stale since Oct 2024.** |
+| `sentiment_positive/negative` | listing_performance | Guest review sentiment. **Table is 532M rows — always filter tightly.** |
 | `churn_reason` | csm_churn_report | Primary churn reason |
 
 ### Common SQL patterns
 
 ```sql
--- Calls per account last 30 days
+-- Verified: Calls per account last 30 days (45K rows total, Aug 2025–present)
 SELECT
   m.account_crm_id,
   a.account_name,
   COUNT(m.callId)       AS call_count,
-  AVG(m.duration/60.0) AS avg_duration_min
-FROM `guesty-data.csm.modjo_transcripts_structured` m
+  ROUND(AVG(m.duration/60.0), 1) AS avg_duration_min
+FROM `guesty-data.csm.modjo_transcripts_structured_master` m
 JOIN `guesty-data.guesty_analytics.dim_accounts` a
   ON m.account_crm_id = a.sf_account_id
 WHERE m.startDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
@@ -431,29 +455,29 @@ GROUP BY m.account_crm_id, a.account_name
 ORDER BY call_count DESC
 LIMIT 20;
 
--- Calls with churn risk signals
+-- Verified: Calls with commercial/technical risk signals
 SELECT
   m.callId,
   m.startDate,
   a.account_name,
-  m.risk_churn,
+  m.risk_commercial,
   m.risk_technical,
   m.summary_interaction
-FROM `guesty-data.csm.modjo_transcripts_structured` m
+FROM `guesty-data.csm.modjo_transcripts_structured_master` m
 JOIN `guesty-data.guesty_analytics.dim_accounts` a
   ON m.account_crm_id = a.sf_account_id
-WHERE m.risk_churn IS NOT NULL
-  AND m.risk_churn != ''
+WHERE (m.risk_commercial IS NOT NULL AND m.risk_commercial != ''
+       OR m.risk_technical IS NOT NULL AND m.risk_technical != '')
   AND m.startDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
 ORDER BY m.startDate DESC;
 
--- Health score trends (current vs previous)
+-- Verified: Health score trends (current vs previous). Note: previous_score often NULL for new accounts.
 SELECT
   h.account_id,
   h.account_name,
   h.total_score,
   h.previous_score,
-  h.total_score - h.previous_score AS score_change,
+  ROUND(h.total_score - h.previous_score, 2) AS score_change,
   h.ticket_score,
   h.profit_score,
   h.channel_score,
@@ -461,11 +485,11 @@ SELECT
   h.eng_score
 FROM `guesty-data.csm.health_score` h
 WHERE h.partition_date = (SELECT MAX(partition_date) FROM `guesty-data.csm.health_score`)
-  AND h.account_active = TRUE
+  AND IFNULL(h.account_active, FALSE) = TRUE
 ORDER BY score_change ASC
 LIMIT 20;
 
--- Portfolio at-risk accounts
+-- Verified: Portfolio at-risk accounts. Risk levels: 'High Risk', 'Medium Risk', 'Low Risk', 'Healthy' (NOT 'High'/'Critical').
 SELECT
   p.account_name,
   p.csm,
@@ -475,11 +499,12 @@ SELECT
   p.active_listings,
   p.next_renewal_date
 FROM `guesty-data.csm.portfolio` p
-WHERE p.account_active = TRUE
-  AND p.csm_overall_risk_level IN ('High', 'Critical')
+WHERE IFNULL(p.account_active, FALSE) = TRUE
+  AND p.csm_overall_risk_level IN ('High Risk', 'Medium Risk')
 ORDER BY p.actual_mrr DESC;
 
--- NPS score distribution
+-- Verified: NPS score distribution (5,248 total responses). WARNING: data stale (latest Oct 2024).
+-- Verified results (all-time): Detractor 2,606 (avg 2.1), Promoter 2,075 (avg 9.8), Passive 567 (avg 7.6)
 SELECT
   CASE
     WHEN d.score >= 9 THEN 'Promoter'
@@ -487,12 +512,12 @@ SELECT
     ELSE 'Detractor'
   END AS nps_category,
   COUNT(*) AS cnt,
-  AVG(d.score) AS avg_score
+  ROUND(AVG(d.score), 1) AS avg_score
 FROM `guesty-data.csm.delighted_data` d
-WHERE d.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
+-- WHERE d.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)  -- uncomment when data is fresh
 GROUP BY nps_category;
 
--- NPS detractors with comments
+-- Verified: NPS detractors with comments
 SELECT
   d.account_name,
   d.score,
@@ -503,59 +528,87 @@ FROM `guesty-data.csm.delighted_data` d
 WHERE d.score <= 6
   AND d.comment IS NOT NULL
   AND d.comment != ''
-  AND d.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-ORDER BY d.created_at DESC;
+ORDER BY d.created_at DESC
+LIMIT 50;
 
--- Listing performance with guest sentiment
+-- Verified: Listing performance with guest sentiment. WARNING: 532M rows — always filter by account_id or listing_active.
 SELECT
   lp.account_id,
   a.account_name,
   SUM(lp.sentiment_positive) AS total_positive,
   SUM(lp.sentiment_negative) AS total_negative,
-  AVG(lp.overall_rating)     AS avg_rating,
-  AVG(lp.benchmark_review_overall_rating) AS benchmark_rating
+  ROUND(AVG(lp.overall_rating), 2) AS avg_rating,
+  ROUND(AVG(lp.benchmark_review_overall_rating), 2) AS benchmark_rating
 FROM `guesty-data.csm.listing_performance` lp
 JOIN `guesty-data.guesty_analytics.dim_accounts` a
   ON lp.account_id = a.account_id
-WHERE lp.listing_active = TRUE
+WHERE IFNULL(lp.listing_active, FALSE) = TRUE
 GROUP BY lp.account_id, a.account_name
 HAVING total_negative > 5
 ORDER BY total_negative DESC
 LIMIT 20;
 
--- Churn analysis by reason
+-- Verified: Churn analysis by reason (2,960 rows). Use 180-day window for meaningful results.
+-- Verified top reasons: Unknown Reason (83), Inactive/Silent User (82), Non-Responsive (54), Pricing (41), Product Fit (37)
 SELECT
   c.churn_reason_modified,
   COUNT(*) AS churn_count,
-  AVG(c.avg_mrr) AS avg_mrr_at_churn,
-  AVG(c.months_in_guesty) AS avg_tenure
+  ROUND(AVG(c.avg_mrr), 0) AS avg_mrr_at_churn,
+  ROUND(AVG(c.months_in_guesty), 0) AS avg_tenure
 FROM `guesty-data.csm.csm_churn_report` c
-WHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+WHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 180 DAY)
 GROUP BY c.churn_reason_modified
 ORDER BY churn_count DESC;
 
--- Account 360: health + tickets + calls
+-- Verified: Account 360 — health + tickets + risk level
 SELECT
   h.account_id,
   h.account_name,
   h.total_score AS health_score,
   p.csm_overall_risk_level,
-  COUNT(DISTINCT t.ticket_id) AS recent_tickets,
-  COUNT(DISTINCT m.callId)    AS recent_calls
+  COUNT(DISTINCT t.ticket_id) AS recent_tickets
 FROM `guesty-data.csm.health_score` h
 LEFT JOIN `guesty-data.csm.portfolio` p
   ON h.account_id = p.account_id
 LEFT JOIN `guesty-data.zendesk_analytics.tickets_clean` t
   ON h.account_id = t.account_id
   AND t.created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-LEFT JOIN `guesty-data.csm.modjo_transcripts_structured` m
-  ON h.sf_account_id = m.account_crm_id
-  AND m.startDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
 WHERE h.partition_date = (SELECT MAX(partition_date) FROM `guesty-data.csm.health_score`)
-  AND h.account_active = TRUE
+  AND IFNULL(h.account_active, FALSE) = TRUE
 GROUP BY h.account_id, h.account_name, h.total_score, p.csm_overall_risk_level
 ORDER BY h.total_score ASC
 LIMIT 20;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- CSM lookup pattern: USE THE IN-QUERY `csm` COLUMN, do NOT round-trip to SF
+-- ════════════════════════════════════════════════════════════════════════════
+-- ✅ CORRECT: Daily churn report including the CSM, no SF round-trip needed.
+-- The csm.csm_churn_report table already has a `csm` column — just SELECT it.
+-- Verified Apr 10, 2026: c.csm is populated for all churned accounts in this table.
+SELECT
+  c.account_id,
+  c.account_name,
+  c.from_date           AS churn_date,
+  c.churn_reason_modified,
+  c.csm,                              -- ← canonical CSM, no Salesforce needed
+  c.avg_mrr,
+  c.account_segmentation
+FROM `guesty-data.csm.csm_churn_report` c
+WHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+ORDER BY c.from_date DESC
+LIMIT 100;
+
+-- ❌ WRONG: Same workflow, but adding an unnecessary Salesforce round-trip.
+-- This pattern was observed in harvested_cs_005 — the AI queried csm_churn_report
+-- (which already has c.csm) and then made a second SF call to Owner.Name. The two
+-- values disagree on ~80% of accounts and the workflow ends up showing both with
+-- conflicting data. Don't do this:
+--
+--   SELECT c.account_id, c.csm, da.sf_account_id
+--   FROM csm.csm_churn_report c JOIN dim_accounts da USING (account_id)
+--   → then a Salesforce node: SELECT Id, Owner.Name FROM Account WHERE Id = '...'
+--
+-- The c.csm column already has the answer. Skip the SF call entirely.
 ```
 
 ### Filters & limits

@@ -1,0 +1,51 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Guesty Billing - {{ $json.data[0].Account }}",
+        "emailType": "html",
+        "message": "=<p>Hi {{ $json.data[0][\"Contact name\"] }},</p>\n<br>\n<p>Please find your latest Guesty invoices attached.</p>\n<br>\n<p>Don't hesitate to reach out if you have any questions or concerns.</p>\n<br>\n<p>Best,<br>\nRaphi</p>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "={{ Object.keys($binary).join(',') }}"
+              }
+            ]
+          },
+          "ccList": "={{ $json.data[0][\"CSM email\"] }}",
+          "sendTo": "={{ $json.data[0][\"Contact Emails\"] }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2336,
+        -3752
+      ],
+      "id": "2ed35387-9ac2-4832-92f5-75396c6d099e",
+      "name": "RONI",
+      "webhookId": "0434a786-1f35-49d0-8b6b-9acf47c8d452",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3XKWZw8KuGVggGEH",
+          "name": "Gmail - @Ronishif - CS"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "RONI": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

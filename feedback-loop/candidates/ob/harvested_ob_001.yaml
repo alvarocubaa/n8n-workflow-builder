@@ -1,0 +1,32 @@
+- name: harvested_ob_001
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery for Zendesk ..."
+  department: ob
+  prompt: >
+    Build a daily workflow that queries BigQuery for Zendesk tickets from zendesk_analytics.tickets_clean where status = 'open' and group_name = 'Onboarding' and created_at is older than 5 days. Group by account_name, show count and oldest ticket per account. Post an escalation report to #ob-escalations in Slack. Run at 10am UTC daily.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - if
+    - code
+    - slack
+  expected_creds:
+    googleApi: jTPSwPeDuM4ipl69
+    slackOAuth2Api: BXeGv4HZaOauuct6
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: Aaq2HRQ5vlGq6GVUosBE
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a daily workflow that queries BigQuery for Zendesk ..."
+    node_count: 6
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
+    workflow_json_file: harvested_ob_001_workflow.json

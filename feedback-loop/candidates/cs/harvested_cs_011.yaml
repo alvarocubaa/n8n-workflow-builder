@@ -1,0 +1,49 @@
+- name: harvested_cs_011
+  description: "Harvested from roni.shif@guesty.com - this is the input 
+[
+  {
+    \"Alloggio\": [
+      {
+      ..."
+  department: cs
+  prompt: >
+    this is the input 
+    [
+      {
+        "Alloggio": [
+          {
+            "ticket_id": "1913722",
+            "status": "Open",
+            "sub_account": "Alloggio",
+            "created_by": "Kylie Redden",
+            "link": "https://guesty3396.zendesk.com/agent/tickets/1913722",
+            "subject": "Booking.com Reservation Display Issues",
+            "bullet_points": [
+              "Alloggio is observing an issue where Booking.com end-of-month reservations are not accurately reflecting within Guesty.",
+              "Our team is...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - httpRequest
+    - set
+  expected_creds:
+    oAuth2Api: B1ksdYFDJ8LJKaTJ
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: j2VM8xPQIuLuUPedHk1b
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "this is the input 
+[
+  {
+    \"Alloggio\": [
+      {
+      ..."
+    node_count: 2
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cs_011_workflow.json

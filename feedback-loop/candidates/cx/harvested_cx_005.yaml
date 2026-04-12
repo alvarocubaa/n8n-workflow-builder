@@ -1,47 +1,33 @@
 - name: harvested_cx_005
-  description: "Harvested from roni.shif@guesty.com - the following is an automation in production 
-
-{
-  \"nodes..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow at 8am UTC. Query BigQuery zendes..."
   department: cx
   prompt: >
-    the following is an automation in production 
-    
-    {
-      "nodes": [
-        {
-          "parameters": {
-            "documentId": {
-              "__rl": true,
-              "value": "1uufa0K4rpTjsjK-YsJ4CDZ3rcR8gMBsv-lhcGMrKzKk",
-              "mode": "id"
-            },
-            "sheetName": {
-              "__rl": true,
-              "value": 1673902714,
-              "mode": "list",
-              "cachedResultName": "N8N",
-              "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1uufa0K4rpTjsjK-YsJ4CDZ3rcR8gMBsv-lhcGMrKzKk/edi...
+    Create a daily workflow at 8am UTC. Query BigQuery zendesk_analytics.tickets_clean for tickets where status = 'open' and updated_at is older than 14 days. For each ticket in the results, use the native Zendesk node to add an internal comment saying 'Auto-reminder: This ticket has been open for 14+ days. Please review and update.' After processing all tickets, post a summary count of tickets commented on to #cx-ticket-hygiene in Slack.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - httpRequest
+    - scheduleTrigger
+    - googleBigQuery
+    - splitInBatches
+    - zendesk
+    - slack
   expected_creds:
-    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+    googleApi: vWwsUUkc4EYrtsmN
+    zendeskApi: PEFCagywCPGDJGjg
+    slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - slack_config
   _metadata:
-    source_conversation: O1QJuZknzpVWCKXhzKDo
-    source_user: roni.shif@guesty.com
+    source_conversation: pbnlzKO9YQwVch55zf0E
+    source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "the following is an automation in production 
-
-{
-  \"nodes..."
-    node_count: 1
+    workflow_name: "Create a daily workflow at 8am UTC. Query BigQuery zendes..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.957Z
+    harvested_at: 2026-04-01T09:38:06.210Z
     confidence: medium
     workflow_json_file: harvested_cx_005_workflow.json

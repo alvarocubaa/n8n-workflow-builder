@@ -1,202 +1,390 @@
 {
+  "name": "SF vs Zuora Contract Comparison (Weekly)",
   "nodes": [
     {
+      "id": "a3f1c2d4-8b5e-4f7a-9c1d-2e3f4a5b6c7d",
+      "name": "Every Monday 9am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
       "parameters": {
-        "authentication": "serviceAccount",
-        "documentId": {
-          "__rl": true,
-          "value": "={{ $('Find Manual Billing File').item.json.id }}",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "={{ $json.sheets.properties.sheetId }}",
-          "mode": "id"
-        },
-        "filtersUI": {
-          "values": [
+        "rule": {
+          "interval": [
             {
-              "lookupColumn": "account",
-              "lookupValue": "={{ $('Set Month Variables1').item.json.Account }}"
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
             }
           ]
-        },
+        }
+      }
+    },
+    {
+      "id": "b4e2d3f5-9c6f-4a8b-0d2e-3f4a5b6c7d8e",
+      "name": "Fetch Active Accounts SF + Zuora",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "projectId": "guesty-data",
+        "sqlQuery": "WITH zuora_latest AS (\n  SELECT\n    pc.account_id,\n    pc.plan_name                          AS zuora_plan,\n    pc.mrr                                AS zuora_mrr,\n    pc.subscription_status                AS zuora_subscription_status,\n    pc.billing_period                     AS zuora_billing_cycle,\n    pc.quantity                           AS zuora_listing_quantity\n  FROM `guesty-data.zuora_analytics.product_catalog` pc\n  WHERE pc.subscription_status = 'Active'\n    AND pc.account_id IS NOT NULL\n)\n\nSELECT\n  da.account_id,\n  da.account_name,\n  da.account_created_at,\n\n  sf.Package__c                           AS sf_package,\n  sf.Average_MRR__c                       AS sf_mrr,\n  sf.Guesty_Contract_Status__c            AS sf_contract_status,\n  da.billing_cycle                        AS sf_billing_cycle,\n  sf.Number_of_Listings__c               AS sf_listing_count,\n\n  z.zuora_plan,\n  z.zuora_mrr,\n  z.zuora_subscription_status,\n  z.zuora_billing_cycle,\n  z.zuora_listing_quantity\n\nFROM `guesty-data.guesty_analytics.dim_accounts` da\nJOIN `guesty-data.salesforce.sf_account` sf\n  ON da.account_id = sf.Guesty_Admin_ID__c\nLEFT JOIN zuora_latest z\n  ON da.account_id = z.account_id\n\nWHERE IFNULL(da.account_active, FALSE) = TRUE\n  AND IFNULL(da.is_churn, FALSE) = FALSE\n  AND da.account_created_at IS NOT NULL\n\nORDER BY da.account_created_at DESC",
         "options": {}
       },
+      "credentials": {
+        "googleApi": {
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
+        }
+      }
+    },
+    {
+      "id": "c5f3e4a6-0d7a-4b9c-1e3f-4a5b6c7d8e9f",
+      "name": "Read Reviewed Log",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        352,
-        80
-      ],
-      "id": "e5f6a7b8-c9d0-4e1f-2a3b-5e6f7a8b9c0d",
-      "name": "Read Manual Billing Sheet",
-      "credentials": {
-        "googleApi": {
-          "id": "VQ7CU7dKViVcv8Ah",
-          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "f3a1c2d4-9e8b-4f7a-b6c5-1d2e3f4a5b6c",
-              "name": "row_number",
-              "value": "",
-              "type": "string"
-            }
-          ]
-        },
-        "include": "allInputData",
-        "options": {
-          "ignoreConversionErrors": true
-        }
-      },
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        572,
-        80
-      ],
-      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "name": "Remove row_number"
-    },
-    {
-      "parameters": {
-        "resource": "spreadsheet",
-        "title": "={{ $('Set Month Variables1').item.json.accountname }} Add-Ons {{ $('Set Month Variables1').item.json.monthFolder }}",
-        "sheetsUi": {
-          "sheetValues": [
-            {
-              "title": "Sheet 1"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        572,
+        440,
         300
       ],
-      "id": "baf81175-851f-4e6d-b62b-64b9f9101715",
-      "name": "Create spreadsheet",
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "reviewed_log"
+        },
+        "options": {}
+      },
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "RPi7Ecm1B3utIhYr",
-          "name": "Google Sheets - Roni Shif"
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
         }
       }
     },
     {
-      "parameters": {
-        "mode": "combine",
-        "combineBy": "combineByPosition",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.merge",
-      "typeVersion": 3,
+      "id": "d6a4f5b7-1e8b-4c0d-2f4a-5b6c7d8e9f0a",
+      "name": "Build Reviewed ID Set",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        812,
-        180
+        660,
+        300
       ],
-      "id": "c3d4e5f6-a7b8-9012-cdef-234567890abc",
-      "name": "Merge Data + Sheet ID"
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Collect all already-reviewed account_ids from the sheet\nconst sheetRows = $input.all();\nconst reviewedIds = new Set(\n  sheetRows\n    .map(item => item.json.account_id)\n    .filter(id => id && id.trim() !== '')\n);\n\n// Pass the set as a JSON array for the next node\nreturn [{ json: { reviewed_ids: Array.from(reviewedIds) } }];"
+      }
     },
     {
+      "id": "e7b5a6c8-2f9c-4d1e-3a5b-6c7d8e9f0a1b",
+      "name": "Filter New Accounts Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Get the reviewed IDs set from the previous node\nconst reviewedIds = new Set($node['Build Reviewed ID Set'].json.reviewed_ids || []);\n\n// Get all accounts from the BQ node\nconst allAccounts = $node['Fetch Active Accounts SF + Zuora'].json;\n\n// allAccounts may be a single item or array -- normalise\nconst accountsArray = Array.isArray(allAccounts) ? allAccounts : [allAccounts];\n\n// Filter to only accounts NOT yet reviewed\nconst newAccounts = accountsArray.filter(acc => !reviewedIds.has(acc.account_id));\n\nif (newAccounts.length === 0) {\n  return [{ json: { no_new_accounts: true } }];\n}\n\nreturn newAccounts.map(acc => ({ json: acc }));"
+      }
+    },
+    {
+      "id": "f8c6b7d9-3a0d-4e2f-4b6c-7d8e9f0a1b2c",
+      "name": "Any New Accounts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
+              "leftValue": "={{ $json.no_new_accounts }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a9d7c8e0-4b1e-4f3a-5c7d-8e9f0a1b2c3d",
+      "name": "Compare Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const accounts = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nreturn accounts.map(item => {\n  const a = item.json;\n  const mismatches = [];\n\n  // A: Package / Plan\n  const sfPkg = (a.sf_package || '').toLowerCase().trim();\n  const zuoraPkg = (a.zuora_plan || '').toLowerCase().trim();\n  if (sfPkg && zuoraPkg && sfPkg !== zuoraPkg) {\n    mismatches.push('Package/Plan (SF: ' + a.sf_package + ' | Zuora: ' + a.zuora_plan + ')');\n  }\n\n  // B: MRR\n  const sfMrr = parseFloat(a.sf_mrr) || 0;\n  const zuoraMrr = parseFloat(a.zuora_mrr) || 0;\n  if (Math.abs(sfMrr - zuoraMrr) > 0) {\n    mismatches.push('MRR (SF: $' + sfMrr.toFixed(2) + ' | Zuora: $' + zuoraMrr.toFixed(2) + ')');\n  }\n\n  // C: Contract Status\n  const sfStatus = (a.sf_contract_status || '').toLowerCase().trim();\n  const zuoraStatus = (a.zuora_subscription_status || '').toLowerCase().trim();\n  if (sfStatus && zuoraStatus && sfStatus !== zuoraStatus) {\n    mismatches.push('Status (SF: ' + a.sf_contract_status + ' | Zuora: ' + a.zuora_subscription_status + ')');\n  }\n\n  // D: Billing Cycle\n  const sfCycle = (a.sf_billing_cycle || '').toLowerCase().trim();\n  const zuoraCycle = (a.zuora_billing_cycle || '').toLowerCase().trim();\n  if (sfCycle && zuoraCycle && sfCycle !== zuoraCycle) {\n    mismatches.push('Billing Cycle (SF: ' + a.sf_billing_cycle + ' | Zuora: ' + a.zuora_billing_cycle + ')');\n  }\n\n  // E: Listing Count\n  const sfListings = parseFloat(a.sf_listing_count) || 0;\n  const zuoraListings = parseFloat(a.zuora_listing_quantity) || 0;\n  if (sfListings !== zuoraListings) {\n    mismatches.push('Listings (SF: ' + sfListings + ' | Zuora: ' + zuoraListings + ')');\n  }\n\n  return {\n    json: {\n      account_id: a.account_id,\n      account_name: a.account_name,\n      account_created_at: a.account_created_at,\n      reviewed_date: today,\n      has_mismatch: mismatches.length > 0,\n      mismatch_count: mismatches.length,\n      mismatch_fields: mismatches.join(' | '),\n      sf_package: a.sf_package,\n      sf_mrr: a.sf_mrr,\n      sf_contract_status: a.sf_contract_status,\n      sf_billing_cycle: a.sf_billing_cycle,\n      sf_listing_count: a.sf_listing_count,\n      zuora_plan: a.zuora_plan,\n      zuora_mrr: a.zuora_mrr,\n      zuora_subscription_status: a.zuora_subscription_status,\n      zuora_billing_cycle: a.zuora_billing_cycle,\n      zuora_listing_quantity: a.zuora_listing_quantity\n    }\n  };\n});"
+      }
+    },
+    {
+      "id": "b0e8d9f1-5c2f-4a4b-6d8e-9f0a1b2c3d4e",
+      "name": "Log All Results to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        180
+      ],
       "parameters": {
         "operation": "append",
         "documentId": {
-          "__rl": true,
-          "value": "={{ $('Create spreadsheet').item.json.spreadsheetId }}",
-          "mode": "id"
+          "mode": "url",
+          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
         },
         "sheetName": {
-          "__rl": true,
-          "value": "={{ $('Create spreadsheet').item.json.sheets[0].properties.sheetId }}",
-          "mode": "id"
+          "mode": "name",
+          "value": "reviewed_log"
         },
         "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": false
+          "mappingMode": "defineBelow",
+          "value": {
+            "account_id": "={{ $json.account_id }}",
+            "account_name": "={{ $json.account_name }}",
+            "reviewed_date": "={{ $json.reviewed_date }}",
+            "has_mismatch": "={{ $json.has_mismatch }}",
+            "mismatch_fields": "={{ $json.mismatch_fields }}"
+          }
         },
-        "options": {
-          "handlingExtraData": "insertInNewColumn"
-        }
+        "options": {}
       },
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.7,
-      "position": [
-        1052,
-        180
-      ],
-      "id": "d4e5f6a7-b8c9-0123-defa-34567890abcd",
-      "name": "Append rows to new sheet",
       "credentials": {
         "googleSheetsOAuth2Api": {
-          "id": "RPi7Ecm1B3utIhYr",
-          "name": "Google Sheets - Roni Shif"
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
         }
       }
+    },
+    {
+      "id": "c1f9e0a2-6d3a-4b5c-7e9f-0a1b2c3d4e5f",
+      "name": "Has Mismatches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1760,
+        180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b2c3d4e5-f6a7-4890-bcde-f01234567890",
+              "leftValue": "={{ $json.has_mismatch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d2a0f1b3-7e4b-4c6d-8f0a-1b2c3d4e5f6a",
+      "name": "Build Slack Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        60
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const mismatches = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nlet lines = mismatches.map(item => {\n  const a = item.json;\n  return '*' + a.account_name + '* (`' + a.account_id + '`)\\n  Issues: ' + a.mismatch_fields;\n});\n\nconst header = ':warning: *SF vs Zuora Contract Mismatch Report -- ' + today + '*\\n' +\n  mismatches.length + ' account(s) with mismatches found this week.\\n\\n';\n\nconst body = lines.join('\\n\\n');\nconst message = header + body;\n\nreturn [{ json: { slack_message: message, mismatch_count: mismatches.length } }];"
+      }
+    },
+    {
+      "id": "e3b1a2c4-8f5c-4d7e-9a1b-2c3d4e5f6a7b",
+      "name": "Send Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        2200,
+        60
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-contract-mismatches"
+        },
+        "text": "={{ $json.slack_message }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      }
+    },
+    {
+      "id": "f4c2b3d5-9a6d-4e8f-0b2c-3d4e5f6a7b8c",
+      "name": "No New Accounts - Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        420
+      ],
+      "parameters": {}
     }
   ],
   "connections": {
-    "Read Manual Billing Sheet": {
+    "Every Monday 9am": {
       "main": [
         [
           {
-            "node": "Remove row_number",
+            "node": "Fetch Active Accounts SF + Zuora",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Remove row_number": {
+    "Fetch Active Accounts SF + Zuora": {
       "main": [
         [
           {
-            "node": "Merge Data + Sheet ID",
+            "node": "Read Reviewed Log",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create spreadsheet": {
+    "Read Reviewed Log": {
       "main": [
         [
           {
-            "node": "Merge Data + Sheet ID",
+            "node": "Build Reviewed ID Set",
             "type": "main",
-            "index": 1
+            "index": 0
           }
         ]
       ]
     },
-    "Merge Data + Sheet ID": {
+    "Build Reviewed ID Set": {
       "main": [
         [
           {
-            "node": "Append rows to new sheet",
+            "node": "Filter New Accounts Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Accounts Only": {
+      "main": [
+        [
+          {
+            "node": "Any New Accounts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any New Accounts?": {
+      "main": [
+        [
+          {
+            "node": "Compare Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No New Accounts - Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compare Fields": {
+      "main": [
+        [
+          {
+            "node": "Log All Results to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log All Results to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Has Mismatches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Mismatches?": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Build Slack Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Slack Alert",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "pinData": {},
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
   }
 }

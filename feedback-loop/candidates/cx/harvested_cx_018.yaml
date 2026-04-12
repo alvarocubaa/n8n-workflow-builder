@@ -1,0 +1,53 @@
+- name: harvested_cx_018
+  description: "Harvested from roni.shif@guesty.com - PRD — HQ Billing Automation (Updated)
+Overview
+A manually..."
+  department: cx
+  prompt: >
+    PRD — HQ Billing Automation (Updated)
+    Overview
+    A manually triggered n8n automation that processes HQ billing accounts, fetches Zuora invoices, downloads relevant files, and drafts emails with the correct attachments based on each account's billing model.
+    
+    Trigger
+    Manual 
+    Source sheet: Google Sheet (HQ Billing — tab: N8N)
+    Account Types & Required Deliverables
+    Billing Model	Invoice PDF	Attachment CSV	Manual Billing GSheet
+    HQ pays for all	✅	✅	✅
+    Hybrid	✅	✅	✅
+    Subaccount	✅	❌	❌
+    Flow
+    Step 1 — Fetch A...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - executeWorkflowTrigger
+    - googleSheets
+    - if
+    - set
+    - googleDrive
+    - httpRequest
+    - filter
+    - splitOut
+    - aggregate
+    - code
+  expected_creds:
+    googleApi: VQ7CU7dKViVcv8Ah
+    googleSheetsOAuth2Api: RPi7Ecm1B3utIhYr
+    googleDriveOAuth2Api: buZzVXa0qB706qpQ
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: yBh8Q2jldrkKLSIXAtfR
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "PRD — HQ Billing Automation (Updated)
+Overview
+A manually..."
+    node_count: 18
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.214Z
+    confidence: medium
+    workflow_json_file: harvested_cx_018_workflow.json

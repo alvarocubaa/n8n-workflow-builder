@@ -1,0 +1,254 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "PASTE_YOUR_MASTER_SHEET_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Account": "={{ $json.Account }}",
+            "Guesty ID": "={{ $json.GuestyID }}",
+            "Billing Type": "={{ $('Filter Just ID').item.json.BillingModel }}",
+            "Invoice Number": "={{ $json.invoice_number }}",
+            "Invoice Amount": "={{ $json.invoice_amount ?? $('Code in JavaScript1').item.json.invoice_amount }}",
+            "Requester Email": "={{ $json['Contact Emails'] }}",
+            "Contact Name": "={{ $json['Contact name'] }}",
+            "CSM Email": "={{ $json['CSM email'] }}",
+            "Invoice PDF URL": "={{ 'https://rest.na.zuora.com' + $json.data[0].invoiceFiles[0].pdfFileUrl }}",
+            "CSV URL": "={{ $json.data?.[0]?.fileContentType === 'text/csv' ? 'https://rest.na.zuora.com/v1/files/' + $json.data[0].fileId : '' }}",
+            "Summary URL": "={{ $json.data?.[1]?.fileId ? 'https://rest.na.zuora.com/v1/files/' + $json.data[1].fileId : '' }}",
+            "Subject": "={{ 'Guesty Pro Invoice - ' + $json.Account + ' - ' + $json.invoice_number }}",
+            "Message Body": "={{ '<p>Hi ' + $json['Contact name'] + ',</p><p>Please find your latest Guesty Pro invoice attached.</p><p>Do not hesitate to reach out if you have any questions.</p><p>Best,<br>Raphi</p>' }}",
+            "Run Date": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "Group": "",
+            "Issue Type": "",
+            "Product Domain": "",
+            "Multi-level Category": "",
+            "Knowledge Exists": "",
+            "Author ID": "",
+            "ZD Ticket Status": ""
+          },
+          "schema": [
+            {
+              "id": "Account",
+              "displayName": "Account",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Guesty ID",
+              "displayName": "Guesty ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Billing Type",
+              "displayName": "Billing Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice Number",
+              "displayName": "Invoice Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice Amount",
+              "displayName": "Invoice Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Requester Email",
+              "displayName": "Requester Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Contact Name",
+              "displayName": "Contact Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CSM Email",
+              "displayName": "CSM Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Invoice PDF URL",
+              "displayName": "Invoice PDF URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CSV URL",
+              "displayName": "CSV URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary URL",
+              "displayName": "Summary URL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message Body",
+              "displayName": "Message Body",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Run Date",
+              "displayName": "Run Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Group",
+              "displayName": "Group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Issue Type",
+              "displayName": "Issue Type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product Domain",
+              "displayName": "Product Domain",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Multi-level Category",
+              "displayName": "Multi-level Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Knowledge Exists",
+              "displayName": "Knowledge Exists",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Author ID",
+              "displayName": "Author ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ZD Ticket Status",
+              "displayName": "ZD Ticket Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1300,
+        -3400
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Append to ZD Master Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "q3XVQiSUNn6QTd3Y",
+          "name": "Google Sheets account 69"
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

@@ -72,8 +72,10 @@ With validated SQL/payload/field names, build the workflow:
   2. BigQuery projectId is plain string "guesty-data" (not an object).
   3. No date filters reference future dates unless user explicitly requested it.
   4. Every BigQuery node has a non-empty SQL query. If empty, copy the validated SQL from Phase 2.
-- Briefly explain each node's role.
-- Output complete workflow JSON in a json code block.
+  5. Cross-check: re-read the user's original request and your confirmed plan from Phase 1/2. Verify every stated requirement is present in the workflow — recipients filled in, channels named, filters applied, all data sources included. If anything is missing, add it now.
+  6. Field-shape contracts: For every Set/Edit Fields node that produces an array (via .split(), .map(), or array literal), find each downstream If/Filter/Switch node that reads that field. If the downstream node uses string operators (equals, notEquals, contains, notEmpty) on the array-typed field, fix it: either reference the first element (field[0]) for a single-value gate, or use array semantics. Reason: ["N/A"] != "N/A" evaluates TRUE in n8n loose comparison and silently passes broken data downstream.
+- Output complete workflow JSON in a json code block FIRST.
+- Then briefly explain each node's role.
 - Mention the "Deploy to n8n" button the UI provides.
 - Note any credentials to configure and manual activation steps.
 </phase>
@@ -147,6 +149,13 @@ Guesty account_id mapping (use these exact columns for cross-source joins):
 - SF bridge: dim_accounts.sf_account_id = tickets_clean.sf_account_id = modjo_transcripts_structured.account_crm_id
 - Zendesk org_id: tickets_clean.org_id (Zendesk organization -- rarely used for cross-source joins)
 - For ticket comments/messages: use zendesk_analytics.incoming_outgoing (NOT the Zendesk API comments endpoint)
+</rule>
+
+<rule name="csm_owner_field">
+When the user asks for "CSM", "account owner", "who owns the account", or similar:
+- If your workflow already queries any BQ table with a 'csm' column, SELECT that column directly. Do NOT add a Salesforce round-trip. Tables with a 'csm' column: dim_accounts, csm.portfolio, csm.health_score, csm.csm_churn_report, csm.mrr_calculator, csm.segmentation_report.
+- If your workflow has NO BQ data source and only uses the Salesforce native node, use standard Owner.Name (resolve via OwnerId -> sf_users.Name in BQ, or Owner.Name in SOQL).
+- The BQ 'csm' column (100% populated) and the SF account owner (also 100% populated) are different concepts and disagree on ~80% of accounts. They are NOT interchangeable. Always prefer the BQ csm column when a BQ table is already in the workflow -- it is the canonical CS-team CSM and avoids an unnecessary network hop.
 </rule>
 
 <rule name="no_code_nodes">

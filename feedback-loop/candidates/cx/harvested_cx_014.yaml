@@ -1,0 +1,35 @@
+- name: harvested_cx_014
+  description: "Harvested from roni.shif@guesty.com - FIXING THE POST ZENDESK TICKET"
+  department: cx
+  prompt: >
+    {
+      "ticket": {
+        "subject": "{{ $('Set Core Fields').item.json.subject }}",
+        "comment": {
+          "html_body": "{{ $('Set Core Fields').item.json.message_body }}",
+          "author_id": 16671505749277,
+          "uploads": {{ JSON.stringify([...($json.invoice_tokens || []), ...($json.attachment_tokens || []), ...($json.csv_tokens || [])].filter(t => t && t !== '')) }}
+        },
+        "requester_id": {{ $('Set Core Fields').item.json.requester_id }},
+        "submitter_id": 16671505749277,
+        "group_id":...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - googleSheets
+  expected_creds:
+    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: k6GQDqxNIGy2ryGFlHN0
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "FIXING THE POST ZENDESK TICKET"
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.213Z
+    confidence: medium
+    workflow_json_file: harvested_cx_014_workflow.json

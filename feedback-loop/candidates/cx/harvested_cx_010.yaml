@@ -1,0 +1,47 @@
+- name: harvested_cx_010
+  description: "Harvested from roni.shif@guesty.com - this is the input
+[
+  {
+    \"Alloggio\": [
+      {
+       ..."
+  department: cx
+  prompt: >
+    this is the input
+    [
+      {
+        "Alloggio": [
+          {
+            "ticket_id": "1913724",
+            "status": "Open",
+            "sub_account": "Alloggio",
+            "created_by": "Kylie Redden",
+            "link": "https://guesty3396.zendesk.com/agent/tickets/1913724",
+            "subject": "Booking.com Reservation Fee Discrepancy",
+            "bullet_points": [
+              "Alloggio experienced financial discrepancies for Booking.com reservations where the \"Guest Experience\" fee was configured as non-bundled, lead...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - gmail
+  expected_creds:
+    gmailOAuth2: 3XKWZw8KuGVggGEH
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: PV7nFH1QXJIBVxrMGcKE
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "this is the input
+[
+  {
+    \"Alloggio\": [
+      {
+       ..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cx_010_workflow.json

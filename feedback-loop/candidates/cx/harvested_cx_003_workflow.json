@@ -1,38 +1,169 @@
 {
+  "name": "Daily Ticket Hygiene - 14-Day Stale Open Tickets",
   "nodes": [
     {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
+        "rule": {
+          "interval": [
             {
-              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-              "leftValue": "={{ $json._no_match }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "notExists"
-              }
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
             }
-          ],
-          "combinator": "and"
-        },
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Get Stale Open Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  ticket_id,\n  subject,\n  assignee_email,\n  updated_at\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status = 'open'\n  AND updated_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\nORDER BY updated_at ASC",
         "options": {}
       },
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Has SF Match?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
+      "credentials": {
+        "googleApi": {
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
+        }
+      }
+    },
+    {
+      "id": "3d8b1c2e-9f4a-4b7c-8e5d-1a2b3c4d5e6f",
+      "name": "Add Internal Comment",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
       "position": [
-        -6720,
-        -400
-      ]
+        680,
+        300
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.ticket_id }}",
+        "updateFields": {
+          "internalNote": "Auto-reminder: This ticket has been open for 14+ days. Please review and update."
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "OTFp18SnDgGUSn9u",
+          "name": "Zendesk Sandbox - Info@guesty"
+        }
+      }
+    },
+    {
+      "id": "a9f2e8d1-6c3b-4e7a-9d5f-2b4c6e8a0d1f",
+      "name": "Aggregate Ticket IDs",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateIndividualFields",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "ticket_id",
+              "renameField": false
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b5d7f9e2-4a1c-4f8b-8e6d-3c5a7b9d1e3f",
+      "name": "Post Slack Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-ticket-hygiene"
+        },
+        "text": "={{ '*Daily Ticket Hygiene Report*\\n' + $json.ticket_id.length + ' tickets have been open for 14+ days and received an auto-reminder internal comment today.' }}"
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     }
   ],
-  "connections": {}
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Stale Open Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Stale Open Tickets": {
+      "main": [
+        [
+          {
+            "node": "Add Internal Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Internal Comment": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Ticket IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Ticket IDs": {
+      "main": [
+        [
+          {
+            "node": "Post Slack Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

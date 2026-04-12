@@ -1,0 +1,42 @@
+- name: harvested_cs_013
+  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] Workflow 2 - ZD Master Sheet to Zendesk Ticket"
+  department: cs
+  prompt: >
+    Workflow Requirements: Email-to-Sheet-to-Zendesk Pipeline
+    Overview
+    Two-workflow system where email content is the single source of truth, logged to a master Google Sheet, which then feeds Zendesk ticket creation.
+    Workflow 1: Email Processing & Logging (Primary Workflow)
+    Steps:
+    Send or draft email (via Gmail or equivalent)
+    Log email content to master Google Sheet immediately after email action
+    Capture: subject line, message body, recipient email, timestamp, any other relevant metadata
+    This cre...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - manualTrigger
+    - googleSheets
+    - filter
+    - splitInBatches
+    - salesforce
+    - set
+    - httpRequest
+  expected_creds:
+    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    oAuth2Api: B1ksdYFDJ8LJKaTJ
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - sf_config
+  _metadata:
+    source_conversation: srcgXskcYdhUI3pMjI9l
+    source_user: roni.shif@guesty.com
+    deployed: true
+    deployed_workflow_id: ILnUxp7DpmbwnBCp
+    workflow_name: "[AI by roni.shif] Workflow 2 - ZD Master Sheet to Zendesk Ticket"
+    node_count: 12
+    complexity_score: 4
+    harvested_at: 2026-04-01T09:38:06.214Z
+    confidence: high
+    workflow_json_file: harvested_cs_013_workflow.json

@@ -78,7 +78,7 @@ Never use other project names (e.g. `agentic-workflows-485210`, `payments_proces
 | `jira` | `jira_hierarchy` | Issues with full hierarchy — `account_ids` is REPEATED (use UNNEST) |
 | `jira` | `jira_issues_base` | Raw Jira issue data |
 | `jira` | `jira_epic` | Epic-level data |
-| `csm` | `modjo_transcripts_structured` | Call recordings and AI-analyzed transcripts — join via `account_crm_id = sf_account_id` |
+| `csm` | `modjo_transcripts_structured_master` | Call transcripts + AI risk signals (45K rows). **Use `_master`, NOT `modjo_transcripts_structured` (17 test rows).** Join via `account_crm_id = sf_account_id` |
 
 ---
 
@@ -229,4 +229,5 @@ LIMIT 20;
 | `zendesk.md` | `tickets_clean`, `incoming_outgoing`, `productivity_hourly` |
 | `zuora.md` | `invoices`, `invoice_items`, `product_catalog` — includes Zuora-specific gotchas |
 | `jira.md` | `jira_hierarchy` (10+ tables) — UNNEST patterns |
-| `modjo.md` | `modjo_transcripts_structured` — call recordings, AI summaries |
+| `csm.md` | Full CSM dataset — 8 primary tables, verified SQL patterns, join conditions, data freshness notes |
+| `modjo.md` | `modjo_transcripts_structured` — call recordings, AI summaries (see csm.md for the correct `_master` table) |

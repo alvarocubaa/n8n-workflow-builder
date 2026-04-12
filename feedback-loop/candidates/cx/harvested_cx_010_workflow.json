@@ -1,0 +1,36 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Weekly Support Update - {{ $json.hqName }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "sendTo": "={{ $json.Main_Contact_Email__c }}"
+        }
+      },
+      "id": "74dd9a92-d9bc-4c1e-b17f-c2f4f2202c39",
+      "name": "Gmail: Create Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        176,
+        -6608
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "3XKWZw8KuGVggGEH",
+          "name": "Gmail - @Ronishif - CS"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail: Create Draft": {
+      "main": [
+        []
+      ]
+    }
+  }
+}

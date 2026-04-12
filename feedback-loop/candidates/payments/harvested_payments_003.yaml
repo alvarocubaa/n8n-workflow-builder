@@ -1,0 +1,31 @@
+- name: harvested_payments_003
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery zuora_analy..."
+  department: payments
+  prompt: >
+    Create a daily workflow that queries BigQuery zuora_analytics.invoices for unpaid invoices where status = 'Posted' and balance > 0 and the invoice is older than 30 days. Group by mongo_account_id and show total outstanding amount per account. Post an aging report to #payments-collections in Slack. Run daily at 9am UTC.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - code
+    - slack
+  expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    slackApi: 0l2bJ3SquNB8nyFd
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: Q29JLPUKZY8pajB6FoEa
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a daily workflow that queries BigQuery zuora_analy..."
+    node_count: 4
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
+    workflow_json_file: harvested_payments_003_workflow.json

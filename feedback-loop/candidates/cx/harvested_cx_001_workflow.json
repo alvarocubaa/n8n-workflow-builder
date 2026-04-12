@@ -1,9 +1,9 @@
 {
-  "name": "CX Aging Tickets Daily Report",
+  "name": "Daily Ticket Hygiene - Stale Open Tickets",
   "nodes": [
     {
       "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Every Day at 9am UTC",
+      "name": "Daily 8am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
@@ -15,7 +15,7 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 9 * * *"
+              "expression": "0 8 * * *"
             }
           ]
         }
@@ -23,46 +23,73 @@
     },
     {
       "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "Query Aging Tickets",
+      "name": "Get Stale Open Tickets",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        480,
+        460,
         300
       ],
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  account_name,\n  account_segment,\n  COUNT(ticket_id) AS ticket_count,\n  MIN(created_at) AS oldest_ticket_date,\n  STRING_AGG(DISTINCT assignee_name ORDER BY assignee_name LIMIT 3) AS assignees\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status IN ('open', 'pending')\n  AND created_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\n  AND account_name IS NOT NULL\nGROUP BY account_name, account_segment\nORDER BY ticket_count DESC\nLIMIT 100"
+        "sqlQuery": "SELECT\n  ticket_id,\n  subject,\n  assignee_email,\n  assignee_name,\n  updated_at,\n  account_name\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status = 'open'\n  AND updated_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 14 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\nORDER BY updated_at ASC",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
-          "id": "vWwsUUkc4EYrtsmN",
-          "name": "Google BigQuery account 3"
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
         }
       }
     },
     {
-      "id": "3d594a5e-1b2f-4c8e-9f1a-6b7e8d9c0a1b",
-      "name": "Build Slack Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "3d594a8e-1b2f-4c6e-9f0a-8b7e5d2c1a4f",
+      "name": "Add Internal Note",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
       "position": [
-        720,
+        680,
         300
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const rows = $input.all();\n\nif (!rows || rows.length === 0) {\n  return [{ json: { message: ':white_check_mark: *Aging Tickets Report* -- No open/pending tickets older than 7 days. All clear!' } }];\n}\n\nconst today = new Date().toISOString().slice(0, 10);\nconst totalAccounts = rows.length;\nconst totalTickets = rows.reduce((sum, r) => sum + Number(r.json.ticket_count || 0), 0);\n\nlet lines = [];\nlines.push(':clock3: *Aging Tickets Report* -- Open/Pending > 7 days');\nlines.push('Date: ' + today + ' | Run at 09:00 UTC');\nlines.push('');\nlines.push('*Account* | *Segment* | *Tickets* | *Oldest Ticket* | *Assignees*');\nlines.push('---------|-----------|-----------|-----------------|------------');\n\nfor (const row of rows) {\n  const name = row.json.account_name || 'Unknown';\n  const segment = row.json.account_segment || '-';\n  const count = row.json.ticket_count || 0;\n  const oldest = row.json.oldest_ticket_date\n    ? String(row.json.oldest_ticket_date).slice(0, 10)\n    : '-';\n  const assignees = row.json.assignees || '-';\n  lines.push(name + ' | ' + segment + ' | ' + count + ' | ' + oldest + ' | ' + assignees);\n}\n\nlines.push('');\nlines.push('*Total:* ' + totalTickets + ' aging tickets across ' + totalAccounts + ' accounts');\n\nreturn [{ json: { message: lines.join('\\n') } }];"
+        "resource": "ticket",
+        "operation": "update",
+        "id": "={{ $json.ticket_id }}",
+        "updateFields": {
+          "internalNote": "Auto-reminder: This ticket has been open for 14+ days. Please review and update."
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "OTFp18SnDgGUSn9u",
+          "name": "Zendesk Sandbox - Info@guesty"
+        }
       }
     },
     {
-      "id": "9a1b2c3d-4e5f-6789-abcd-ef0123456789",
-      "name": "Post to #cx-aging-tickets",
+      "id": "9a1b3c5d-7e2f-4a8b-b6c4-0d9e8f7a6b5c",
+      "name": "Aggregate Ticket Count",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "tickets",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "b2d4f6a8-c0e2-4f4a-a8c6-1e3d5b7f9a0c",
+      "name": "Post Slack Summary",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        960,
+        1120,
         300
       ],
       "parameters": {
@@ -71,9 +98,9 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cx-aging-tickets"
+          "value": "#cx-ticket-hygiene"
         },
-        "text": "={{ $json.message }}",
+        "text": "=:white_check_mark: *Daily Ticket Hygiene Run -- 8am UTC*\nAuto-reminder comments added to *{{ $json.tickets.length }}* stale open tickets (last updated 14+ days ago).",
         "otherOptions": {}
       },
       "credentials": {
@@ -89,33 +116,44 @@
     }
   ],
   "connections": {
-    "Every Day at 9am UTC": {
+    "Daily 8am UTC": {
       "main": [
         [
           {
-            "node": "Query Aging Tickets",
+            "node": "Get Stale Open Tickets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Query Aging Tickets": {
+    "Get Stale Open Tickets": {
       "main": [
         [
           {
-            "node": "Build Slack Message",
+            "node": "Add Internal Note",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build Slack Message": {
+    "Add Internal Note": {
       "main": [
         [
           {
-            "node": "Post to #cx-aging-tickets",
+            "node": "Aggregate Ticket Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Ticket Count": {
+      "main": [
+        [
+          {
+            "node": "Post Slack Summary",
             "type": "main",
             "index": 0
           }

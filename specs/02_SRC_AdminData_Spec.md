@@ -317,37 +317,45 @@ Query: Apply date and status filters; use LIMIT/OFFSET pagination; UNNEST for RE
 
 ### Common SQL patterns
 
+> All queries verified against live BigQuery data (Apr 1, 2026).
+
 ```sql
--- Active accounts created last 30 days
+-- Verified: Active accounts count (47,323 active as of Apr 2026)
+SELECT COUNT(*) AS active_accounts
+FROM `guesty-data.datalake_glue.accounts`
+WHERE IFNULL(active, FALSE) = TRUE;
+
+-- Verified: Active accounts created last 30 days
 SELECT _id, name, createdat, internaldata_accountmanager
 FROM `guesty-data.datalake_glue.accounts`
 WHERE createdat >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
-  AND active = TRUE
+  AND IFNULL(active, FALSE) = TRUE
 ORDER BY createdat DESC;
 
--- Accounts with plan info
+-- Verified: Accounts with plan info
+-- NOTE: software_plan_type and software_plan_value are mostly NULL. Use the `plan` REPEATED field instead.
 SELECT _id, name, software_plan_type, software_plan_value, billing_billingcycle
 FROM `guesty-data.datalake_glue.accounts`
-WHERE active = TRUE AND software_plan_value > 0;
+WHERE IFNULL(active, FALSE) = TRUE AND software_plan_value > 0;
 
--- UNNEST the plan REPEATED field
+-- Verified: UNNEST the plan REPEATED field (more reliable than software_plan_type/value)
 SELECT a._id, a.name, p.name AS plan_name, p.plantype, p.value
 FROM `guesty-data.datalake_glue.accounts` a
 CROSS JOIN UNNEST(a.plan) AS p
-WHERE a.active = TRUE;
+WHERE IFNULL(a.active, FALSE) = TRUE;
 
--- Cross-source: accounts + payment gateway fees
+-- Verified: Cross-source: accounts + payment gateway fees
 SELECT a.name, pc.plan_name, pc.plan_value, pc.quantity
 FROM `guesty-data.datalake_glue.accounts` a
 JOIN `guesty-data.zuora_analytics.product_catalog` pc
   ON a._id = pc.account_id
 WHERE LOWER(pc.plan_name) LIKE '%payment gateway%'
-  AND a.active = TRUE;
+  AND IFNULL(a.active, FALSE) = TRUE;
 ```
 
 ### Filters & limits
-- Always filter `WHERE active = TRUE` for current customers
+- Always filter `WHERE IFNULL(active, FALSE) = TRUE` for current customers (Boolean may be NULL)
 - Exclude cancelled: `WHERE canceledat IS NULL`
 - Use `LIMIT` for exploration — full table has ~100K+ rows (including historical)
 - UNNEST REPEATED fields when filtering or selecting nested values
-- Boolean columns (active, rufeeactivation, billingv2enabled, etc.) may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`
+- `software_plan_type`/`software_plan_value` are mostly NULL — prefer the `plan` REPEATED field for plan data

@@ -99,7 +99,7 @@ Raw Salesforce Account object. Contains all standard and custom fields. Use `dim
 |--------|------|-------|
 | `Id` | STRING | Salesforce Account Id (18-char) — PK |
 | `Name` | STRING | Account name |
-| `OwnerId` | STRING | Account owner (Salesforce User Id) |
+| `OwnerId` | STRING | Account owner (Salesforce User Id). **Use only if your workflow has no BQ data source.** If any BQ table with a `csm` column is already in the workflow (`dim_accounts`, `csm.portfolio`, `csm.health_score`, `csm.csm_churn_report`, `csm.mrr_calculator`, `csm.segmentation_report`), use that column directly — do NOT round-trip to Salesforce. See `02_SRC_CSM_Spec.md` "CSM / Account Owner Lookup Rule". |
 | `Guesty_Admin_ID__c` | STRING | **Guesty account_id** — primary cross-system join key |
 | `Guesty_Test_Account_ID__c` | STRING | Test account ID |
 | `Status__c` | STRING | Account status |
@@ -743,7 +743,12 @@ JOIN `guesty-data.guesty_analytics.dim_listings` l
 WHERE r.check_in >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
 LIMIT 100;
 
--- Resolve OwnerId to user name
+-- Resolve OwnerId to user name (SF-only fallback — see CSM lookup rule below)
+-- ⚠️ Use this ONLY when the workflow has no BQ data source from the CSM dataset.
+-- If your workflow already queries dim_accounts, csm.portfolio, csm.health_score,
+-- csm.csm_churn_report, csm.mrr_calculator, or csm.segmentation_report — those
+-- tables already have a `csm` column. Use it directly instead of this join.
+-- See `02_SRC_CSM_Spec.md` "CSM / Account Owner Lookup Rule" for the full rule.
 SELECT
   sf.Name AS account_name,
   u.Name AS owner_name,
@@ -760,5 +765,5 @@ WHERE u.IsActive = TRUE;
 - Use `LIMIT` during exploration; remove for production aggregations
 - sf_account has 736 columns — always SELECT specific fields, never SELECT *
 - Join sf_account to dim_accounts via `Guesty_Admin_ID__c = account_id` or `Id = sf_account_id`
-- Resolve OwnerId fields via sf_users.Id for human-readable names
+- **CSM / account owner lookups**: prefer the `csm` column from any BQ table already in your workflow (`dim_accounts`, `csm.portfolio`, etc.). Only use the `OwnerId` → `sf_users.Name` resolution above when the workflow has no BQ data source. The two sources represent different concepts (CS-team CSM vs SF account owner) and disagree on ~80% of accounts — they are NOT interchangeable. See `02_SRC_CSM_Spec.md` for the full rule.
 - Boolean columns (IsClosed, IsWon, IsActive, account_active, is_churn) may be NULL in BigQuery — use `IFNULL(col, FALSE) = FALSE` instead of `col = FALSE`

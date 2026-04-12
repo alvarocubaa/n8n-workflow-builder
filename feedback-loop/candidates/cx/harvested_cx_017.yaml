@@ -1,0 +1,35 @@
+- name: harvested_cx_017
+  description: "Harvested from roni.shif@guesty.com - Here is an end-to-end breakdown of your n8n workflow.
+
+##..."
+  department: cx
+  prompt: >
+    Here is an end-to-end breakdown of your n8n workflow.
+    
+    ### **Workflow End-to-End Description**
+    
+    This workflow automates the creation of client-facing weekly support ticket digests. It can be triggered automatically every Monday morning for a specific Customer Success Manager (CSM) or manually on-demand via a form. 
+    
+    When triggered automatically, it queries Salesforce for all Headquarter (HQ) accounts owned by the CSM, loops through them, and retrieves their associated sub-accounts. When trigg...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - httpRequest
+  expected_creds:
+    zendeskApi: OTFp18SnDgGUSn9u
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: pHhYZLzImc3VHNnLUQt1
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Here is an end-to-end breakdown of your n8n workflow.
+
+##..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.213Z
+    confidence: medium
+    workflow_json_file: harvested_cx_017_workflow.json

@@ -1,28 +1,33 @@
 - name: harvested_cx_003
-  description: "Harvested from roni.shif@guesty.com - The cheat sheet workflow is fialing at the same spot ever..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow at 8am UTC. Query BigQuery zendes..."
   department: cx
   prompt: >
-    The cheat sheet workflow is fialing at the same spot every time. 
-    
-    The issue: CSM cal is scanned and filters out internal meetings. We get the account using the contact from the meeting in SF. As the attenddee can be anyone assosieted to the acconunt we must search through all the contacts. 
-    
-    I added a code node to match between the contact  lists and the attenddeess and output the user's name. Right now if there is no match it outputs fallback responses which ten is passed to the query which...
+    Create a daily workflow at 8am UTC. Query BigQuery zendesk_analytics.tickets_clean for tickets where status = 'open' and updated_at is older than 14 days. For each ticket in the results, use the native Zendesk node to add an internal comment saying 'Auto-reminder: This ticket has been open for 14+ days. Please review and update.' After processing all tickets, post a summary count of tickets commented on to #cx-ticket-hygiene in Slack.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - if
+    - scheduleTrigger
+    - googleBigQuery
+    - zendesk
+    - aggregate
+    - slack
   expected_creds:
+    googleApi: PAAimNTryrvB72dp
+    zendeskApi: OTFp18SnDgGUSn9u
+    slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - slack_config
   _metadata:
-    source_conversation: ICroRQq0YOYJWY40fZ9P
-    source_user: roni.shif@guesty.com
+    source_conversation: QrGEsgYgeAfFx9HqM1rz
+    source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "The cheat sheet workflow is fialing at the same spot ever..."
-    node_count: 1
+    workflow_name: "Create a daily workflow at 8am UTC. Query BigQuery zendes..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.957Z
-    confidence: medium
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
     workflow_json_file: harvested_cx_003_workflow.json

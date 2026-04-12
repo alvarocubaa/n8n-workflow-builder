@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://guesty3396.zendesk.com/api/v2/users/search.json?query=email:{{ $('Read GSheet').item.json['Requester Email'] }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "id": "604a6df5-2b76-42f6-bbfe-77e5701747c9",
+      "name": "SANDBOX - Get Zendesk Org1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -416,
+        -1872
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "RuVOaOP3GPBqgNCu",
+          "name": "Zendesk - Read and Write - @Ronishif"
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

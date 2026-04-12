@@ -1,49 +1,31 @@
 - name: harvested_cs_003
-  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] HQ Weekly Support Update - Redesigned"
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery zendesk_anal..."
   department: cs
   prompt: >
-    evaluate my architrcutre
-    
-    {
-      "nodes": [
-        {
-          "parameters": {
-            "rule": {
-              "interval": [
-                {
-                  "field": "cronExpression",
-                  "expression": "0 9 * * 1"
-                }
-              ]
-            }
-          },
-          "id": "f38065f7-8833-4b92-b5a4-8346743fb8cb",
-          "name": "Every Monday at 9AM",
-          "type": "n8n-nodes-base.scheduleTrigger",
-          "typeVersion": 1.1,
-          "position": [
-            -272,
-            -4848
-          ]
-        },
-        {
-          "paramet...
+    Build a daily workflow that queries BigQuery zendesk_analytics.tickets_clean for Zendesk tickets where status is 'open' or 'pending' and the ticket is older than 7 days. Group by account_name and show count and oldest ticket date per account. Post the aging report to #cs-ticket-aging in Slack. Run daily at 9am UTC.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - set
+    - scheduleTrigger
+    - googleBigQuery
+    - code
+    - slack
   expected_creds:
+    googleApi: VQ7CU7dKViVcv8Ah
+    slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - slack_config
   _metadata:
-    source_conversation: OaVItFDSR6kIHjfWXjYr
-    source_user: roni.shif@guesty.com
-    deployed: true
-    deployed_workflow_id: 1I6CfSGISIXdgkxi
-    workflow_name: "[AI by roni.shif] HQ Weekly Support Update - Redesigned"
-    node_count: 1
-    complexity_score: 4
-    harvested_at: 2026-03-20T12:38:09.958Z
-    confidence: medium
+    source_conversation: 6Ume9rL9PMaPvGO0D6Vf
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a daily workflow that queries BigQuery zendesk_anal..."
+    node_count: 4
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.208Z
+    confidence: high
     workflow_json_file: harvested_cs_003_workflow.json

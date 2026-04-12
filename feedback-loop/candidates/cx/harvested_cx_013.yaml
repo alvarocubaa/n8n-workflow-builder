@@ -1,0 +1,36 @@
+- name: harvested_cx_013
+  description: "Harvested from roni.shif@guesty.com - HQ Billing Automation — Full Project Brief
+🎯 Project Ove..."
+  department: cx
+  prompt: >
+    HQ Billing Automation — Full Project Brief
+    🎯 Project Overview
+    An end-to-end billing automation system for Guesty Pro HQ accounts that:
+    
+    Automatically generates and sends monthly invoice emails with PDF attachments
+    Logs every email action to a master Google Sheet
+    Creates Zendesk support tickets from that sheet — triggered either automatically or via a Slack slash command
+    The Google Sheet is the single source of truth — everything flows through it.
+    
+    🏗️ Architecture — 3 Components
+    Workflow 1 (...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - if
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: Z0dF6Gt1LwlyJ1m9vpda
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "HQ Billing Automation — Full Project Brief
+🎯 Project Ove..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cx_013_workflow.json

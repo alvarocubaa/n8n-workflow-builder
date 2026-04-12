@@ -1,44 +1,35 @@
 - name: harvested_cs_004
-  description: "Harvested from roni.shif@guesty.com - [Attached file: Weekly HQ Ticket Reporting - @Ronishif (1..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a production workflow that polls Salesforce every ..."
   department: cs
   prompt: >
-    [Attached file: Weekly HQ Ticket Reporting - @Ronishif (1).json]
-    <file_content>
-    {
-      "name": "Weekly HQ Ticket Reporting - @Ronishif",
-      "nodes": [
-        {
-          "parameters": {
-            "rule": {
-              "interval": [
-                {
-                  "field": "cronExpression",
-                  "expression": "0 9 * * 1"
-                }
-              ]
-            }
-          },
-          "id": "ef316373-aae3-4e1b-8c28-a0e058b41d33",
-          "name": "Every Monday at 9AM",
-          "type": "n8n-nodes-base.scheduleTrigger",
-       ...
+    Create a production workflow that polls Salesforce every day at 6pm for updated opportunities. Use production credentials. When an opportunity is updated, query Salesforce for the opportunity details including Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, and Account.Guesty_Admin_ID__c. Filter for renewal record type (RecordTypeId = "0125p000001101UAAQ") where Last_Stage__c contains "declined" and churn date is after 2024-01-01. Then query BigQuery csm_churn_report for max...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - splitInBatches
-    - executeWorkflow
+    - scheduleTrigger
+    - salesforce
+    - if
+    - splitOut
+    - googleBigQuery
+    - slack
   expected_creds:
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    googleApi: VQ7CU7dKViVcv8Ah
+    slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
   _metadata:
-    source_conversation: l5KEZceNEAXP24x0lBc1
-    source_user: roni.shif@guesty.com
+    source_conversation: ED3ftk5YB2VTs7BcLI2F
+    source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "[Attached file: Weekly HQ Ticket Reporting - @Ronishif (1..."
-    node_count: 2
+    workflow_name: "Create a production workflow that polls Salesforce every ..."
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.958Z
-    confidence: medium
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
     workflow_json_file: harvested_cs_004_workflow.json

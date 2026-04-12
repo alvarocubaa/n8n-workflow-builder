@@ -1,0 +1,36 @@
+- name: harvested_cs_007
+  description: "Harvested from alvaro.cuba@guesty.com - Create a production workflow that polls Salesforce every ..."
+  department: cs
+  prompt: >
+    Create a production workflow that polls Salesforce every day at 6pm for updated opportunities. Use production credentials. When an opportunity is updated, query Salesforce for the opportunity details including Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, and Account.Guesty_Admin_ID__c. Filter for renewal record type (RecordTypeId = "0125p000001101UAAQ") where Last_Stage__c contains "declined" and churn date is after 2024-01-01. Then query BigQuery csm_churn_report for max...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - salesforce
+    - if
+    - splitOut
+    - googleBigQuery
+    - set
+    - slack
+  expected_creds:
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    googleApi: h7fJ82YhtOnUL58u
+    slackApi: 7H6auF31TpX7Wk7M
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
+  _metadata:
+    source_conversation: hp0ytcw5XWxPI6CKb0jj
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a production workflow that polls Salesforce every ..."
+    node_count: 7
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.210Z
+    confidence: high
+    workflow_json_file: harvested_cs_007_workflow.json

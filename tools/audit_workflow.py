@@ -175,6 +175,61 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
         else:
             results["jira_ids"] = (True, "jira_ids referenced, method unclear")
 
+    # --- 11. CSM lookup: no unnecessary SF round-trip ---
+    # Rule: if a BQ query already SELECTs the `csm` column from a CSM-dataset table,
+    # the workflow should NOT also call Salesforce to look up account owner — the BQ
+    # query already has the answer. This catches the harvested_cs_005 pattern where
+    # the AI selected `c.csm` from csm_churn_report AND made a redundant SF call.
+    # See specs/02_SRC_CSM_Spec.md "CSM / Account Owner Lookup Rule".
+    #
+    # We only flag the unambiguous case (BQ already SELECTs csm) — workflows that
+    # query SF as their primary source (SF Trigger + SF query) are NOT flagged.
+    csm_tables = [
+        "guesty_analytics.dim_accounts",
+        "csm.portfolio",
+        "csm.health_score",
+        "csm.csm_churn_report",
+        "csm.mrr_calculator",
+        "csm.segmentation_report",
+    ]
+    # Find BQ nodes that both reference a csm-dataset table AND already select csm.
+    bq_csm_select_nodes = []
+    for n in nodes:
+        if "googleBigQuery" not in n.get("type", ""):
+            continue
+        sql = n.get("parameters", {}).get("sqlQuery", "") or ""
+        sql_l = sql.lower()
+        if not any(t in sql for t in csm_tables):
+            continue
+        # Heuristic: SELECT clause references a `csm` column (alias.csm or bare csm
+        # in a SELECT list). Avoid false positives from `csm_overall_risk_level`,
+        # `csm_request_date`, etc., by requiring word-boundary `csm` immediately
+        # followed by `,`, whitespace, end-of-line, or `as`/`AS`.
+        if re.search(r"\bcsm\b\s*(?:,|\s|$|as\b)", sql_l, re.MULTILINE):
+            bq_csm_select_nodes.append(n["name"])
+
+    sf_query_nodes_with_owner = [
+        n["name"] for n in nodes
+        if "salesforce" in n.get("type", "").lower()
+        and "trigger" not in n.get("type", "").lower()
+        and (
+            "owner" in str(n.get("parameters", {}).get("query", "")).lower()
+            or "owner" in str(n.get("parameters", {}).get("additionalFields", {})).lower()
+        )
+    ]
+    if bq_csm_select_nodes and sf_query_nodes_with_owner:
+        results["csm_no_sf_roundtrip"] = (
+            False,
+            f"BQ query already SELECTs `csm` column ({bq_csm_select_nodes}) AND workflow makes a "
+            f"Salesforce owner lookup ({sf_query_nodes_with_owner}). The SF call is redundant — "
+            f"use the BQ `csm` column directly. See specs/02_SRC_CSM_Spec.md."
+        )
+    elif bq_csm_select_nodes:
+        results["csm_no_sf_roundtrip"] = (
+            True,
+            f"BQ query SELECTs csm from {bq_csm_select_nodes}, no redundant SF lookup"
+        )
+
     return results
 
 

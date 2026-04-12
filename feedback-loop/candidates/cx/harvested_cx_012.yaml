@@ -1,0 +1,37 @@
+- name: harvested_cx_012
+  description: "Harvested from roni.shif@guesty.com - Fetches account list from Google Sheet
+Looks up the Zuora..."
+  department: cx
+  prompt: >
+    Fetches account list from Google Sheet
+    Looks up the Zuora Account ID via Salesforce
+    Authenticates with Zuora and fetches the account's invoice summary
+    Filters for valid invoices (Posted, last 30 days, amount > 0)
+    Downloads the PDF invoice 
+    FIlters by account BILLING MODEL - CRITICAL 
+    IF TRUE TO NOT SUBACCOUNT THEN CALL Zuoura to get CSV attachment from Zuora +
+    Calls a subworkflow to generate a manual billing Google Sheet. 
+    IF TRUE / IF FALSE 
+    Creates a Gmail draft CONTAINING  
+    IF TRUE -> all ...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - gmail
+  expected_creds:
+    gmailOAuth2: 3XKWZw8KuGVggGEH
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: WfwS1Cz3FYGE5tCK6EeP
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Fetches account list from Google Sheet
+Looks up the Zuora..."
+    node_count: 1
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cx_012_workflow.json

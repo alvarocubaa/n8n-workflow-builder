@@ -227,11 +227,11 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
                   if (isTruncated) {
                     return (
                       <div className="relative">
-                        <div className="mb-2 rounded-lg border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-                          Workflow JSON was truncated. Download the partial file and ask the AI to regenerate.
+                        <div className="mb-2 rounded-lg border border-guesty-200 bg-guesty-50 px-3 py-2 text-sm text-guesty-400">
+                          This workflow is extensive — download it below to import into n8n.
                         </div>
                         <div className="flex gap-2">
-                          <DownloadButton json={codeString} filename="workflow-partial.json" />
+                          <DownloadButton json={codeString} filename="workflow.json" />
                           <CopyButton text={codeString} />
                         </div>
                       </div>

@@ -1,0 +1,245 @@
+{
+  "name": "Weekly Conference Pipeline & Email Engagement Report",
+  "nodes": [
+    {
+      "id": "a3f7c2d1-84e6-4b19-9f3a-1c2d3e4f5a6b",
+      "name": "Every Monday 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b4e8d3f2-95f7-4c2a-a04b-2d3e4f5a6b7c",
+      "name": "SF Conference Campaigns",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "resource": "search",
+        "operation": "query",
+        "query": "SELECT Id, Name, Type, StartDate, EndDate, Status, Description, NumberOfLeads, NumberOfOpportunities, ExpectedRevenue FROM Campaign WHERE Type = 'Conference' AND StartDate >= TODAY AND StartDate <= NEXT_N_DAYS:30 ORDER BY StartDate ASC"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "c5f9e4a3-a608-4d3b-b15c-3e4f5a6b7c8d",
+      "name": "BQ Email Metrics",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT campaignName, COUNT(*) AS total_events, COUNTIF(event_type = 'OPEN') AS opens, COUNTIF(event_type = 'CLICK') AS clicks, COUNTIF(event_type = 'DELIVERED') AS delivered, COUNTIF(event_type = 'BOUNCE') AS bounces, SAFE_DIVIDE(COUNTIF(event_type = 'OPEN'), COUNTIF(event_type = 'DELIVERED')) AS open_rate, SAFE_DIVIDE(COUNTIF(event_type = 'CLICK'), COUNTIF(event_type = 'OPEN')) AS click_to_open_rate FROM `guesty-data.marketing_data.hubspot_emails_events` WHERE event_created_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY) GROUP BY campaignName ORDER BY total_events DESC"
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "Cr2rXAGCh1K5pJop",
+          "name": "Google Service Account n8n-marketing"
+        }
+      }
+    },
+    {
+      "id": "d6a0f5b4-b719-4e4c-c26d-4f5a6b7c8d9e",
+      "name": "Gemini Strategic Summary",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a marketing analyst at Guesty. Below is data from two sources:\n\nSALESFORCE CONFERENCE PIPELINE (next 30 days):\n{{ $('SF Conference Campaigns').all().map(c => '- ' + c.json.Name + ' | Start: ' + c.json.StartDate + ' | Status: ' + c.json.Status + ' | Leads: ' + c.json.NumberOfLeads + ' | Opps: ' + c.json.NumberOfOpportunities + ' | Expected Revenue: $' + c.json.ExpectedRevenue).join('\\n') }}\n\nHUBSPOT EMAIL ENGAGEMENT (last 30 days):\n{{ $('BQ Email Metrics').all().map(e => '- ' + e.json.campaignName + ' | Delivered: ' + e.json.delivered + ' | Opens: ' + e.json.opens + ' | Clicks: ' + e.json.clicks + ' | Open Rate: ' + (Number(e.json.open_rate) * 100).toFixed(1) + '% | CTOR: ' + (Number(e.json.click_to_open_rate) * 100).toFixed(1) + '%').join('\\n') }}\n\nPlease provide:\n1. A strategic summary of upcoming conference pipeline vs. email engagement\n2. Which conferences have strong email support and which are under-supported\n3. Top 2-3 recommendations for the marketing team this week\nKeep it concise and actionable (max 300 words)."
+      }
+    },
+    {
+      "id": "e7b1a6c5-c82a-4f5d-d37e-5a6b7c8d9e0f",
+      "name": "Gemini LM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        900,
+        500
+      ],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.3,
+          "maxOutputTokens": 1024
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "f8c2b7d6-d93b-4a6e-e48f-6b7c8d9e0f1a",
+      "name": "Write to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Conference Pipeline"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Date": "={{ $now.toFormat('yyyy-MM-dd') }}",
+            "Campaign Name": "={{ $('SF Conference Campaigns').item.json.Name }}",
+            "Start Date": "={{ $('SF Conference Campaigns').item.json.StartDate }}",
+            "Status": "={{ $('SF Conference Campaigns').item.json.Status }}",
+            "SF Leads": "={{ $('SF Conference Campaigns').item.json.NumberOfLeads }}",
+            "SF Opps": "={{ $('SF Conference Campaigns').item.json.NumberOfOpportunities }}",
+            "Expected Revenue": "={{ $('SF Conference Campaigns').item.json.ExpectedRevenue }}",
+            "AI Summary": "={{ $json.text }}"
+          },
+          "matchingColumns": []
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "LaWDjKMsqe74XASy",
+          "name": "Google Sheets account 64"
+        }
+      }
+    },
+    {
+      "id": "a9d3c8e7-e04c-4b7f-f59a-7c8d9e0f1a2b",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1340,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-events"
+        },
+        "text": "=*:bar_chart: Weekly Conference Pipeline & Email Engagement Summary*\n_Generated {{ $now.toFormat('EEEE, MMMM d yyyy') }} | Powered by Gemini AI_\n\n{{ $('Gemini Strategic Summary').item.json.text }}\n\n:link: <https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID|View full data in Google Sheets>",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "MkMAiC1ecfpYtIz1",
+          "name": "Ron's Slack credentials"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "SF Conference Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SF Conference Campaigns": {
+      "main": [
+        [
+          {
+            "node": "BQ Email Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BQ Email Metrics": {
+      "main": [
+        [
+          {
+            "node": "Gemini Strategic Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini LM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gemini Strategic Summary",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Strategic Summary": {
+      "main": [
+        [
+          {
+            "node": "Write to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

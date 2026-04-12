@@ -1,0 +1,33 @@
+- name: harvested_cx_011
+  description: "Harvested from roni.shif@guesty.com - 2 CSMS already reported they are not meeting with this cl..."
+  department: cx
+  prompt: >
+    2 CSMS already reported they are not meeting with this client today, and so the cheat sheet is irrelevant. 
+    
+    Below I am adding the context needed for the investigation. Your task is to find the root cause of this mismatch, and propose a cleaner solution. 
+    Code nodes are causing data mismatches all the time and i prefer to avoide them so you gotta ensure you actually analyze and understand the issue. 
+    The workflow basically takes CSMs calendar and email adresss. usingthe email we get the accou...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - splitOut
+    - filter
+    - salesforce
+    - limit
+  expected_creds:
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - sf_config
+  _metadata:
+    source_conversation: UgSisdIL5MinwfvqnJSz
+    source_user: roni.shif@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "2 CSMS already reported they are not meeting with this cl..."
+    node_count: 5
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cx_011_workflow.json

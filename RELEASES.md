@@ -1,6 +1,89 @@
 # n8n Workflow Builder -- Release History
 
-## v0.21 -- 2026-03-25 (deployed, revision n8n-chat-ui-00024-6sm)
+## v0.23 -- 2026-04-10 (deployed, revision n8n-chat-ui-00027-5q4)
+
+### Changes
+
+**CSM/owner field rule (K-3)** — driven by Gil + Céline Slack feedback (Apr 9) and live BQ verification:
+- Live data finding: `dim_accounts.csm` (BQ analytics CSM, 100% populated) and SF `Owner.Name` / `Account_Owner_F__c` are different concepts at Guesty and disagree on **~80% of random active accounts**. `Account_Owner_F__c` is sparse (10.7% populated, mostly tier-specific). Documented in `feedback_two_csm_concepts.md`.
+- Bug pattern: harvested_cs_005 selected `c.csm` from `csm_churn_report` AND made a redundant SF round-trip to `Owner.Name` — Slack output showed both with conflicting values. Multi-layered fix:
+  1. **System prompt** new `<rule name="csm_owner_field">`: when a BQ table with a `csm` column is already in the workflow, SELECT it directly. Only fall back to SF Owner.Name when no BQ data source.
+  2. **CSM spec callout** + verified SQL example pair (✅ correct in-query pattern + ❌ wrong SF round-trip pattern).
+  3. **Salesforce spec** OwnerId precedence annotation referencing the CSM rule.
+  4. **`audit_workflow.py` check #11** `csm_no_sf_roundtrip` — static check that flags BQ-already-has-csm AND SF owner lookup. Verified: catches harvested_cs_005, 0 false positives across 44 harvested workflows.
+  5. **Regression test** `cs_churn_bq_slack` fixed: removed `salesforceOAuth2Api` from expected_creds (was rewarding the bug), added `csm_no_sf_roundtrip` check.
+
+**Phase 4 self-check #6 — field-shape contracts (K-3)** — driven by Roni's Apr 5 chat (`bYJaD5Gt3tpgwvTR98DG`):
+- Bug pattern: builder modified a Set node to convert `attachments_url` from string to array via `.split().map()`, but failed to update the downstream `IF Attachment URL Valid` node which still compared with `notEquals "N/A"`. Result: `["N/A"] != "N/A"` evaluated TRUE in n8n's loose comparison → workflow tried to download "N/A" as a URL → broken.
+- Fix: Phase 4 self-check #6 added — for every Set node that produces an array, scan downstream IF/Filter/Switch nodes; if they use string operators on array-typed fields, fix with `field[0]` or array semantics. Currently a passive guardrail; synthetic test case TBD.
+
+**v0.23-prep (K-1, queued from Apr 1)** — bundled because system-prompt.ts changes overlapped with K-3:
+- **Phase 4 self-check #5**: cross-check workflow against original user request (catches Gil's "missing email/recipients" pattern from harvested_payments_007).
+- **JSON-first output order**: workflow JSON before explanations (so truncation cuts explanations, not JSON).
+- **`PINNED_START_SIZE = 4`** (was 2): preserves Phase 1+2 in long conversations through context windowing.
+- **Truncation UX polish**: yellow warning → teal "extensive workflow" message with download.
+- **CX/Payments wrong-cred examples**: programmatic JSON examples to anchor against credential hallucination.
+
+### Triggered by
+
+- **Gil + Céline Slack feedback (Apr 9, 6:15-6:37 AM)**: "Big query is csm" / "SF is `Account_Owner_F__c`" — investigated, found Account_Owner_F__c populated only on 10.7% of active accounts and that the BQ csm column was the right canonical source (CS-team always meant the analytics CSM, not the SF account owner).
+- **Roni chat `bYJaD5Gt3tpgwvTR98DG` (Apr 5, 20 messages)**: Builder introduced an array-vs-string bug while modifying a CX billing-ticket workflow.
+- **K-1 backlog**: v0.23-prep code was queued since Apr 1 awaiting regression and Docker.
+
+### Files changed
+
+- `chat-ui/src/lib/system-prompt.ts` (Phase 4 self-checks #5 + #6, csm_owner_field rule, JSON-first output)
+- `chat-ui/src/lib/claude.ts` (PINNED_START_SIZE=4, softer truncation message)
+- `chat-ui/src/components/MessageBubble.tsx` (teal truncation UX)
+- `chat-ui/src/lib/departments.ts` (CX/Payments wrong-cred examples)
+- `specs/02_SRC_CSM_Spec.md` (section 2 callout, section 5 csm column ref + verified SQL pattern pair)
+- `specs/02_SRC_Salesforce_Spec.md` (OwnerId precedence annotation, filter list update)
+- `tools/audit_workflow.py` (new check #11 csm_no_sf_roundtrip with regex-precise SELECT detection)
+- `tools/test_cases.yaml` (cs_churn_bq_slack fix: removed SF cred, added new check)
+- `feedback-loop/STATE.md` (Session K-3 entry)
+- `MEMORY.md` (Where We Left Off)
+- `~/.claude/projects/.../memory/feedback_two_csm_concepts.md` (new feedback memory)
+
+### Verification
+
+- TypeScript clean (`npx tsc --noEmit`)
+- Next.js build clean (compiled in 6.6s, 5/5 static pages OK)
+- Docker build clean (local rebuild + restart)
+- Audit check #11 against all 44 harvested workflows: 1 true positive (harvested_cs_005), 0 false positives
+- **End-to-end LLM regression `cs_churn_bq_slack`**: PASS — AI Phase 1 plan literally said *"Account owner: csm column from the same table (no Salesforce round-trip needed — it's 100% populated)"*. Final workflow: 6 nodes (BQ + Slack only, NO Salesforce). Audit: 8 PASS, 0 FAIL.
+- Cloud Build 5d658f33 (1m16s)
+- Cloud Run revision `n8n-chat-ui-00027-5q4` serving 100% of traffic
+- Production smoke test: HTTP 302 → IAP OAuth (correct)
+- **Rollback target**: `n8n-chat-ui-00026-qf5` (v0.22)
+
+---
+
+## v0.22 -- 2026-03-27 (superseded by v0.23, revision n8n-chat-ui-00026-qf5)
+### Changes
+- **Context window 10x increase**: `CONTEXT_TOKEN_THRESHOLD` 80K → 800K. Vertex AI supports 1M input tokens for Sonnet 4.6 GA. 200K margin for system prompt, tools, output, and safety.
+- **Output capacity doubled**: `max_tokens` 32768 → 65536.
+- **Sliding window widened**: `RECENT_WINDOW_SIZE` 12 → 20.
+- **Typing lag fix**: `React.memo` on MessageBubble with custom comparator, memoized `MessageList` component, stable `crypto.randomUUID()` keys. Eliminates re-render cascade on keystroke in long conversations.
+- **Full Guesty rebrand**: Teal palette (guesty-50→400), Figtree font, AI avatar, typing indicator, code block headers. All 20+ components restyled.
+
+### Triggered by
+- User feedback: "takes almost a minute to show what I'm typing" in multi-day conversation
+- Context windowing triggered at only 80K (8% of available 1M)
+
+### Files changed
+- chat-ui/src/lib/claude.ts (context threshold, max_tokens, window size)
+- chat-ui/src/components/MessageBubble.tsx, ChatWindow.tsx, ChatInput.tsx (performance + rebrand)
+- chat-ui/tailwind.config.ts, globals.css (Guesty design system)
+- 15+ additional components (rebrand), Toast.tsx (new), guesty-logo.png (new)
+
+### Verification
+- TypeScript clean, Next.js build passes, Docker build succeeds
+- Cloud Run revision `n8n-chat-ui-00026-qf5` serving 100%
+- Rollback target: `n8n-chat-ui-00024-6sm` (v0.21)
+
+---
+
+## v0.21 -- 2026-03-25 (superseded by v0.22, revision n8n-chat-ui-00024-6sm)
 ### Changes
 - **Data Consultant mode**: New dual-mode assistant — Builder (existing workflow builder) + Data Consultant for schema exploration, SQL generation, and AI agent planning. ModeSelector card UI on landing page, mode-aware system prompt routing, tool filtering (no workflow tools in data mode), credential stripping in data mode. Mode persisted in Firestore conversations + analytics. Builder mode has zero overhead (3 if-checks per request).
 - **Feedback loop process**: New harvest-test-learn-improve cycle as core development process. Harvester tool (`tools/harvest_test_cases.ts`) extracts test candidates from Firestore conversations. First harvest: 54 candidates from 140 conversations across CS, CX, Payments departments.

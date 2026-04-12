@@ -1,34 +1,31 @@
 - name: harvested_cs_001
-  description: "Harvested from alvaro.cuba@guesty.com - Create a workflow triggered by Salesforce when an Opportu..."
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery zendesk_anal..."
   department: cs
   prompt: >
-    Create a workflow triggered by Salesforce when an Opportunity is updated. Query the updated Opportunity for RecordType.Name, StageName, Account.Name, and Account.Guesty_Admin_ID__c. Use a Filter node to keep only opportunities where RecordType.Name = 'Renewal'. Query BigQuery csm.csm_churn_report using the Guesty_Admin_ID__c to get max_paid_listings and churn_reason. Post a renewal status update to #cs-renewals in Slack. Use production credentials.
+    Build a daily workflow that queries BigQuery zendesk_analytics.tickets_clean for Zendesk tickets where status is 'open' or 'pending' and the ticket is older than 7 days. Group by account_name and show count and oldest ticket date per account. Post the aging report to #cs-ticket-aging in Slack. Run daily at 9am UTC.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - salesforceTrigger
-    - salesforce
-    - filter
+    - scheduleTrigger
     - googleBigQuery
+    - code
     - slack
   expected_creds:
-    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
-    googleApi: h7fJ82YhtOnUL58u
+    googleApi: VQ7CU7dKViVcv8Ah
     slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
     - bq_projectId
-    - sf_config
     - slack_config
   _metadata:
-    source_conversation: EFJ2g3n76fjVb5QzFDJ5
+    source_conversation: 0rvzwm1VPG2Ww6pg2u0u
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a workflow triggered by Salesforce when an Opportu..."
-    node_count: 5
+    workflow_name: "Build a daily workflow that queries BigQuery zendesk_anal..."
+    node_count: 4
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.955Z
+    harvested_at: 2026-04-01T09:38:06.208Z
     confidence: high
     workflow_json_file: harvested_cs_001_workflow.json

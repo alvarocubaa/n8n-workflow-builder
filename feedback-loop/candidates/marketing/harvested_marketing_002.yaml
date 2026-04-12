@@ -1,0 +1,40 @@
+- name: harvested_marketing_002
+  description: "Harvested from alvaro.cuba@guesty.com - Create a weekly workflow that runs every Monday at 8am UT..."
+  department: marketing
+  prompt: >
+    Create a weekly workflow that runs every Monday at 8am UTC. Step 1: Query Salesforce for Campaign records where Type = 'Conference' and StartDate is in the next 30 days. Step 2: Query BigQuery marketing_data for HubSpot email metrics associated with those campaign names. Step 3: Use the Google Gemini node to generate a strategic summary comparing event pipeline data with marketing engagement. Step 4: Write results to a Google Sheet. Step 5: Post the AI summary to #marketing-events in Slack.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - salesforce
+    - googleBigQuery
+    - merge
+    - aggregate
+    - @n8n/n8n-nodes-langchain.chainLlm
+    - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
+    - googleSheets
+    - slack
+  expected_creds:
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    googleApi: h7fJ82YhtOnUL58u
+    googlePalmApi: LL8fLgZSrUn8oZtV
+    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
+    slackOAuth2Api: 5Ii5X9IFid1S8rIE
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
+  _metadata:
+    source_conversation: 89orrLeiLOXMKvwtgURm
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a weekly workflow that runs every Monday at 8am UT..."
+    node_count: 9
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
+    workflow_json_file: harvested_marketing_002_workflow.json

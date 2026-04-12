@@ -1,106 +1,104 @@
 {
-  "name": "Daily CS Churn Report - cs-churn-alerts",
+  "name": "Salesforce Renewal Opportunity - Slack Alert",
   "nodes": [
     {
-      "id": "a3f7c2d1-84e6-4b19-9c3a-f1e2d5b6c7a8",
-      "name": "Daily 9am UTC",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Salesforce Trigger - Opportunity Updated",
+      "type": "n8n-nodes-base.salesforceTrigger",
+      "typeVersion": 1,
       "position": [
-        240,
+        250,
         300
       ],
       "parameters": {
-        "rule": {
-          "interval": [
+        "triggerOn": "opportunityUpdated"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Get Opportunity Details",
+      "type": "n8n-nodes-base.salesforce",
+      "typeVersion": 1,
+      "position": [
+        470,
+        300
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "search",
+        "operation": "query",
+        "query": "=SELECT Id, Name, StageName, RecordType.Name, Account.Name, Account.Guesty_Admin_ID__c FROM Opportunity WHERE Id = '{{ $json.Id }}'"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read"
+        }
+      }
+    },
+    {
+      "id": "3d594a8e-1b2c-4f5d-9e6a-7b8c9d0e1f2a",
+      "name": "Filter - Renewal Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        690,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
             {
-              "field": "cronExpression",
-              "expression": "0 9 * * *"
+              "id": "a1f2e3d4-b5c6-4d7e-8f9a-0b1c2d3e4f5a",
+              "leftValue": "={{ $json.records[0].RecordType.Name }}",
+              "rightValue": "Renewal",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ]
         }
       }
     },
     {
-      "id": "b8d4e9f2-31c7-4a56-8e0b-2c3d4e5f6a7b",
-      "name": "BQ - Churn Last 30 Days",
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "BigQuery - Get Churn Data",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        480,
+        910,
         300
       ],
       "parameters": {
-        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  c.account_id,\n  c.account_name,\n  c.from_date,\n  c.churn_reason,\n  c.churn_reason_modified,\n  c.customer_churn_reason,\n  c.churn_type,\n  c.csm,\n  c.avg_mrr,\n  c.account_segmentation,\n  c.geo_area,\n  c.months_in_guesty,\n  c.etf\nFROM `guesty-data.csm.csm_churn_report` c\nWHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nORDER BY c.from_date DESC\nLIMIT 100",
-        "options": {}
+        "sqlQuery": "=SELECT c.account_id, c.account_name, c.churn_reason, m.last_month_paid_listings AS max_paid_listings FROM `guesty-data.csm.csm_churn_report` c LEFT JOIN `guesty-data.csm.mrr_calculator` m ON c.account_id = m.account_id WHERE c.account_id = '{{ $('Get Opportunity Details').item.json.records[0].Account.Guesty_Admin_ID__c }}' ORDER BY c.from_date DESC LIMIT 1"
       },
       "credentials": {
         "googleApi": {
-          "id": "VQ7CU7dKViVcv8Ah",
-          "name": "Google Service Account n8n-ai-cx-read"
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
         }
       }
     },
     {
-      "id": "c9e5f0a3-42d8-4b67-9f1c-3d4e5f6a7b8c",
-      "name": "Build SOQL IN Clause",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        720,
-        300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\nif (!items || items.length === 0) {\n  return [{ json: { accountIds: '', churnRows: [] } }];\n}\nconst ids = items.map(i => i.json.account_id).filter(Boolean);\nconst uniqueIds = [...new Set(ids)];\nconst inClause = uniqueIds.map(id => `'${id}'`).join(', ');\nconst churnRows = items.map(i => i.json);\nreturn [{ json: { accountIds: inClause, churnRows } }];"
-      }
-    },
-    {
-      "id": "d0f6a1b4-53e9-4c78-a02d-4e5f6a7b8c9d",
-      "name": "SF - Get Account Owners",
-      "type": "n8n-nodes-base.salesforce",
-      "typeVersion": 1,
-      "position": [
-        960,
-        300
-      ],
-      "parameters": {
-        "resource": "search",
-        "operation": "query",
-        "query": "={{ 'SELECT Id, Name, Owner.Name, Guesty_Admin_ID__c FROM Account WHERE Guesty_Admin_ID__c IN (' + $json.accountIds + ')' }}"
-      },
-      "credentials": {
-        "salesforceOAuth2Api": {
-          "id": "aBjJNGRAjYF66z5F",
-          "name": "Salesforce Partial Sandbox"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "e1a7b2c5-64fa-4d89-b13e-5f6a7b8c9d0e",
-      "name": "Build Slack Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1200,
-        300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\nconst sfRecords = items.map(i => i.json).filter(i => i && i.Guesty_Admin_ID__c);\nconst ownerMap = {};\nfor (const rec of sfRecords) {\n  ownerMap[rec.Guesty_Admin_ID__c] = (rec.Owner && rec.Owner.Name) ? rec.Owner.Name : 'N/A';\n}\nconst prevData = $('Build SOQL IN Clause').first().json;\nconst churnRows = prevData.churnRows || [];\nif (churnRows.length === 0) {\n  return [{ json: { message: ':white_check_mark: *Daily Churn Report* -- No churned accounts in the last 30 days.' } }];\n}\nconst totalMrr = churnRows.reduce((sum, r) => sum + (r.avg_mrr || 0), 0);\nconst top20 = churnRows.slice(0, 20);\nconst today = new Date().toISOString().slice(0, 10);\nconst lines = [];\nlines.push(':rotating_light: *Daily Churn Report* -- Last 30 Days (' + today + ')');\nlines.push('*Total churned accounts:* ' + churnRows.length + '  |  *Total avg MRR lost:* $' + Math.round(totalMrr).toLocaleString());\nlines.push('');\nlines.push('*Account* | Churn Date | Reason | CSM | SF Owner | MRR | Segment | Geo');\nlines.push('---');\nfor (const r of top20) {\n  const owner = ownerMap[r.account_id] || 'N/A';\n  const mrr = r.avg_mrr ? '$' + Math.round(r.avg_mrr).toLocaleString() : 'N/A';\n  const reason = r.churn_reason_modified || r.churn_reason || 'N/A';\n  lines.push('*' + r.account_name + '* | ' + r.from_date + ' | ' + reason + ' | ' + (r.csm || 'N/A') + ' | ' + owner + ' | ' + mrr + ' | ' + (r.account_segmentation || 'N/A') + ' | ' + (r.geo_area || 'N/A'));\n}\nif (churnRows.length > 20) {\n  lines.push('_...and ' + (churnRows.length - 20) + ' more accounts. Showing top 20 by churn date._');\n}\nreturn [{ json: { message: lines.join('\\n') } }];"
-      }
-    },
-    {
-      "id": "f2b8c3d6-75ab-4e9a-c24f-6a7b8c9d0e1f",
-      "name": "Slack - Post to cs-churn-alerts",
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Slack - Post to cs-renewals",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1440,
+        1130,
         300
       ],
       "parameters": {
@@ -109,10 +107,9 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cs-churn-alerts"
+          "value": "#cs-renewals"
         },
-        "text": "={{ $json.message }}",
-        "otherOptions": {}
+        "text": "={{ '*Renewal Opportunity Updated*\\n*Account:* ' + $('Get Opportunity Details').item.json.records[0].Account.Name + '\\n*Stage:* ' + $('Get Opportunity Details').item.json.records[0].StageName + '\\n*Guesty Admin ID:* ' + $('Get Opportunity Details').item.json.records[0].Account.Guesty_Admin_ID__c + '\\n*Max Paid Listings:* ' + $json.max_paid_listings + '\\n*Churn Reason:* ' + $json.churn_reason }}"
       },
       "credentials": {
         "slackApi": {
@@ -127,63 +124,49 @@
     }
   ],
   "connections": {
-    "Daily 9am UTC": {
+    "Salesforce Trigger - Opportunity Updated": {
       "main": [
         [
           {
-            "node": "BQ - Churn Last 30 Days",
+            "node": "Get Opportunity Details",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BQ - Churn Last 30 Days": {
+    "Get Opportunity Details": {
       "main": [
         [
           {
-            "node": "Build SOQL IN Clause",
+            "node": "Filter - Renewal Only",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build SOQL IN Clause": {
+    "Filter - Renewal Only": {
       "main": [
         [
           {
-            "node": "SF - Get Account Owners",
+            "node": "BigQuery - Get Churn Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "SF - Get Account Owners": {
+    "BigQuery - Get Churn Data": {
       "main": [
         [
           {
-            "node": "Build Slack Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Slack Message": {
-      "main": [
-        [
-          {
-            "node": "Slack - Post to cs-churn-alerts",
+            "node": "Slack - Post to cs-renewals",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "settings": {
-    "executionOrder": "v1"
   }
 }

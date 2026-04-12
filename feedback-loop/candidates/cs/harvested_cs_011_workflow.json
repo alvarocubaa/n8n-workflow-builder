@@ -1,0 +1,58 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://guesty3396.zendesk.com/api/v2/users/{{ $json.requester_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "id": "bcb01151-c4f0-43ae-8ede-4a1bec172160",
+      "name": "Get user ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        928,
+        -6656
+      ],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "B1ksdYFDJ8LJKaTJ",
+          "name": "Zendesk Production - Read - OAuth2 Generic - Cross Dept"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "name": "ticket_id",
+              "value": "={{ $('Split Out').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "e7d788de-0db5-4349-8907-e02d62189048",
+      "name": "Map Ticket ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -6624
+      ]
+    }
+  ],
+  "connections": {}
+}

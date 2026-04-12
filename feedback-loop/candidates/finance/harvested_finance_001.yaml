@@ -1,0 +1,33 @@
+- name: harvested_finance_001
+  description: "Harvested from alvaro.cuba@guesty.com - Build a weekly workflow running Monday at 8am UTC. Run tw..."
+  department: finance
+  prompt: >
+    Build a weekly workflow running Monday at 8am UTC. Run two BigQuery queries in parallel. First: query zuora_analytics.invoices for total invoice_amount grouped by company_code for the past month. Second: query zuora_analytics.invoice_items for total amount grouped by company_code for the same period. Use a Merge node to combine both results by company_code. Use a Set node to calculate the difference between invoice totals and item totals. Post a company-level reconciliation summary to #financ...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - merge
+    - set
+    - aggregate
+    - slack
+  expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    slackApi: g3NQlNzyjFofD87l
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: QJgEHsbZfXQs6JVXK4fI
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build a weekly workflow running Monday at 8am UTC. Run tw..."
+    node_count: 7
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.209Z
+    confidence: high
+    workflow_json_file: harvested_finance_001_workflow.json

@@ -1,0 +1,37 @@
+- name: harvested_payments_007
+  description: "Harvested from gil.almog@guesty.com - [AI by gil.almog] GuestyPay Sub-Accounts - Monthly Inactive Monitor"
+  department: payments
+  prompt: >
+    help me automate based on these requirements
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - set
+    - googleBigQuery
+    - filter
+    - switch
+    - aggregate
+    - if
+    - gmail
+    - splitOut
+    - zendesk
+  expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    gmailOAuth2: 4BConxQW0qmylDKE
+    zendeskApi: cFdFPhADfsxMmPFC
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+  _metadata:
+    source_conversation: RZYtu3ZXwl8713Fw0XzA
+    source_user: gil.almog@guesty.com
+    deployed: true
+    deployed_workflow_id: tmtUN7VistuIt4om
+    workflow_name: "[AI by gil.almog] GuestyPay Sub-Accounts - Monthly Inactive Monitor"
+    node_count: 31
+    complexity_score: 4
+    harvested_at: 2026-04-01T09:38:06.211Z
+    confidence: medium
+    workflow_json_file: harvested_payments_007_workflow.json

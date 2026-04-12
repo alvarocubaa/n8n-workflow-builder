@@ -1,0 +1,29 @@
+- name: harvested_cs_010
+  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] Universal Client Reporting - HQ + Non-HQ"
+  department: cs
+  prompt: >
+    Here is the high-level guideline document you can hand off to your n8n builder. It explains exactly how to refactor the existing workflow into the scalable, modular architecture required for both HQ and Non-HQ clients.
+    
+    ***
+    
+    # Builder Guidelines: Universal Client Reporting Automation
+    **Objective:** Refactor the existing monolithic HQ reporting workflow into a "Core Engine" (Sub-workflow) powered by dynamic "Sourcing Triggers." This ensures we can process both HQ (Many-to-One) and Non-HQ/At-Ri...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - set
+  expected_creds:
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: iGYjAAytXxl4L8fEL7aG
+    source_user: roni.shif@guesty.com
+    deployed: true
+    deployed_workflow_id: AlTAZjQ2mwuj8JAu
+    workflow_name: "[AI by roni.shif] Universal Client Reporting - HQ + Non-HQ"
+    node_count: 1
+    complexity_score: 4
+    harvested_at: 2026-04-01T09:38:06.212Z
+    confidence: medium
+    workflow_json_file: harvested_cs_010_workflow.json

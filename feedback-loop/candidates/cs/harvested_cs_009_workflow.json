@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+              "name": "Guesty_Admin_ID__c",
+              "value": "={{ $json.Guesty_Admin_ID__c }}",
+              "type": "string"
+            },
+            {
+              "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
+              "name": "Name",
+              "value": "={{ $json.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b",
+              "name": "Main_Contact_Email__c",
+              "value": "={{ $json.Main_Contact_Email__c }}",
+              "type": "string"
+            },
+            {
+              "id": "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c",
+              "name": "Parent_Name",
+              "value": "={{ $json.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+              "name": "is_hq",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4af8b0ca-e648-43f4-9527-4186bee6f9f9",
+      "name": "Format Non-HQ as Account Array",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1872,
+        -6960
+      ]
+    }
+  ],
+  "connections": {}
+}

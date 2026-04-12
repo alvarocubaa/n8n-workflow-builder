@@ -1,18 +1,18 @@
 {
-  "harvested_at": "2026-03-20T12:38:09.972Z",
-  "total_candidates": 13,
-  "workflow_jsons_written": 13,
+  "harvested_at": "2026-04-01T09:38:06.231Z",
+  "total_candidates": 45,
+  "workflow_jsons_written": 45,
   "by_department": {
-    "marketing": 0,
-    "cs": 5,
-    "cx": 7,
-    "ob": 0,
-    "payments": 1,
-    "finance": 0
+    "marketing": 4,
+    "cs": 13,
+    "cx": 18,
+    "ob": 1,
+    "payments": 7,
+    "finance": 2
   },
   "by_confidence": {
-    "high": 3,
-    "medium": 10,
+    "high": 25,
+    "medium": 20,
     "low": 0
   }
 }

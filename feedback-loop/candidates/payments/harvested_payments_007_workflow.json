@@ -1,0 +1,1168 @@
+{
+  "name": "GuestyPay Sub-Accounts - Monthly Inactive Monitor",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 1 * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b9f1a2c3-d4e5-4f6a-7b8c-9d0e1f2a3b4c",
+      "name": "TEST MODE",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+              "name": "test_mode",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "Query Inactive Sub-Accounts",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        440,
+        400
+      ],
+      "parameters": {
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT g.*,\n       a.notifications_email\nFROM `payments_processing.guesty_churn` g\nLEFT JOIN `payments_processing.applications` a\n  ON g.sub_account = a.sub_account_id",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "d3e4f5a6-b7c8-4d9e-0f1a-2b3c4d5e6f7a",
+      "name": "Derive CSM Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        400
+      ],
+      "parameters": {
+        "mode": "keepAllExistingFields",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
+              "name": "csm_email",
+              "value": "={{ $json['csm'].toLowerCase().replace(' ', '.') }}@guesty.com",
+              "type": "string"
+            },
+            {
+              "id": "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
+              "name": "test_mode",
+              "value": "={{ $('TEST MODE').first().json.test_mode }}",
+              "type": "boolean"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Filter Eligible Accounts",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": false
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+              "leftValue": "={{ $json['status'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              },
+              "rightValue": "Disabled"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+              "leftValue": "={{ $json['months_from_last_transaction'] }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "-"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+              "leftValue": "={{ Number($json['months_connected']) }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "Route by Branch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+                    "leftValue": "={{ $json['status'] }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "DELETED"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "A - Deleted"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+                    "leftValue": "={{ Number($json['months_connected']) }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 3
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "B - Month 3"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+                    "leftValue": "={{ Number($json['months_connected']) }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 5
+                  },
+                  {
+                    "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+                    "leftValue": "={{ $json['segment'] }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    },
+                    "rightValue": "Enterprise"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "C - Month 5 Non-Enterprise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+                    "leftValue": "={{ Number($json['months_connected']) }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    },
+                    "rightValue": 5
+                  },
+                  {
+                    "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+                    "leftValue": "={{ $json['segment'] }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Enterprise"
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "D - Month 5 Enterprise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+                    "leftValue": "={{ Number($json['months_connected']) }}",
+                    "operator": {
+                      "type": "number",
+                      "operation": "gt"
+                    },
+                    "rightValue": 9
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "E - Month 9+"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Aggregate Deleted Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        100
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Aggregate Month 3 Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        280
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+      "name": "Aggregate Month 5 Non-Ent Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        460
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a",
+      "name": "Aggregate Month 5 Enterprise Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        640
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b",
+      "name": "Aggregate Month 9+ Accounts",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        820
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "6a7b8c9d-0e1f-4a2b-3c4d-5e6f7a8b9c0d",
+      "name": "Branch A - Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "7b8c9d0e-1f2a-4b3c-4d5e-6f7a8b9c0d1e",
+              "leftValue": "={{ $json.accounts[0].test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8c9d0e1f-2a3b-4c4d-5e6f-7a8b9c0d1e2f",
+      "name": "Branch A - Simulate Email (Deleted)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] [ACTION REQUIRED] GuestyPay DELETED Sub-Accounts - Disable & Cancel Fees",
+        "message": "={{ '[TEST MODE] Original recipient: ops_payments@guesty.com\\n\\nHi Payments Ops Team,\\n\\nThe following GuestyPay sub-accounts have been DELETED in the UI but still have no processing history. Please proceed with sub-account disablement and cancel/offset any posted scheduled fees for each account below.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nPlease action these as soon as possible.\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "9d0e1f2a-3b4c-4d5e-6f7a-8b9c0d1e2f3a",
+      "name": "Branch A - Ops Email (Deleted)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        200
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "ops_payments@guesty.com",
+        "subject": "[ACTION REQUIRED] GuestyPay DELETED Sub-Accounts - Disable & Cancel Fees",
+        "message": "={{ 'Hi Payments Ops Team,\\n\\nThe following GuestyPay sub-accounts have been DELETED in the UI but still have no processing history. Please proceed with sub-account disablement and cancel/offset any posted scheduled fees for each account below.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nPlease action these as soon as possible.\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "2b3c4d5e-8f9a-4b5c-6d7e-8f9a0b1c2d3e",
+      "name": "Split Month 3 for Tickets",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        280
+      ],
+      "parameters": {
+        "fieldToSplitOut": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "ae1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d",
+      "name": "Branch B - Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1780,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "bf2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+              "leftValue": "={{ $json.test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cf3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "Branch B - Simulate Zendesk Ticket (Month 3)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] Zendesk Ticket - Your GuestyPay account has not processed any payments",
+        "message": "={{ '[TEST MODE - NO TICKET CREATED] This is a simulation of the Zendesk ticket that would be sent.\\n\\n--- TICKET DETAILS ---\\nTo (requester): ' + $json['notifications_email'] + '\\nCC: ' + $json['csm_email'] + ', ops_payments@guesty.com\\nBrand: Guesty Pro\\nGroup: GFP: Biz\\nIssue Type: Domain related\\nDomain: Reservation Payments\\n\\n--- TICKET SUBJECT ---\\nYour GuestyPay account has not processed any payments\\n\\n--- TICKET BODY ---\\nDear ' + $json['account_name'] + ',\\n\\nWe noticed that your GuestyPay sub-account has been active for 3 months but has not processed any payments to date.\\n\\nPlease be aware that service fees may still apply during this period. If your account remains inactive for 5 months, it may be subject to disablement.\\n\\nWe encourage you to start processing payments or reach out to your Customer Success Manager if you need any assistance getting set up.\\n\\nBest regards,\\nGuesty Payments Team' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "df4e5f6a-7b8c-4d9e-0f1a-2b3c4d5e6f7a",
+      "name": "Branch B - Zendesk Ticket (Month 3)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        380
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "subject": "Your GuestyPay account has not processed any payments",
+        "description": "Dear {{ $json['account_name'] }},\n\nWe noticed that your GuestyPay sub-account has been active for 3 months but has not processed any payments to date.\n\nPlease be aware that service fees may still apply during this period. If your account remains inactive for 5 months, it may be subject to disablement.\n\nWe encourage you to start processing payments or reach out to your Customer Success Manager if you need any assistance getting set up.\n\nBest regards,\nGuesty Payments Team",
+        "additionalFields": {
+          "type": "question",
+          "requesterEmail": "={{ $json['notifications_email'] }}",
+          "ccEmails": "={{ $json['csm_email'] }},ops_payments@guesty.com",
+          "group_id": 7841613976221,
+          "brand_id": 7218885869213,
+          "customFields": {
+            "customFields": [
+              {
+                "id": "8665992190493",
+                "value": "all_brands_issue_type_domain_related"
+              },
+              {
+                "id": "7776207191197",
+                "value": "gfp_reservation_payments"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "cFdFPhADfsxMmPFC",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a",
+      "name": "Split Month 5 Non-Ent for Tickets",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        460
+      ],
+      "parameters": {
+        "fieldToSplitOut": "accounts",
+        "options": {}
+      }
+    },
+    {
+      "id": "ef5f6a7b-8c9d-4e0f-1a2b-3c4d5e6f7a8b",
+      "name": "Branch C - Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1780,
+        460
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "fa6a7b8c-9d0e-4f1a-2b3c-4d5e6f7a8b9c",
+              "leftValue": "={{ $json.test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "1b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "Branch C - Simulate Zendesk Ticket (Month 5 Non-Ent)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2000,
+        360
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] Zendesk Ticket - Your GuestyPay account will be disabled in 30 days",
+        "message": "={{ '[TEST MODE - NO TICKET CREATED] This is a simulation of the Zendesk ticket that would be sent.\\n\\n--- TICKET DETAILS ---\\nTo (requester): ' + $json['notifications_email'] + '\\nCC: ' + $json['csm_email'] + ', ops_payments@guesty.com\\nBrand: Guesty Pro\\nGroup: GFP: Biz\\nIssue Type: Domain related\\nDomain: Reservation Payments\\n\\n--- TICKET SUBJECT ---\\nYour GuestyPay account will be disabled in 30 days\\n\\n--- TICKET BODY ---\\nDear ' + $json['account_name'] + ',\\n\\nWe are writing to inform you that your GuestyPay sub-account has been inactive for 5 months and has not processed any payments during this period.\\n\\nAs a result, your account is scheduled to be disabled within 30 days.\\n\\nIf you wish to keep your account active, please begin processing payments or contact your Customer Success Manager as soon as possible.\\n\\nBest regards,\\nGuesty Payments Team' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "Branch C - Zendesk Ticket (Month 5 Non-Ent)",
+      "type": "n8n-nodes-base.zendesk",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        560
+      ],
+      "parameters": {
+        "resource": "ticket",
+        "operation": "create",
+        "subject": "Your GuestyPay account will be disabled in 30 days",
+        "description": "Dear {{ $json['account_name'] }},\n\nWe are writing to inform you that your GuestyPay sub-account has been inactive for 5 months and has not processed any payments during this period.\n\nAs a result, your account is scheduled to be disabled within 30 days.\n\nIf you wish to keep your account active, please begin processing payments or contact your Customer Success Manager as soon as possible.\n\nBest regards,\nGuesty Payments Team",
+        "additionalFields": {
+          "type": "problem",
+          "requesterEmail": "={{ $json['notifications_email'] }}",
+          "ccEmails": "={{ $json['csm_email'] }},ops_payments@guesty.com",
+          "group_id": 7841613976221,
+          "brand_id": 7218885869213,
+          "customFields": {
+            "customFields": [
+              {
+                "id": "8665992190493",
+                "value": "all_brands_issue_type_domain_related"
+              },
+              {
+                "id": "7776207191197",
+                "value": "gfp_reservation_payments"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "zendeskApi": {
+          "id": "cFdFPhADfsxMmPFC",
+          "name": "Zendesk account"
+        }
+      }
+    },
+    {
+      "id": "3d4e5f6a-7b8c-4d9e-0f1a-2b3c4d5e6f7a",
+      "name": "Branch C - Test Mode Ops Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        580
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "4e5f6a7b-8c9d-4e0f-1a2b-3c4d5e6f7a8b",
+              "leftValue": "={{ $json.accounts[0].test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "5f6a7b8c-9d0e-4f1a-2b3c-4d5e6f7a8b9c",
+      "name": "Branch C - Simulate Ops Email (Month 5 Non-Ent)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        480
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] [ACTION REQUIRED] GuestyPay Month 5 Inactive Sub-Accounts - Proceed with Disablement",
+        "message": "={{ '[TEST MODE] Original recipient: ops_payments@guesty.com\\n\\nHi Payments Ops Team,\\n\\nThe following non-Enterprise GuestyPay sub-accounts have reached 5 months of inactivity. Please proceed with disablement and cancel any associated scheduled fees.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nUser disablement notices have already been simulated via email (test mode).\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "6a7b8c9d-0e1f-4a2b-3c4d-5e6f7a8b9c0e",
+      "name": "Branch C - Ops Email (Month 5 Non-Ent)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        680
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "ops_payments@guesty.com",
+        "subject": "[ACTION REQUIRED] GuestyPay Month 5 Inactive Sub-Accounts - Proceed with Disablement",
+        "message": "={{ 'Hi Payments Ops Team,\\n\\nThe following non-Enterprise GuestyPay sub-accounts have reached 5 months of inactivity. Please proceed with disablement and cancel any associated scheduled fees.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nUser disablement notices have already been sent via Zendesk.\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "7b8c9d0e-1f2a-4b3c-4d5e-6f7a8b9c0d1f",
+      "name": "Branch D - Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        640
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "8c9d0e1f-2a3b-4c4d-5e6f-7a8b9c0d1e2g",
+              "leftValue": "={{ $json.accounts[0].test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "9d0e1f2a-3b4c-4d5e-6f7a-8b9c0d1e2f3b",
+      "name": "Branch D - Simulate Approval Email (Month 5 Enterprise)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        560
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] [APPROVAL REQUIRED] GuestyPay Enterprise Inactive Sub-Accounts",
+        "message": "={{ '[TEST MODE] Original recipient: ops_payments@guesty.com | CC: tal.sossover@guesty.com\\n\\nHi Payments Ops Team,\\n\\nThe following Enterprise GuestyPay sub-accounts have been inactive for 5 months with no processing history. Please review and provide approval to proceed with sub-account disablement and fee cancellation before any action is taken.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nPlease reply with your approval or any questions.\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "ae1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4e",
+      "name": "Branch D - Ops Approval Email (Month 5 Enterprise)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        760
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "ops_payments@guesty.com",
+        "subject": "[APPROVAL REQUIRED] GuestyPay Enterprise Inactive Sub-Accounts",
+        "message": "={{ 'Hi Payments Ops Team,\\n\\nThe following Enterprise GuestyPay sub-accounts have been inactive for 5 months with no processing history. Please review and provide approval to proceed with sub-account disablement and fee cancellation before any action is taken.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nPlease reply with your approval or any questions.\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {
+          "ccList": "tal.sossover@guesty.com"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "bf2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5f",
+      "name": "Branch E - Test Mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        820
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cf3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6g",
+              "leftValue": "={{ $json.accounts[0].test_mode }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "df4e5f6a-7b8c-4d9e-0f1a-2b3c4d5e6f7b",
+      "name": "Branch E - Simulate Follow-Up Email (Month 9+)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        720
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "elena.chechik@guesty.com",
+        "subject": "[TEST SIMULATION] [FOLLOW-UP REQUIRED] GuestyPay Long-Term Inactive Sub-Accounts (9+ Months)",
+        "message": "={{ '[TEST MODE] Original recipient: ops_payments@guesty.com\\n\\nHi Payments Ops Team,\\n\\nThe following GuestyPay sub-accounts have been inactive for more than 9 months with no processing history. Please review each account and proceed with disablement if applicable.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "ef5f6a7b-8c9d-4e0f-1a2b-3c4d5e6f7a8c",
+      "name": "Branch E - Ops Follow-Up Email (Month 9+)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1780,
+        920
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "ops_payments@guesty.com",
+        "subject": "[FOLLOW-UP REQUIRED] GuestyPay Long-Term Inactive Sub-Accounts (9+ Months)",
+        "message": "={{ 'Hi Payments Ops Team,\\n\\nThe following GuestyPay sub-accounts have been inactive for more than 9 months with no processing history. Please review each account and proceed with disablement if applicable.\\n\\n' + $json.accounts.map(a => 'Platform Name: ' + a['platform_name'] + ' | Account Name: ' + a['account_name'] + ' | Processors: ' + a['processors'] + ' | Sub Accounts: ' + a['sub_accounts'] + ' | Account Balance: ' + a['account_balance']).join('\\n') + '\\n\\nThis is an automated notification from n8n.' }}",
+        "options": {}
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "4BConxQW0qmylDKE",
+          "name": "Gmail - cx_automations@guesty.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "TEST MODE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEST MODE": {
+      "main": [
+        [
+          {
+            "node": "Query Inactive Sub-Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Inactive Sub-Accounts": {
+      "main": [
+        [
+          {
+            "node": "Derive CSM Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derive CSM Email": {
+      "main": [
+        [
+          {
+            "node": "Filter Eligible Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Eligible Accounts": {
+      "main": [
+        [
+          {
+            "node": "Route by Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Branch": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Deleted Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Month 3 Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Month 5 Non-Ent Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Month 5 Enterprise Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Month 9+ Accounts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Deleted Accounts": {
+      "main": [
+        [
+          {
+            "node": "Branch A - Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch A - Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Branch A - Simulate Email (Deleted)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch A - Ops Email (Deleted)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month 3 Accounts": {
+      "main": [
+        [
+          {
+            "node": "Split Month 3 for Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Month 3 for Tickets": {
+      "main": [
+        [
+          {
+            "node": "Branch B - Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch B - Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Branch B - Simulate Zendesk Ticket (Month 3)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch B - Zendesk Ticket (Month 3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month 5 Non-Ent Accounts": {
+      "main": [
+        [
+          {
+            "node": "Split Month 5 Non-Ent for Tickets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Branch C - Test Mode Ops Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Month 5 Non-Ent for Tickets": {
+      "main": [
+        [
+          {
+            "node": "Branch C - Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch C - Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Branch C - Simulate Zendesk Ticket (Month 5 Non-Ent)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch C - Zendesk Ticket (Month 5 Non-Ent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch C - Test Mode Ops Email?": {
+      "main": [
+        [
+          {
+            "node": "Branch C - Simulate Ops Email (Month 5 Non-Ent)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch C - Ops Email (Month 5 Non-Ent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month 5 Enterprise Accounts": {
+      "main": [
+        [
+          {
+            "node": "Branch D - Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch D - Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Branch D - Simulate Approval Email (Month 5 Enterprise)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch D - Ops Approval Email (Month 5 Enterprise)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Month 9+ Accounts": {
+      "main": [
+        [
+          {
+            "node": "Branch E - Test Mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Branch E - Test Mode?": {
+      "main": [
+        [
+          {
+            "node": "Branch E - Simulate Follow-Up Email (Month 9+)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Branch E - Ops Follow-Up Email (Month 9+)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

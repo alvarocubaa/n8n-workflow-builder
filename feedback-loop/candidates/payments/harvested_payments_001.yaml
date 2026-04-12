@@ -1,32 +1,33 @@
 - name: harvested_payments_001
-  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow with two BigQuery queries run in p..."
+  description: "Harvested from alvaro.cuba@guesty.com - help me automate based on these requirements"
   department: payments
   prompt: >
-    Build a daily workflow with two BigQuery queries run in parallel. First query: zuora_analytics.product_catalog for configured payment processing fees per account. Second query: zuora_analytics.invoice_items for actually invoiced payment processing amounts in the past month grouped by mongo_account_id. Use a Merge node to combine both results matching by account ID. Use an If node to flag accounts where the configured fee differs from the invoiced amount by more than 10 percent. Post mismatche...
+    help me automate based on these requirements
   confirm_message: "Looks good, build it"
   expected_nodes:
     - scheduleTrigger
-    - googleBigQuery
-    - merge
-    - if
-    - slack
+    - googleSheets
+    - filter
+    - code
+    - switch
+    - aggregate
+    - emailSend
+    - zendesk
   expected_creds:
-    googleApi: aLlYQkLWrmANkfFZ
-    slackApi: 87t2GgsbEJDItDs7
+    googleSheetsTriggerOAuth2Api: W6Zn2BYAkgmc1t8W
+    zendeskApi: cFdFPhADfsxMmPFC
   checks:
     - encoding
     - uuids
     - credentials
-    - bq_projectId
-    - slack_config
   _metadata:
-    source_conversation: VbbHlN9rDh9XVUHLSMBB
+    source_conversation: 7ZXsa2Vn5T0yNT3QlQIZ
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Build a daily workflow with two BigQuery queries run in p..."
-    node_count: 6
+    workflow_name: "help me automate based on these requirements"
+    node_count: 16
     complexity_score: 1
-    harvested_at: 2026-03-20T12:38:09.955Z
+    harvested_at: 2026-04-01T09:38:06.209Z
     confidence: high
     workflow_json_file: harvested_payments_001_workflow.json

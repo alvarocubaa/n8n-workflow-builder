@@ -1,104 +1,70 @@
 {
-  "name": "Salesforce Renewal Opportunity Alert",
+  "name": "Daily Zendesk Ticket Aging Report",
   "nodes": [
     {
       "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Salesforce Trigger",
-      "type": "n8n-nodes-base.salesforceTrigger",
-      "typeVersion": 1,
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
       "position": [
         240,
         300
       ],
       "parameters": {
-        "triggerOn": "opportunityUpdated"
-      },
-      "credentials": {
-        "salesforceOAuth2Api": {
-          "id": "fCB6gfK7EaGpMnZy",
-          "name": "Salesforce Production Read"
-        }
-      }
-    },
-    {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "Salesforce SOQL",
-      "type": "n8n-nodes-base.salesforce",
-      "typeVersion": 1,
-      "position": [
-        460,
-        300
-      ],
-      "parameters": {
-        "resource": "search",
-        "operation": "query",
-        "query": "=SELECT Id, StageName, RecordType.Name, Account.Name, Account.Guesty_Admin_ID__c FROM Opportunity WHERE Id = '{{ $json.Id }}'"
-      },
-      "credentials": {
-        "salesforceOAuth2Api": {
-          "id": "fCB6gfK7EaGpMnZy",
-          "name": "Salesforce Production Read"
-        }
-      }
-    },
-    {
-      "id": "a1f3c2e4-9b7d-4e6f-8a0b-1c2d3e4f5a6b",
-      "name": "Filter Renewals Only",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.3,
-      "position": [
-        680,
-        300
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "caseSensitive": true
-          },
-          "combinator": "and",
-          "conditions": [
+        "rule": {
+          "interval": [
             {
-              "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
-              "leftValue": "={{ $json.RecordType.Name }}",
-              "rightValue": "Renewal",
-              "operator": {
-                "type": "string",
-                "operation": "equals"
-              }
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
             }
           ]
         }
       }
     },
     {
-      "id": "b2e4d6f8-0a1c-4b3d-9e5f-7a8b9c0d1e2f",
-      "name": "BigQuery Churn Data",
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Query Aging Tickets",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        900,
+        480,
         300
       ],
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "=SELECT c.account_id, c.account_name, c.churn_reason, m.last_month_paid_listings AS max_paid_listings FROM `guesty-data.csm.csm_churn_report` c LEFT JOIN `guesty-data.csm.mrr_calculator` m ON c.account_id = m.account_id WHERE c.account_id = '{{ $('Filter Renewals Only').item.json.Account.Guesty_Admin_ID__c }}' LIMIT 1"
+        "sqlQuery": "SELECT\n  account_name,\n  COUNT(ticket_id)                          AS open_ticket_count,\n  MIN(DATE(created_at))                     AS oldest_ticket_date,\n  COUNTIF(status = 'open')                  AS open_count,\n  COUNTIF(status = 'pending')               AS pending_count\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE status IN ('open', 'pending')\n  AND created_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)\n  AND account_name IS NOT NULL\nGROUP BY account_name\nORDER BY open_ticket_count DESC",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
-          "id": "h7fJ82YhtOnUL58u",
-          "name": "Google BigQuery - N8N Service Account"
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read"
         }
       }
     },
     {
-      "id": "d4f6a8c0-2b3e-4d5f-a7b9-8c0d1e2f3a4b",
-      "name": "Slack Renewal Alert",
+      "id": "3d594a5e-1b2f-4c8e-9f1a-6b7c8d9e0f1a",
+      "name": "Format Slack Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = $input.all();\nconst today = new Date().toISOString().slice(0, 10);\n\nif (rows.length === 0) {\n  return [{\n    json: {\n      message: ':white_check_mark: *Daily Ticket Aging Report* -- ' + today + '\\nNo open or pending tickets older than 7 days. All clear!'\n    }\n  }];\n}\n\nconst lines = rows.map(item => {\n  const d = item.json;\n  return ':red_circle: *' + d.account_name + '* -- ' + d.open_ticket_count + ' ticket(s) (open: ' + d.open_count + ', pending: ' + d.pending_count + ') | Oldest: ' + d.oldest_ticket_date;\n});\n\nconst header = ':rotating_light: *Daily Ticket Aging Report* -- ' + today + '\\n_Tickets open or pending, created more than 7 days ago_\\n';\nconst footer = '\\n_Total accounts affected: ' + rows.length + '_';\n\nreturn [{\n  json: {\n    message: header + '\\n' + lines.join('\\n') + footer\n  }\n}];"
+      }
+    },
+    {
+      "id": "9a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      "name": "Post to Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1120,
+        960,
         300
       ],
       "parameters": {
@@ -107,9 +73,10 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cs-renewals"
+          "value": "#cs-ticket-aging"
         },
-        "text": "=*Renewal Opportunity Updated*\n\n*Account:* {{ $('Salesforce SOQL').item.json.Account.Name }}\n*Stage:* {{ $('Salesforce SOQL').item.json.StageName }}\n*Guesty Admin ID:* {{ $('Salesforce SOQL').item.json.Account.Guesty_Admin_ID__c }}\n\n*Churn Reason:* {{ $json.churn_reason ?? 'N/A' }}\n*Max Paid Listings:* {{ $json.max_paid_listings ?? 'N/A' }}"
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
       },
       "credentials": {
         "slackApi": {
@@ -124,44 +91,33 @@
     }
   ],
   "connections": {
-    "Salesforce Trigger": {
+    "Daily 9am UTC": {
       "main": [
         [
           {
-            "node": "Salesforce SOQL",
+            "node": "Query Aging Tickets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Salesforce SOQL": {
+    "Query Aging Tickets": {
       "main": [
         [
           {
-            "node": "Filter Renewals Only",
+            "node": "Format Slack Report",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filter Renewals Only": {
+    "Format Slack Report": {
       "main": [
         [
           {
-            "node": "BigQuery Churn Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "BigQuery Churn Data": {
-      "main": [
-        [
-          {
-            "node": "Slack Renewal Alert",
+            "node": "Post to Slack",
             "type": "main",
             "index": 0
           }

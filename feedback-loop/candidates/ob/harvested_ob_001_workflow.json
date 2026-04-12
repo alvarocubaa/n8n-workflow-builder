@@ -1,0 +1,205 @@
+{
+  "name": "OB Escalation Report -- Daily Stale Tickets",
+  "nodes": [
+    {
+      "id": "a3f1c2d4-8b7e-4f9a-b6c5-1d2e3f4a5b6c",
+      "name": "Daily 10am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b7e2d3f5-9c8f-4a0b-c7d6-2e3f4a5b6c7d",
+      "name": "Query Stale OB Tickets",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  account_name,\n  COUNT(ticket_id) AS open_ticket_count,\n  MIN(created_at) AS oldest_ticket_date,\n  MAX(created_at) AS newest_ticket_date\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status = 'open'\n  AND group_name = 'Onboarding'\n  AND created_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\n  AND account_name IS NOT NULL\nGROUP BY account_name\nORDER BY open_ticket_count DESC, oldest_ticket_date ASC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "jTPSwPeDuM4ipl69",
+          "name": "(OB) Service Account - AI Team"
+        }
+      }
+    },
+    {
+      "id": "c8f3e4a6-0d9a-4b1c-d8e7-3f4a5b6c7d8e",
+      "name": "Check Results Exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d9a4b5c7-1e0b-4c2d-e9f8-4a5b6c7d8e9f",
+              "leftValue": "={{ $items().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e0b5c6d8-2f1c-4d3e-f0a9-5b6c7d8e9f0a",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst today = new Date().toISOString().split('T')[0];\nconst totalAccounts = items.length;\nconst totalTickets = items.reduce((sum, item) => sum + Number(item.json.open_ticket_count), 0);\n\nlet lines = [];\nfor (const item of items) {\n  const acct = item.json.account_name || 'Unknown';\n  const count = item.json.open_ticket_count;\n  const oldest = item.json.oldest_ticket_date\n    ? item.json.oldest_ticket_date.split('T')[0]\n    : 'N/A';\n  const newest = item.json.newest_ticket_date\n    ? item.json.newest_ticket_date.split('T')[0]\n    : 'N/A';\n  lines.push('*' + acct + '* -- ' + count + ' ticket(s) | Oldest: ' + oldest + ' | Newest: ' + newest);\n}\n\nconst header = ':rotating_light: *Onboarding Escalation Report -- ' + today + '*\\n'\n  + 'Accounts with open tickets older than 5 days: *' + totalAccounts + '* | Total stale tickets: *' + totalTickets + '*\\n'\n  + '---';\n\nconst body = lines.join('\\n');\nconst message = header + '\\n' + body;\n\nreturn [{ json: { message } }];"
+      }
+    },
+    {
+      "id": "f1c6d7e9-3a2d-4e4f-a1b0-6c7d8e9f0a1b",
+      "name": "Post to #ob-escalations",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#ob-escalations"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "BXeGv4HZaOauuct6",
+          "name": "Slack - AI Team (Kurt)"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "a2d7e8f0-4b3e-4f5a-b2c1-7d8e9f0a1b2c",
+      "name": "No Stale Tickets Today",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#ob-escalations"
+        },
+        "text": ":white_check_mark: *Onboarding Escalation Report* -- No open tickets older than 5 days found today. All clear!",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "BXeGv4HZaOauuct6",
+          "name": "Slack - AI Team (Kurt)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 10am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query Stale OB Tickets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Stale OB Tickets": {
+      "main": [
+        [
+          {
+            "node": "Check Results Exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Results Exist": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Stale Tickets Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to #ob-escalations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

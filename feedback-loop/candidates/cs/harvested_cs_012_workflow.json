@@ -1,0 +1,33 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://guesty3396.zendesk.com/api/v2/users/search.json?query=email:{{ $('Read GSheet').item.json['Requester Email'] }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "zendeskApi",
+        "options": {}
+      },
+      "id": "7289a757-6f3a-4be3-a476-502021655886",
+      "name": "Get Zendesk Org",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1376,
+        -480
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "zendeskApi": {
+          "id": "4zfIc5d8uJMBSFo2",
+          "name": "Zendesk account 5"
+        }
+      }
+    }
+  ],
+  "connections": {},
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

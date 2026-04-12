@@ -1,0 +1,33 @@
+- name: harvested_finance_002
+  description: "Harvested from alvaro.cuba@guesty.com - I need a daily workflow that reconciles payment gateway f..."
+  department: finance
+  prompt: >
+    I need a daily workflow that reconciles payment gateway fees in Zuora. Compare the configured fees in product_catalog against the actually invoiced amounts in invoice_items. Flag any accounts where the configured fee doesn't match what was invoiced. Post a summary alert to Slack with the mismatched accounts. Run daily at 9am UTC.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleBigQuery
+    - aggregate
+    - if
+    - code
+    - slack
+  expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    slackApi: g3NQlNzyjFofD87l
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - bq_projectId
+    - slack_config
+  _metadata:
+    source_conversation: SukR2WiyTpPxq82iFGfA
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "I need a daily workflow that reconciles payment gateway f..."
+    node_count: 7
+    complexity_score: 1
+    harvested_at: 2026-04-01T09:38:06.210Z
+    confidence: high
+    workflow_json_file: harvested_finance_002_workflow.json
