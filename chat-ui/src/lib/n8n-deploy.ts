@@ -5,7 +5,8 @@
  * Created workflows are:
  *   - Tagged "AI Generated" (tag id: 8pUFynxIQ58Bfpba) via separate tags endpoint
  *   - Created inactive (user activates manually)
- *   - Named with [AI by username] prefix for easy identification
+ *   - Named "Workflow Name – @owner_handle" (handle = email prefix). The AI Generated
+ *     tag does the AI-vs-human filtering, so no [AI by ...] prefix is added.
  */
 
 const N8N_API_URL = (process.env.N8N_API_URL ?? 'https://guesty.app.n8n.cloud').replace(/\/$/, '');
@@ -99,11 +100,13 @@ export async function deployWorkflow(
     return { error: 'Invalid workflow JSON — missing connections object' };
   }
 
-  // Ensure name has [AI by user] prefix; strip existing id so n8n creates a new one
-  const username = userEmail ? userEmail.split('@')[0] : 'unknown';
-  const baseName = customName ?? parsed.name ?? 'Untitled Workflow';
-  const aiPrefix = `[AI by ${username}]`;
-  const name = baseName.startsWith('[AI') ? baseName : `${aiPrefix} ${baseName}`;
+  // Ensure name carries an "@owner_handle" suffix; strip existing id so n8n creates a new one.
+  // If the name already includes "@" the AI provided the suffix itself — pass through unchanged.
+  // Strip any legacy "[AI by ...]" prefix the model may still emit.
+  const handle = userEmail ? userEmail.split('@')[0] : 'unknown';
+  const rawBaseName = customName ?? parsed.name ?? 'Untitled Workflow';
+  const baseName = rawBaseName.replace(/^\[AI by [^\]]+\]\s*/, '').trim() || 'Untitled Workflow';
+  const name = baseName.includes('@') ? baseName : `${baseName} – @${handle}`;
 
   const payload: N8nWorkflow = {
     name,
@@ -175,9 +178,10 @@ export async function updateWorkflow(
     return { error: 'Invalid JSON — cannot parse workflow' };
   }
 
-  const updateUsername = userEmail ? userEmail.split('@')[0] : 'unknown';
-  const updateBaseName = parsed.name ?? 'Workflow';
-  const updateName = updateBaseName.startsWith('[AI') ? updateBaseName : `[AI by ${updateUsername}] ${updateBaseName}`;
+  const updateHandle = userEmail ? userEmail.split('@')[0] : 'unknown';
+  const rawUpdateName = parsed.name ?? 'Workflow';
+  const updateBaseName = rawUpdateName.replace(/^\[AI by [^\]]+\]\s*/, '').trim() || 'Workflow';
+  const updateName = updateBaseName.includes('@') ? updateBaseName : `${updateBaseName} – @${updateHandle}`;
 
   const payload: N8nWorkflow = {
     name: updateName,

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import FeedbackButtons from './FeedbackButtons';
+import { getToolLabel } from '@/lib/tool-labels';
 import type { AssistantMode } from '@/lib/types';
 
 export interface Message {
@@ -15,6 +16,8 @@ export interface Message {
   timestamp?: string;
   toolCalls?: string[]; // names of tools called during this response
   isStreaming?: boolean;
+  startedAt?: number;     // Date.now() when assistant message began streaming
+  lastEventAt?: number;   // Date.now() of most recent text_chunk or tool_call
 }
 
 interface MessageBubbleProps {
@@ -23,6 +26,7 @@ interface MessageBubbleProps {
   departmentId?: string;
   messageIndex?: number;
   mode?: AssistantMode;
+  onCancel?: () => void;
 }
 
 function DownloadButton({ json, filename }: { json: string; filename?: string }) {
@@ -149,9 +153,9 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
   );
 }
 
-function TypingIndicator() {
+function TypingDots() {
   return (
-    <div className="flex items-center gap-1 py-1">
+    <div className="flex items-center gap-1">
       <span className="h-2 w-2 rounded-full bg-guesty-200 animate-bounce" style={{ animationDelay: '0ms' }} />
       <span className="h-2 w-2 rounded-full bg-guesty-200 animate-bounce" style={{ animationDelay: '150ms' }} />
       <span className="h-2 w-2 rounded-full bg-guesty-200 animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -159,7 +163,53 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder' }: MessageBubbleProps) {
+function LiveActivity({
+  startedAt,
+  lastEventAt,
+  lastToolName,
+  onCancel,
+}: {
+  startedAt?: number;
+  lastEventAt?: number;
+  lastToolName?: string;
+  onCancel?: () => void;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const elapsed = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+  const inactivity = lastEventAt ? Math.max(0, Math.floor((now - lastEventAt) / 1000)) : 0;
+
+  // Show the active tool label if a tool call landed in the last 20s, otherwise "Thinking".
+  const label = lastToolName && inactivity < 20 ? getToolLabel(lastToolName) : 'Thinking';
+  const showInactivityWarning = inactivity >= 60;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+      <TypingDots />
+      <span>{label} · {elapsed}s</span>
+      {showInactivityWarning && (
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 ring-1 ring-amber-200">
+          Still working ({inactivity}s since last update)
+        </span>
+      )}
+      {showInactivityWarning && onCancel && (
+        <button
+          onClick={onCancel}
+          className="rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition"
+        >
+          Cancel
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -182,16 +232,17 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
       </div>
 
       <div className="w-full max-w-[88%] rounded-2xl rounded-tl-sm border border-warm-100 bg-white px-4 py-3 shadow-sm">
-        {/* Tool call badges */}
-        {message.toolCalls && message.toolCalls.length > 0 && (
+        {/* Tool call badges — only show once streaming is done, as a summary */}
+        {!message.isStreaming && message.toolCalls && message.toolCalls.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-1">
             {message.toolCalls.map((name, i) => (
               <span
                 key={i}
                 className="inline-flex items-center gap-1 rounded-full bg-guesty-100/40 px-2 py-0.5 text-xs font-medium text-guesty-300 ring-1 ring-guesty-200"
+                title={name}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-guesty-300" />
-                {name}
+                {getToolLabel(name)}
               </span>
             ))}
           </div>
@@ -276,8 +327,15 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
           </ReactMarkdown>
         </div>
 
-        {/* Streaming indicator — three bouncing dots */}
-        {message.isStreaming && !message.content && <TypingIndicator />}
+        {/* Live activity indicator — persists throughout streaming, not just pre-first-token */}
+        {message.isStreaming && (
+          <LiveActivity
+            startedAt={message.startedAt}
+            lastEventAt={message.lastEventAt}
+            lastToolName={message.toolCalls?.[message.toolCalls.length - 1]}
+            onCancel={onCancel}
+          />
+        )}
 
         {/* Feedback buttons (shown after streaming completes) */}
         {!message.isStreaming && (
@@ -292,9 +350,11 @@ const MessageBubble = memo(MessageBubbleInner, (prev, next) => {
   if (prev.message.content !== next.message.content) return false;
   if (prev.message.isStreaming !== next.message.isStreaming) return false;
   if (prev.message.toolCalls?.length !== next.message.toolCalls?.length) return false;
+  if (prev.message.lastEventAt !== next.message.lastEventAt) return false;
   if (prev.conversationId !== next.conversationId) return false;
   if (prev.departmentId !== next.departmentId) return false;
   if (prev.mode !== next.mode) return false;
+  if (prev.onCancel !== next.onCancel) return false;
   return true;
 });
 

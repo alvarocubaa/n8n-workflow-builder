@@ -302,6 +302,94 @@ Avoid Code nodes — Finance users are non-technical.
 For cross-source fee/invoice analysis, BigQuery is preferred (zuora_analytics + guesty_analytics joins).
 </department_rules>`,
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRODUCT — n8n project: cC2MXxyCdYtzY46e (sandbox)
+  // PM-facing. No dedicated sandbox data envs yet; credentials point at prod read-paths.
+  // ═══════════════════════════════════════════════════════════════════════════
+  product: {
+    id: 'product',
+    displayName: 'Product',
+    description: 'Product management workflows: roadmap reporting, release notes, customer feedback, usage analytics',
+    specs: ['salesforce', 'hubspot', 'jira', 'admin_data', 'siit', 'gus'],
+    n8nProjectId: 'cC2MXxyCdYtzY46e',
+    credentials: [
+      // ── Production (no dedicated sandbox envs yet) ──
+      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'HubSpot', name: 'HubSpot Developer', type: 'hubspotDeveloperApi', id: '1AM3RFd0UdBtfZR6', env: 'production' },
+      { service: 'Jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
+      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+    ],
+    promptRules: `<department_rules>
+Avoid Code nodes — Product users are PMs and non-technical.
+Use built-in n8n nodes (If, Switch, Merge, Aggregate, Set, Filter, Sort) instead.
+Prefer native Salesforce, HubSpot, and Jira nodes over BigQuery for direct CRM/issue operations.
+For product analytics (accounts, plans, features, listings, reservations), use BigQuery via the admin_data / siit / gus specs.
+For BigQuery queries, use the shared credential (id: h7fJ82YhtOnUL58u, name: "Google BigQuery - N8N Service Account").
+</department_rules>`,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PEOPLE — n8n project: GG87KkXICRSZxeQu (sandbox)
+  // HR / People Ops. HiBob is system of record. PII-sensitive — see pii_rule.
+  // ═══════════════════════════════════════════════════════════════════════════
+  people: {
+    id: 'people',
+    displayName: 'People',
+    description: 'HR operations: onboarding, offboarding, roster reporting, employee communications',
+    specs: ['hibob', 'admin_data'],
+    n8nProjectId: 'GG87KkXICRSZxeQu',
+    credentials: [
+      // ── Production (no dedicated sandbox envs yet) ──
+      { service: 'HiBob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
+      { service: 'Docebo', name: 'Docebo Bearer Access Token', type: 'httpHeaderAuth', id: 'FoTHzLs4zV4PF4Qw', env: 'production' },
+      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+    ],
+    promptRules: `<department_rules>
+Avoid Code nodes — People users are HR business partners and non-technical.
+Use built-in n8n nodes (If, Switch, Merge, Aggregate, Set, Filter, Sort) instead.
+For HiBob operations, use the HTTP Request node with the httpBasicAuth credential against https://api.hibob.com/v1/* (there is no native HiBob node).
+For cross-reference between employees and Guesty accounts, use BigQuery via the admin_data spec.
+
+<pii_rule priority="high">
+HiBob data contains employee PII: compensation, home address, personal contact info, performance ratings, termination dates.
+- Never post individual-level PII (e.g. name + salary, name + review, name + termination) to public Slack channels.
+- When the destination is a shared channel, aggregate the output (counts, averages, distributions) before posting.
+- Use DMs or HR-only private channels when individual-level detail is required.
+- If the user requests individual PII in a channel whose name does not clearly indicate HR-only access, pause and ask: "This output contains employee PII. Please confirm the target channel is HR-only before I build this."
+</pii_rule>
+</department_rules>`,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INFORMATION SYSTEMS (Team IS) — n8n project: 3wBiKLqcGT5en7HH (sandbox)
+  // IT/systems automation. Audience is technical; Code nodes are allowed.
+  // ═══════════════════════════════════════════════════════════════════════════
+  is: {
+    id: 'is',
+    displayName: 'Information Systems',
+    description: 'IT automation: access requests, service desk ticket flows, account provisioning, internal tooling',
+    specs: ['jira', 'admin_data'],
+    n8nProjectId: '3wBiKLqcGT5en7HH',
+    credentials: [
+      // ── Production (no dedicated sandbox envs yet) ──
+      { service: 'Jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
+      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+      { service: 'n8n (self)', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
+    ],
+    promptRules: `<department_rules>
+Team IS users are technical — Code nodes, JavaScript/Python, and raw HTTP requests are acceptable.
+The current Jira spec covers software-project issues, not Service Desk tickets. For Jira Service Desk (access requests, IT support tickets), use the generic HTTP Request node against the Service Desk REST API and confirm endpoint + payload with the user before building.
+For employee/account/systems cross-reference, use BigQuery via the admin_data spec.
+For BigQuery queries, use the shared credential (id: h7fJ82YhtOnUL58u, name: "Google BigQuery - N8N Service Account").
+</department_rules>`,
+  },
 };
 
 export const DEFAULT_DEPARTMENT = 'cx';

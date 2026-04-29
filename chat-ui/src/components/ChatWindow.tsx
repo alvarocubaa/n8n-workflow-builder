@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
@@ -8,17 +8,21 @@ import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
 import type { AssistantMode } from '@/lib/types';
 
+const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
+
 /** Memoized message list — prevents re-rendering all messages when input state changes. */
 const MessageList = memo(function MessageList({
   messages,
   conversationId,
   departmentId,
   mode,
+  onCancel,
 }: {
   messages: Message[];
   conversationId?: string;
   departmentId: string;
   mode: AssistantMode;
+  onCancel: () => void;
 }) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
@@ -30,6 +34,7 @@ const MessageList = memo(function MessageList({
           departmentId={departmentId}
           messageIndex={i}
           mode={mode}
+          onCancel={msg.isStreaming ? onCancel : undefined}
         />
       ))}
     </div>
@@ -56,47 +61,85 @@ export default function ChatWindow({
   const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? 'cx');
   const [mode, setMode] = useState<AssistantMode>(initialMode ?? 'builder');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
+  const [retryable, setRetryable] = useState(false);
   const departmentLocked = useRef(!!conversationId || initialMessages.length > 0);
   const modeLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConvId = useRef<string | undefined>(conversationId);
+  const abortRef = useRef<AbortController | null>(null);
+  const lastEventAtRef = useRef<number>(0);
+  const lastPromptRef = useRef<{ text: string; file: AttachedFile | null } | null>(null);
 
   // Scroll to bottom whenever messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  async function sendMessage() {
-    const text = input.trim();
-    if (!text || streaming) return;
+  // Abort in-flight request when the component unmounts
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
-    // Capture file before clearing state
-    const fileToSend = attachedFile;
+  const cancelStream = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
-    setInput('');
-    setAttachedFile(null);
+  async function runRequest(text: string, fileToSend: AttachedFile | null, isRetry: boolean) {
+    setRetryable(false);
     setStreaming(true);
 
-    // Append user message immediately (show original text, not file content)
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: fileToSend ? `[${fileToSend.name}] ${text}` : text };
-    setMessages(prev => [...prev, userMsg]);
-
-    // Prepare a placeholder for the assistant response
+    const start = Date.now();
+    lastEventAtRef.current = start;
     const assistantMsg: Message = {
       id: crypto.randomUUID(),
       role: 'model',
       content: '',
       toolCalls: [],
       isStreaming: true,
+      startedAt: start,
+      lastEventAt: start,
     };
-    setMessages(prev => [...prev, assistantMsg]);
+
+    if (isRetry) {
+      // Replace the last assistant message (the errored one) with a fresh placeholder.
+      setMessages(prev => {
+        const updated = [...prev];
+        const lastIdx = updated.length - 1;
+        if (lastIdx >= 0 && updated[lastIdx].role === 'model') {
+          updated[lastIdx] = assistantMsg;
+        } else {
+          updated.push(assistantMsg);
+        }
+        return updated;
+      });
+    } else {
+      const userMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: fileToSend ? `[${fileToSend.name}] ${text}` : text,
+      };
+      setMessages(prev => [...prev, userMsg, assistantMsg]);
+    }
 
     // Lock department and mode after first message
     departmentLocked.current = true;
     modeLocked.current = true;
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let stuckTimeout = false;
+
+    // Inactivity watchdog — abort after STUCK_TIMEOUT_MS of silence
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastEventAtRef.current > STUCK_TIMEOUT_MS) {
+        stuckTimeout = true;
+        controller.abort();
+      }
+    }, 5000);
+
+    const touch = () => { lastEventAtRef.current = Date.now(); };
+
     try {
-      // Build request body — file sent as structured object, not inlined in message
       const requestBody: Record<string, unknown> = {
         message: text,
         conversationId: currentConvId.current,
@@ -116,6 +159,7 @@ export default function ChatWindow({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
 
       if (!res.ok || !res.body) {
@@ -155,6 +199,8 @@ export default function ChatWindow({
           }
 
           if (event.type === 'text_chunk' && event.text) {
+            touch();
+            const now = Date.now();
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -162,11 +208,14 @@ export default function ChatWindow({
                 updated[updated.length - 1] = {
                   ...last,
                   content: last.content + event.text!,
+                  lastEventAt: now,
                 };
               }
               return updated;
             });
           } else if (event.type === 'tool_call' && event.name) {
+            touch();
+            const now = Date.now();
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -174,12 +223,12 @@ export default function ChatWindow({
                 updated[updated.length - 1] = {
                   ...last,
                   toolCalls: [...(last.toolCalls ?? []), event.name!],
+                  lastEventAt: now,
                 };
               }
               return updated;
             });
           } else if (event.type === 'done') {
-            // Mark streaming complete and update URL if new conversation
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
@@ -191,8 +240,6 @@ export default function ChatWindow({
 
             if (event.conversationId && !currentConvId.current) {
               currentConvId.current = event.conversationId;
-              // Only update URL for real Firestore IDs — local-* IDs have no
-              // persisted page to navigate to, so skip the redirect.
               if (!event.conversationId.startsWith('local-')) {
                 router.replace(`/chat/${event.conversationId}`);
               }
@@ -210,25 +257,52 @@ export default function ChatWindow({
               }
               return updated;
             });
+            setRetryable(true);
           }
         }
       }
     } catch (err) {
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      const friendly = stuckTimeout
+        ? 'No response for 3 minutes — connection likely dropped. Try again or refresh.'
+        : isAbort
+          ? 'Request cancelled.'
+          : `Failed to get response: ${String(err)}`;
       setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last?.role === 'model') {
           updated[updated.length - 1] = {
             ...last,
-            content: `Failed to get response: ${String(err)}`,
+            content: last.content ? `${last.content}\n\n_${friendly}_` : friendly,
             isStreaming: false,
           };
         }
         return updated;
       });
+      setRetryable(true);
     } finally {
+      clearInterval(watchdog);
+      if (abortRef.current === controller) abortRef.current = null;
       setStreaming(false);
     }
+  }
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text || streaming) return;
+
+    const fileToSend = attachedFile;
+    setInput('');
+    setAttachedFile(null);
+    lastPromptRef.current = { text, file: fileToSend };
+    await runRequest(text, fileToSend, false);
+  }
+
+  async function retryLast() {
+    if (streaming || !lastPromptRef.current) return;
+    const { text, file } = lastPromptRef.current;
+    await runRequest(text, file, true);
   }
 
   return (
@@ -307,11 +381,27 @@ export default function ChatWindow({
               conversationId={currentConvId.current}
               departmentId={departmentId}
               mode={mode}
+              onCancel={cancelStream}
             />
             <div ref={bottomRef} />
           </>
         )}
       </div>
+
+      {/* Retry affordance — shown when the last turn failed/cancelled and there's a prompt to retry */}
+      {retryable && !streaming && lastPromptRef.current && (
+        <div className="mx-auto max-w-3xl px-4 pb-2">
+          <button
+            onClick={retryLast}
+            className="inline-flex items-center gap-1.5 rounded-full border border-guesty-200 bg-white px-3 py-1 text-xs font-medium text-guesty-400 hover:bg-guesty-100/40 transition"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M5 9a7 7 0 0111.9-4.1M19 15a7 7 0 01-11.9 4.1" />
+            </svg>
+            Retry last message
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput

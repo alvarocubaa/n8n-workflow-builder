@@ -332,21 +332,40 @@ export async function* streamWorkflowChat(
   const turnToolCalls: ToolCallRecord[] = [];
 
   while (true) {
-    const stream = await client.messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 65536,
-      temperature: 0.1,
-      system: [
-        {
-          type: 'text',
-          text: getSystemPrompt(mode),
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages,
-      tools: allTools,
-      stream: true,
-    });
+    // Retry with exponential backoff on transient errors (429, 503, 529)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let stream: any;
+    const MAX_RETRIES = 3;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        stream = await client.messages.create({
+          model: CLAUDE_MODEL,
+          max_tokens: 65536,
+          temperature: 0.1,
+          system: [
+            {
+              type: 'text',
+              text: getSystemPrompt(mode),
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+          messages,
+          tools: allTools,
+          stream: true,
+        });
+        break; // success
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        const isRetryable = status === 429 || status === 503 || status === 529;
+        if (isRetryable && attempt < MAX_RETRIES) {
+          const delay = Math.min(1000 * 2 ** attempt, 8000);
+          console.warn(`Vertex AI ${status}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw err;
+      }
+    }
 
     const toolUses: Array<{ id: string; name: string; inputJson: string }> = [];
     let currentToolIdx = -1;

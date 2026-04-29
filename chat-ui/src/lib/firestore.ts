@@ -116,15 +116,17 @@ export async function appendMessages(
   userEmail: string,
   conversationId: string,
   messages: DisplayMessage[]
-): Promise<void> {
+): Promise<{ messageLimitReached: boolean }> {
   // Local IDs: persist in-memory so follow-up turns have history
   if (conversationId.startsWith('local-')) {
     const conv = localStore.get(conversationId);
     if (conv) {
       conv.messages.push(...messages);
-      if (conv.messages.length > 100) conv.messages = conv.messages.slice(-100);
+      const hit = conv.messages.length > 100;
+      if (hit) conv.messages = conv.messages.slice(-100);
+      return { messageLimitReached: hit };
     }
-    return;
+    return { messageLimitReached: false };
   }
 
   try {
@@ -136,7 +138,8 @@ export async function appendMessages(
 
     const combined = [...existing, ...messages];
     // Keep at most 100 messages to stay well within the 1MB Firestore doc limit
-    const trimmed = combined.length > 100 ? combined.slice(-100) : combined;
+    const messageLimitReached = combined.length > 100;
+    const trimmed = messageLimitReached ? combined.slice(-100) : combined;
 
     await ref.set(
       {
@@ -145,8 +148,9 @@ export async function appendMessages(
       },
       { merge: true }
     );
+    return { messageLimitReached };
   } catch (err) {
-    if (isFirestoreUnavailable(err)) return; // silently skip
+    if (isFirestoreUnavailable(err)) return { messageLimitReached: false };
     throw err;
   }
 }

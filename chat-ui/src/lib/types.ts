@@ -36,6 +36,7 @@ export interface AnalyticsEvent {
   cacheReadTokens?: number;   // tokens read from prompt cache
   cacheWriteTokens?: number;  // tokens written to prompt cache
   truncated?: boolean;        // true if any API call hit max_tokens
+  contextWindowed?: boolean;  // true if conversation history was trimmed for context limits
   mode?: AssistantMode;       // 'builder' | 'data'
   createdAt: string;          // ISO 8601
 }

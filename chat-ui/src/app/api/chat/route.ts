@@ -161,7 +161,10 @@ export async function POST(req: Request): Promise<Response> {
             };
 
             try {
-              await appendMessages(user.email, convId, [userMsg, modelMsg]);
+              const { messageLimitReached } = await appendMessages(user.email, convId, [userMsg, modelMsg]);
+              if (messageLimitReached) {
+                enqueue({ type: 'text_chunk', text: '\n\n> **Note:** This conversation has reached the 100-message limit. Older messages have been trimmed. Consider starting a new conversation for best results.' });
+              }
             } catch (err) {
               console.error('Failed to persist messages:', err);
             }
@@ -185,6 +188,7 @@ export async function POST(req: Request): Promise<Response> {
               cacheReadTokens: usage?.cacheReadTokens,
               cacheWriteTokens: usage?.cacheWriteTokens,
               truncated: event.truncated,
+              contextWindowed: windowed,
               createdAt: new Date().toISOString(),
             };
             logAnalyticsEvent(analyticsEvent).catch(console.error);

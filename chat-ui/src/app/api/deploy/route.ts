@@ -50,6 +50,23 @@ export async function POST(req: Request): Promise<Response> {
     : await deployWorkflow(workflowJson, name, user.email, projectId);
 
   if ('error' in result) {
+    // Log deploy failure for analytics visibility (fire-and-forget)
+    const failMeta = extractWorkflowMeta(workflowJson);
+    logDeployEvent({
+      userEmail: user.email,
+      departmentId: body.departmentId ?? 'unknown',
+      conversationId: body.conversationId ?? '',
+      workflowId: '',
+      workflowUrl: '',
+      workflowName: `[FAILED] ${result.detail ?? result.error}`,
+      nodeCount: failMeta.nodeCount,
+      nodeTypes: failMeta.nodeTypes,
+      hasSqlQuery: failMeta.hasSqlQuery,
+      complexityScore: 0,
+      estimatedHoursSaved: 0,
+      estimatedValueUsd: 0,
+      createdAt: new Date().toISOString(),
+    }).catch(console.error);
     return Response.json(result, { status: 422 });
   }
 

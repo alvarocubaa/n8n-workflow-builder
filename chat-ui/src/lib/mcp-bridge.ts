@@ -20,11 +20,17 @@ async function fetchIdentityToken(audience: string): Promise<string> {
 }
 
 // ─── Session management ───────────────────────────────────────────────────────
-// The n8n-mcp HTTP server uses MCP Streamable HTTP transport.
+// The n8n-mcp HTTP server uses MCP Streamable HTTP transport (single-session).
 // After initialize, the server returns a `mcp-session-id` header that must be
 // sent on every subsequent request.
+//
+// Because the MCP server is single-session, all concurrent requests in this
+// Cloud Run instance share one session. We use a mutex (initPromise) to prevent
+// concurrent initialization races — only the first caller initializes, others
+// await the same promise.
 
 let sessionId: string | null = null;
+let initPromise: Promise<void> | null = null;
 
 async function mcpCall(method: string, params?: unknown): Promise<unknown> {
   const headers: Record<string, string> = {
@@ -33,14 +39,11 @@ async function mcpCall(method: string, params?: unknown): Promise<unknown> {
   };
 
   if (IS_CLOUD_RUN) {
-    // Cloud Run SA-to-SA: identity token satisfies IAM run.invoker at the
-    // network layer; MCP_AUTH satisfies n8n-mcp's app-level auth check.
     const audience = process.env.MCP_SERVICE_URL ?? 'http://localhost:3001';
     const idToken = await fetchIdentityToken(audience);
     headers['Authorization'] = `Bearer ${idToken}`;
     headers['X-MCP-Auth'] = MCP_AUTH;
   } else {
-    // Local dev: single bearer token covers app-level auth (no Cloud Run IAM).
     headers['Authorization'] = `Bearer ${MCP_AUTH}`;
   }
 
@@ -57,16 +60,17 @@ async function mcpCall(method: string, params?: unknown): Promise<unknown> {
   if (newSessionId) sessionId = newSessionId;
 
   if (!res.ok) {
-    // Session expired — reset and let the caller retry via getRawMcpTools()
+    // Session expired — reset so next call re-initializes
     if (res.status === 400 && sessionId) {
       sessionId = null;
+      cachedRawTools = null;
+      initPromise = null;
     }
     throw new Error(`MCP HTTP error ${res.status}: ${await res.text()}`);
   }
 
   // The n8n-mcp server returns SSE-formatted responses (event: message / data: {...})
   // when the client sends Accept: application/json, text/event-stream.
-  // Extract the JSON payload from the SSE data line.
   const text = await res.text();
   const dataLine = text.split('\n').find(l => l.startsWith('data: '));
   const jsonText = dataLine ? dataLine.slice(6) : text;
@@ -75,13 +79,15 @@ async function mcpCall(method: string, params?: unknown): Promise<unknown> {
   return json.result;
 }
 
-async function initSession(): Promise<void> {
+async function doInit(): Promise<void> {
   sessionId = null;
   await mcpCall('initialize', {
     protocolVersion: '2024-11-05',
     capabilities: {},
     clientInfo: { name: 'n8n-chat-ui', version: '1.0.0' },
   });
+  const result = (await mcpCall('tools/list')) as { tools: RawMcpTool[] };
+  cachedRawTools = (result.tools ?? []).filter(t => ALLOWED_TOOLS.has(t.name));
 }
 
 // ─── Raw MCP tool type ──────────────────────────────────────────────────────
@@ -102,9 +108,6 @@ export type RawMcpTool = {
 };
 
 // ─── Tool allowlist ───────────────────────────────────────────────────────────
-// Only expose read-only research tools. Write/execute tools
-// (n8n_create_workflow, n8n_update_*, n8n_delete_*, n8n_test_workflow, etc.)
-// are excluded so the model can never modify the live n8n instance.
 const ALLOWED_TOOLS = new Set([
   'tools_documentation',
   'search_nodes',
@@ -122,14 +125,21 @@ const ALLOWED_TOOLS = new Set([
 
 let cachedRawTools: RawMcpTool[] | null = null;
 
-/** Returns raw MCP tools — provider-agnostic. */
+/** Returns raw MCP tools. Concurrent callers share one init to avoid races. */
 export async function getRawMcpTools(): Promise<RawMcpTool[]> {
   if (cachedRawTools) return cachedRawTools;
 
-  await initSession();
-  const result = (await mcpCall('tools/list')) as { tools: RawMcpTool[] };
-  cachedRawTools = (result.tools ?? []).filter(t => ALLOWED_TOOLS.has(t.name));
-  return cachedRawTools;
+  // Mutex: only the first caller triggers init; concurrent callers await the same promise
+  if (!initPromise) {
+    initPromise = doInit().catch(err => {
+      // Reset on failure so the next call retries
+      initPromise = null;
+      cachedRawTools = null;
+      throw err;
+    });
+  }
+  await initPromise;
+  return cachedRawTools!;
 }
 
 export async function callMcpTool(
