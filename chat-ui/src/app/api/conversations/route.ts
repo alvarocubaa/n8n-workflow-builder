@@ -1,11 +1,11 @@
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { listConversations } from '@/lib/firestore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request): Promise<Response> {
-  const user = getUserFromHeaders(req.headers);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }

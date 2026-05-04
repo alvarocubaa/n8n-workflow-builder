@@ -1,19 +1,21 @@
-import { headers } from 'next/headers';
 import Link from 'next/link';
+import AuthGate from '@/components/AuthGate';
 import { isAdmin } from '@/lib/admin';
+import { getUserFromServerContext } from '@/lib/auth-server';
 
 export default async function AnalyticsLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const hdrs = await headers();
-  const rawEmail = hdrs.get('x-goog-authenticated-user-email') ?? '';
-  const email = rawEmail
-    ? rawEmail.replace('accounts.google.com:', '')
-    : (process.env.MOCK_USER_EMAIL ?? '');
+  const user = await getUserFromServerContext();
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID ?? '';
 
-  if (!isAdmin(email)) {
+  if (!user) {
+    return <AuthGate clientId={clientId}>{null}</AuthGate>;
+  }
+
+  if (!isAdmin(user.email)) {
     return (
       <div className="flex h-screen flex-col bg-warm-50">
         <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-warm-100 bg-white px-4 shadow-sm">

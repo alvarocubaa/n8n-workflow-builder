@@ -1,8 +1,7 @@
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
 import ChatWindow from '@/components/ChatWindow';
 import { getConversation } from '@/lib/firestore';
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromServerContext } from '@/lib/auth-server';
 import type { Message } from '@/components/MessageBubble';
 
 interface Props {
@@ -12,8 +11,9 @@ interface Props {
 export default async function ExistingChatPage({ params }: Props) {
   const { id } = await params;
 
-  const hdrs = await headers();
-  const user = getUserFromHeaders(new Headers(Object.fromEntries(hdrs.entries())));
+  const user = await getUserFromServerContext();
+  // Layout-level AuthGate already redirects unauthenticated users; this guard
+  // is defense-in-depth for direct GET to /chat/[id] before the layout renders.
   if (!user) notFound();
 
   const conversation = await getConversation(user.email, id);

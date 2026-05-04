@@ -1,4 +1,4 @@
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { getConversation } from '@/lib/firestore';
 
 export const runtime = 'nodejs';
@@ -8,7 +8,7 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Response> {
-  const user = getUserFromHeaders(req.headers);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }

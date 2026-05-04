@@ -1,9 +1,10 @@
-import { headers } from 'next/headers';
 import Image from 'next/image';
 import Link from 'next/link';
 import ConversationList from '@/components/ConversationList';
 import SidebarToggle from '@/components/SidebarToggle';
+import AuthGate from '@/components/AuthGate';
 import { isAdmin } from '@/lib/admin';
+import { getUserFromServerContext } from '@/lib/auth-server';
 
 /**
  * Shared layout for /chat and /chat/[id].
@@ -14,13 +15,19 @@ export default async function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Read user from IAP headers server-side for display
-  const hdrs = await headers();
-  const rawEmail = hdrs.get('x-goog-authenticated-user-email') ?? '';
-  const email = rawEmail
-    ? rawEmail.replace('accounts.google.com:', '')
-    : (process.env.MOCK_USER_EMAIL ?? 'dev@example.com');
-  const displayName = email.split('@')[0];
+  // Resolve user via cookie (post-IAP) → IAP header (during dual-auth) → mock (dev).
+  const user = await getUserFromServerContext();
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID ?? '';
+
+  // Unauthenticated branch — render the GIS sign-in shell. Once the user signs
+  // in, /api/auth/exchange sets the cookie and reloads — server then re-renders
+  // this layout with `user` populated and we hit the authenticated branch below.
+  if (!user) {
+    return <AuthGate clientId={clientId}>{null}</AuthGate>;
+  }
+
+  const email = user.email;
+  const displayName = user.displayName;
 
   return (
     <div className="flex h-screen flex-col bg-warm-50">

@@ -1,19 +1,14 @@
-import { headers } from 'next/headers';
 import { isAdmin } from '@/lib/admin';
 import { getAnalyticsEvents, getDeployEvents, getFeedbackEntries } from '@/lib/firestore';
+import { getUserFromServerContext } from '@/lib/auth-server';
 import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export default async function AnalyticsPage() {
-  const hdrs = await headers();
-  const rawEmail = hdrs.get('x-goog-authenticated-user-email') ?? '';
-  const email = rawEmail
-    ? rawEmail.replace('accounts.google.com:', '')
-    : (process.env.MOCK_USER_EMAIL ?? '');
-
-  if (!isAdmin(email)) return null; // layout already shows access denied
+  const user = await getUserFromServerContext();
+  if (!user || !isAdmin(user.email)) return null; // layout already handles auth/admin gate
 
   // Default: last 30 days
   const to = new Date();

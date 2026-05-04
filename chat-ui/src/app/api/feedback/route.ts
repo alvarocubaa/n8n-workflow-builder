@@ -1,4 +1,4 @@
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { logFeedback } from '@/lib/firestore';
 
 export const runtime = 'nodejs';
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * Body: { conversationId: string, messageIndex: number, rating: 'up'|'down', comment?: string }
  */
 export async function POST(req: Request): Promise<Response> {
-  const user = getUserFromHeaders(req.headers);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }

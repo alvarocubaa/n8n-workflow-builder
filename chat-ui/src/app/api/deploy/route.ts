@@ -1,4 +1,4 @@
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { deployWorkflow, updateWorkflow } from '@/lib/n8n-deploy';
 import { logDeployEvent, getConversation } from '@/lib/firestore';
 import { computeComplexity, extractWorkflowMeta } from '@/lib/complexity';
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
  * Returns: { workflowId, workflowUrl, workflowName } or { error, detail }
  */
 export async function POST(req: Request): Promise<Response> {
-  const user = getUserFromHeaders(req.headers);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }

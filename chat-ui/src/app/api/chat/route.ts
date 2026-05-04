@@ -1,4 +1,4 @@
-import { getUserFromHeaders } from '@/lib/auth';
+import { getUserFromRequest } from '@/lib/auth';
 import { streamWorkflowChat, manageContext } from '@/lib/claude';
 import { getRawMcpTools, type RawMcpTool } from '@/lib/mcp-bridge';
 import {
@@ -163,7 +163,7 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const user = getUserFromHeaders(req.headers);
+  const user = await getUserFromRequest(req);
   if (!user) {
     return new Response('Unauthorized', { status: 401 });
   }

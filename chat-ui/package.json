@@ -13,6 +13,7 @@
     "@anthropic-ai/vertex-sdk": "^0.14.4",
     "@google-cloud/bigquery": "^8.3.0",
     "firebase-admin": "^13.0.0",
+    "google-auth-library": "^9.15.1",
     "next": "^16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
