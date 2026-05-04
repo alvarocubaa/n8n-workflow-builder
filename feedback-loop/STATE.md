@@ -1,32 +1,47 @@
 # Feedback Loop State
 
-*Last updated: 2026-04-10 (Session K-3 — v0.23 deployed)*
+*Last updated: 2026-05-04 (Session 2 — Direction-2 ship + Session 2 backlog)*
+
+> Session 2 did NOT touch the feedback loop directly. Captured for cross-session continuity.
+> Direction-2 Hub × n8n-builder integration SHIPPED to production: chat-ui v0.27 (revision 00033-jcn) + v0.28 (revision 00034-wjp) deployed; Hub PRs #18 + #19 (stacked) open against kurtpabilona-code/AI-Innovation-Hub-Vertex; Supabase migration `add_extracted_fields.sql` applied LIVE; Edge Function `n8n-conversation-callback` v2 redeployed with defense-in-depth re-validation.
+> Sync-hub fix (workflow `MJhuTMoNzvfC3V3G`) DIAGNOSED only — fix is ~12 lines in n8n-ops/src/routes/sync-hub.ts; deferred to a focused n8n-ops PR. Doc at `docs/sync-hub-coverage-fix.md`.
+> The 51 Apr 15 candidates are still pending review. Harvest is ~20 days overdue (weekly cadence). Schedule a feedback-loop session next.
 
 ---
 
 ## Last Harvest
 
-- **Date**: 2026-03-20
+- **Date**: 2026-04-15
 - **Source mode**: conversations (scans ALL Firestore conversations)
-- **Conversations scanned**: 167
-- **Candidates extracted**: 13 (3 high, 10 medium) — filtered to --from 2026-03-16
-- **Bug fixed**: harvester output path was relative, resolved to `chat-ui/feedback-loop/` instead of project root. Fixed in `harvest_test_cases.ts` line 113: now uses `path.join(path.dirname(__dirname), ...)`.
+- **Conversations scanned**: 354 total, 107 processed (--from 2026-04-01)
+- **Candidates extracted**: 51 (42 high, 9 medium)
+- **Deployed workflows found**: 8 (marked `[deployed]` in candidates)
 
-### This Week's Candidates (Mar 16-20)
+### This Harvest's Candidates (Apr 1-15)
 
 | Department | Candidates | High | Medium |
 |------------|-----------|------|--------|
-| CS | 5 | 2 | 3 |
-| CX | 7 | 1 | 6 |
-| Payments | 1 | 0 | 1 |
+| Marketing | 11 | 10 | 1 |
+| CS | 12 | 10 | 2 |
+| CX | 19 | 15 | 4 |
+| OB | 1 | 1 | 0 |
+| Payments | 4 | 4 | 0 |
+| Finance | 4 | 4 | 0 |
 
-### Users This Week
+### Users This Harvest
 
 | User | Candidates | Key Conversations |
 |------|-----------|-------------------|
-| alvaro.cuba@guesty.com | 4 | CS/CX/Payments testing |
-| roni.shif@guesty.com | 8 | HQ Support Update, HQ Billing, Modjo pagination |
-| gil.almog@guesty.com | 1 | Zendesk upsell intent detection (deployed) |
+| alvaro.cuba@guesty.com | 27 | Testing all departments |
+| roni.shif@guesty.com | 7 | CX/CS workflows, support updates |
+| kayla.adams@guesty.com | 3 | CX data queries + strategy reservations (deployed) |
+| samantha.burd@guesty.com | 1 | Competitor Event Intelligence (deployed) |
+| assaf.norman@guesty.com | 1 | Marketing workflow (deployed) |
+| erik.cohen@guesty.com | 1 | Marketing workflow (deployed) |
+| shimon.feld@guesty.com | 1 | BigQuery Agent Chat UI (deployed) |
+| uri.hertzwolf@guesty.com | 1 | CS Slack Bot BQ Q&A (deployed) |
+| yoni.sharon@guesty.com | 1 | CX workflow |
+| dor.adam@guesty.com | 1 | CX workflow |
 
 ---
 
@@ -333,6 +348,105 @@ Spec actively pushed the wrong pattern at multiple layers:
 - [ ] Optional follow-up: ask CS-Ops whether the 10.7% population of `Account_Owner_F__c` is intentional (tier-specific) or a data hygiene gap
 - [ ] Synthetic test case for Roni R1 (string→array Set node + IF) to validate Phase 4 self-check #6 end-to-end
 - [ ] Power-user re-test invitations: Roni for the array/IF fix, Gil for the CSM rule
+
+---
+
+## Session M (Apr 17, 2026 — 3 new departments + thinking-indicator UX)
+
+### Context: Post-demo usage snapshot (Apr 13-17)
+
+| Day | Events | Users | Deploys | Avg latency |
+|-----|--------|-------|---------|-------------|
+| Apr 13 (demo) | 22 | 5 | 3 | 40s |
+| Apr 14 | 16 | 3 | 1 | 70s |
+| Apr 15 | 76 | 11 | 7 | 37s |
+| Apr 16 | 201 | 13 | 14 | 34s |
+| Apr 17 (session day) | 6 | 1 | 0 | 29s |
+
+Total: 321 events, **22 unique users**, 25 deploys, 241 hours saved, ~$6,025 value. Marketing drove the adoption spike (124 events). CS unusually quiet (12 events) — worth a nudge. Only 2 feedback submissions / 321 events — feedback button underused (addressed in the onboarding Slack message).
+
+### 3 new departments added (deployed n8n-chat-ui-00030-tk6)
+
+- **Product** (`id: 'product'`): PM audience, non-technical. Specs: `salesforce, hubspot, jira, admin_data, siit, gus`. n8nProject `cC2MXxyCdYtzY46e`.
+- **People** (`id: 'people'`): HRBP audience, non-technical. Specs: `hibob, admin_data`. Has explicit `<pii_rule priority="high">` — never post individual-level PII (comp/reviews/terminations) to public Slack. n8nProject `GG87KkXICRSZxeQu`.
+- **Information Systems** (`id: 'is'`): IT audience, **technical — Code nodes allowed** (first non-"avoid Code nodes" dept). Specs: `jira, admin_data`. promptRule directs to HTTP Request for Jira Service Desk (current Jira spec is issue-focused). n8nProject `3wBiKLqcGT5en7HH`.
+
+All three use production-only creds (no dedicated sandbox data envs), mirroring OB pattern. Known follow-up gaps: GitHub/Amplitude/Mixpanel (Product), Greenhouse/Lever/Okta (People), Okta/GitHub/GW Admin + formal Service Desk spec (IS).
+
+Key finding: the "three-location sync" documented in CLAUDE.md is **spec-only**. Departments are resolved dynamically via `getDepartment()` — only `chat-ui/src/lib/departments.ts` needs editing.
+
+### Thinking-indicator UX shipped (deployed n8n-chat-ui-00031-9kk)
+
+**Problem**: post-demo feedback — "not clear whether it got stuck or still working." SSE streaming technically worked, but the typing dots disappeared after the first token, leaving 30-90s of dead silence during multi-tool builds.
+
+**Fix** (Track 1 of the approved plan):
+1. **New file** `chat-ui/src/lib/tool-labels.ts` — maps tool names to human labels (`search_nodes` → "Searching n8n nodes", `get_node` → "Loading node details", `validate_workflow` → "Validating workflow", etc.).
+2. **`MessageBubble.tsx`**: new `LiveActivity` sub-component — animated dots + live label + elapsed timer, visible throughout the whole streaming turn. At 60s inactivity: amber warning + **Cancel** button.
+3. **`ChatWindow.tsx`**: AbortController wired to the fetch; Cancel aborts cleanly. 3-minute watchdog auto-aborts on total silence. **Retry last message** button appears after any error/cancel and replaces the errored assistant message (no duplicate user messages).
+
+**Track 2 deferred** (default-on error handling / logging / execution-save flags in generated workflows): needs full regression cycle to re-baseline workflow shape. Approved for a follow-up session.
+
+### Feedback-loop work
+
+- No harvest this session (last harvest Apr 15, 51 candidates pending review).
+- No regression run (deferred to Session N with Track 2 work).
+
+### Deploys
+
+| Revision | What | Rollback target |
+|----------|------|------------------|
+| n8n-chat-ui-00030-tk6 | 3 new depts | n8n-chat-ui-00029-vfj |
+| n8n-chat-ui-00031-9kk | Thinking indicator | n8n-chat-ui-00030-tk6 |
+
+Both healthy, no ERROR-severity logs, IAP responding correctly.
+
+### Next session priorities (Session N)
+
+1. **Track 2: default-on workflow quality guardrails** — `<quality_defaults>` in system prompt, new `error-handling-logging` skill, `audit_workflow.py` checks #12-14, per-dept `auditLogDestination`. **Full regression required before ship.**
+2. **Review 51 harvested candidates** (still pending since Apr 15) — especially CX (19, only 2 in suite) and Finance (4, only 1 in suite).
+3. **Share the onboarding Slack message** once user approves the draft.
+4. **Monitor adoption of the 3 new departments** — expect analytics events to start appearing as Product/People/IS users try it.
+
+---
+
+## Session L (Apr 15, 2026 — Scaling hardening + harvest)
+
+### Context: Marketing demo drove 2→15 users in 5 days
+
+Usage spike after marketing all-hands demo (Apr 13):
+
+| Day | Events | Users | Deploys |
+|-----|--------|-------|---------|
+| Apr 10 | 2 | 1 | 0 |
+| Apr 12 | 7 | 1 | 0 |
+| Apr 13 (demo) | 22 | 5 | 3 |
+| Apr 14 | 16 | 3 | 1 |
+| Apr 15 (today) | 66 | 10 | 7 |
+
+**15 unique users**, including `estefania.jaramillo@rentalsunited.com` (new domain).
+
+### Bugs fixed (deployed as n8n-chat-ui-00029-vfj)
+
+1. **MCP 404 fix (Session L-1, Apr 13)**: n8n-mcp-cloud had `--ingress internal` but chat-ui had no VPC connector → 404. Changed to `--ingress all`. Also ported `X-MCP-Auth` dual-header auth from deprecated http-server.ts to single-session server. MCP tools now working (32% of turns use them vs 0% before).
+2. **MCP session race condition (P0)**: Global `sessionId` shared across concurrent users → races. Added mutex (`initPromise`) so only the first caller initializes, others await the same promise.
+3. **Vertex AI retry logic**: 3 retries with exponential backoff (1s/2s/4s) on 429/503/529.
+4. **Context windowing tracked**: New `contextWindowed` field in analytics events.
+5. **Deploy failures logged**: Failed deploys now write to `analytics_deploys` with `[FAILED]` prefix.
+6. **Message limit warning**: Users see a note when conversations hit 100 messages.
+
+### Scaling config changes
+
+| Setting | Before | After |
+|---------|--------|-------|
+| chat-ui max-instances | 5 | 15 |
+| n8n-mcp min-instances | 0 | 1 |
+| n8n-mcp max-instances | 3 | 5 |
+
+### Harvest (Apr 15)
+
+- 51 candidates (42 high, 9 medium) from 10 users
+- 8 deployed workflows found
+- **Next session**: Review candidates, promote high-confidence to test_cases.yaml, run regression
 
 ---
 
