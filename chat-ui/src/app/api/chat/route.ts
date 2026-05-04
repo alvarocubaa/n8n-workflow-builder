@@ -116,6 +116,52 @@ lines after the purpose (per the system prompt's <sticky_notes> rule):
 </initiative_context>`;
 }
 
+/**
+ * Extract a fenced ```json block from the assistant's final reply and
+ * whitelist it down to fields the Hub's StrategicIdea form recognises.
+ * Returns null when no parseable JSON block is found, when no whitelisted
+ * keys survive validation, or when the input is malformed.
+ *
+ * Defense-in-depth: the Edge Function re-validates these same bounds.
+ */
+function extractAndValidatePlanningFields(text: string): Record<string, string | number> | null {
+  // Match the LAST ```json … ``` block — Claude may emit a draft mid-conversation
+  // and a final at the end; we want the final.
+  const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+  if (matches.length === 0) return null;
+  const lastMatch = matches[matches.length - 1];
+  const jsonText = lastMatch[1];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+
+  const obj = parsed as Record<string, unknown>;
+  const out: Record<string, string | number> = {};
+
+  const stringField = (key: string, max: number): void => {
+    const v = obj[key];
+    if (typeof v === 'string' && v.length > 0 && v.length <= max) out[key] = v;
+  };
+  const numberField = (key: string, min: number, max: number): void => {
+    const v = obj[key];
+    if (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max) out[key] = v;
+  };
+
+  stringField('improvement_kpi', 500);
+  stringField('business_justification', 1000);
+  stringField('current_state', 1000);
+  numberField('current_process_minutes_per_run', 1, 1440);
+  numberField('current_process_runs_per_month', 0, 100000);
+  numberField('current_process_people_count', 0, 10000);
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 export async function POST(req: Request): Promise<Response> {
   const user = getUserFromHeaders(req.headers);
   if (!user) {
@@ -148,6 +194,10 @@ export async function POST(req: Request): Promise<Response> {
   // Load or create the conversation
   let conversationId = existingConvId;
   let history: DisplayMessage[] = [];
+  // Initiative state — derived from prefill on first turn, from conv on later turns.
+  // Used at end-of-stream to fire the planning-mode JSON extraction callback.
+  let initiativeId: string | undefined = prefill?.initiative_id;
+  let initiativeMode: 'planning' | 'building' | undefined = prefill?.mode;
 
   if (conversationId) {
     const conv = await getConversation(user.email, conversationId);
@@ -159,6 +209,12 @@ export async function POST(req: Request): Promise<Response> {
       }
       if (conv.mode) {
         mode = conv.mode;
+      }
+      if (conv.initiativeId) {
+        initiativeId = conv.initiativeId;
+      }
+      if (conv.initiativeMode) {
+        initiativeMode = conv.initiativeMode;
       }
     } else {
       conversationId = undefined;
@@ -214,6 +270,7 @@ export async function POST(req: Request): Promise<Response> {
         mode: prefill.mode === 'planning' ? 'planning' : 'building',
         created_by: user.email,
       }),
+      signal: AbortSignal.timeout(5000),
     }).catch((err) => console.error('Hub conversation-callback failed:', err));
   }
 
@@ -277,6 +334,38 @@ export async function POST(req: Request): Promise<Response> {
               }
             } catch (err) {
               console.error('Failed to persist messages:', err);
+            }
+
+            // Planning-mode auto-pop: when the assistant's reply contains a
+            // fenced ```json block at the end, parse + whitelist it and POST
+            // to the Hub's n8n-conversation-callback. The Edge Function
+            // upserts {extracted_fields, extracted_fields_at} on the
+            // initiative_chat_conversations row. Fire-and-forget; failures
+            // log only — never break the chat response.
+            if (
+              initiativeMode === 'planning' &&
+              initiativeId &&
+              process.env.HUB_CALLBACK_URL &&
+              process.env.HUB_CALLBACK_SECRET
+            ) {
+              const extracted = extractAndValidatePlanningFields(modelChunks.join(''));
+              if (extracted) {
+                fetch(`${process.env.HUB_CALLBACK_URL}/n8n-conversation-callback`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Hub-Secret': process.env.HUB_CALLBACK_SECRET,
+                  },
+                  body: JSON.stringify({
+                    initiative_id: initiativeId,
+                    conversation_id: convId,
+                    mode: 'planning',
+                    created_by: user.email,
+                    extracted_fields: extracted,
+                  }),
+                  signal: AbortSignal.timeout(5000),
+                }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
+              }
             }
 
             // Log analytics event with token usage (fire-and-forget)
