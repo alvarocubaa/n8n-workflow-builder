@@ -1,6 +1,6 @@
 import { getUserFromHeaders } from '@/lib/auth';
 import { deployWorkflow, updateWorkflow } from '@/lib/n8n-deploy';
-import { logDeployEvent } from '@/lib/firestore';
+import { logDeployEvent, getConversation } from '@/lib/firestore';
 import { computeComplexity, extractWorkflowMeta } from '@/lib/complexity';
 import { getDepartment } from '@/lib/departments';
 
@@ -88,6 +88,35 @@ export async function POST(req: Request): Promise<Response> {
     estimatedValueUsd: roi.estimatedValueUsd,
     createdAt: new Date().toISOString(),
   }).catch(console.error);
+
+  // Hub × n8n-builder integration: if this deploy belongs to a conversation that
+  // was launched from a Hub initiative, auto-link the workflow back to that initiative.
+  // Fire-and-forget — Hub being down must NOT fail the deploy.
+  if (body.conversationId && process.env.HUB_CALLBACK_URL && process.env.HUB_CALLBACK_SECRET) {
+    (async () => {
+      try {
+        const conv = await getConversation(user.email, body.conversationId!);
+        if (conv?.initiativeId) {
+          await fetch(`${process.env.HUB_CALLBACK_URL}/n8n-builder-callback`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Hub-Secret': process.env.HUB_CALLBACK_SECRET!,
+            },
+            body: JSON.stringify({
+              initiative_id: conv.initiativeId,
+              n8n_workflow_id: result.workflowId,
+              n8n_workflow_name: result.workflowName,
+              deployed_by: user.email,
+              deployed_at: new Date().toISOString(),
+            }),
+          });
+        }
+      } catch (err) {
+        console.error('Hub builder-callback failed:', err);
+      }
+    })();
+  }
 
   return Response.json(result);
 }

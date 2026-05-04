@@ -10,6 +10,8 @@ interface LocalConv {
   title: string;
   mode: AssistantMode;
   messages: DisplayMessage[];
+  initiativeId?: string;
+  initiativeMode?: 'planning' | 'building';
 }
 const localStore = new Map<string, LocalConv>();
 
@@ -44,6 +46,8 @@ export interface Conversation {
   departmentId?: string;
   mode?: AssistantMode;
   messages: DisplayMessage[];
+  initiativeId?: string;
+  initiativeMode?: 'planning' | 'building';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,6 +82,8 @@ export async function createConversation(
   firstMessage: string,
   departmentId?: string,
   mode?: AssistantMode,
+  initiativeId?: string,
+  initiativeMode?: 'planning' | 'building',
 ): Promise<string> {
   const title =
     firstMessage.length > 60
@@ -86,22 +92,33 @@ export async function createConversation(
 
   try {
     const now = admin.firestore.FieldValue.serverTimestamp();
+    const docPayload: Record<string, unknown> = {
+      title,
+      departmentId: departmentId ?? 'cx',
+      mode: mode ?? 'builder',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    if (initiativeId) {
+      docPayload.initiativeId = initiativeId;
+      docPayload.initiativeMode = initiativeMode ?? 'building';
+    }
     const ref = await userRef(userEmail)
       .collection('conversations')
-      .add({
-        title,
-        departmentId: departmentId ?? 'cx',
-        mode: mode ?? 'builder',
-        createdAt: now,
-        updatedAt: now,
-        messages: [],
-      });
+      .add(docPayload);
     return ref.id;
   } catch (err) {
     if (isFirestoreUnavailable(err)) {
       // No Firestore yet — store in-memory so multi-turn works locally
       const id = `local-${randomUUID()}`;
-      localStore.set(id, { title, mode: mode ?? 'builder', messages: [] });
+      localStore.set(id, {
+        title,
+        mode: mode ?? 'builder',
+        messages: [],
+        initiativeId,
+        initiativeMode,
+      });
       return id;
     }
     throw err;
@@ -165,7 +182,16 @@ export async function getConversation(
 ): Promise<Conversation | null> {
   if (conversationId.startsWith('local-')) {
     const conv = localStore.get(conversationId);
-    return conv ? { id: conversationId, title: conv.title, mode: conv.mode, messages: conv.messages } : null;
+    return conv
+      ? {
+          id: conversationId,
+          title: conv.title,
+          mode: conv.mode,
+          messages: conv.messages,
+          initiativeId: conv.initiativeId,
+          initiativeMode: conv.initiativeMode,
+        }
+      : null;
   }
 
   try {
@@ -179,6 +205,8 @@ export async function getConversation(
       departmentId: (data.departmentId as string) ?? undefined,
       mode: (data.mode as AssistantMode) ?? 'builder',
       messages: (data.messages as DisplayMessage[]) ?? [],
+      initiativeId: (data.initiativeId as string) ?? undefined,
+      initiativeMode: (data.initiativeMode as 'planning' | 'building' | undefined) ?? undefined,
     };
   } catch (err) {
     if (isFirestoreUnavailable(err)) return null;

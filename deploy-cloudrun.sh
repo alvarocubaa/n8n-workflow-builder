@@ -153,9 +153,9 @@ deploy_chat_ui() {
         --memory 512Mi \
         --cpu 1 \
         --min-instances 1 \
-        --max-instances 5 \
-        --set-secrets="N8N_API_KEY=N8N_API_KEY:latest,MCP_AUTH_TOKEN=AUTH_TOKEN:latest" \
-        --set-env-vars="MCP_SERVICE_URL=${MCP_URL},N8N_API_URL=${N8N_API_URL},NODE_ENV=production"
+        --max-instances 15 \
+        --set-secrets="N8N_API_KEY=N8N_API_KEY:latest,MCP_AUTH_TOKEN=AUTH_TOKEN:latest,HUB_CALLBACK_SECRET=HUB_CALLBACK_SECRET:latest" \
+        --set-env-vars="MCP_SERVICE_URL=${MCP_URL},N8N_API_URL=${N8N_API_URL},NODE_ENV=production,HUB_CALLBACK_URL=https://ilhlkseqwparwdwhzcek.supabase.co/functions/v1"
 
     CHAT_URL=$(gcloud run services describe "$CHAT_SERVICE_NAME" \
         --region="$REGION" --project="$PROJECT_ID" --format='value(status.url)')

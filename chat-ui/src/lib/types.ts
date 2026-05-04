@@ -2,6 +2,30 @@
 
 export type AssistantMode = 'builder' | 'data';
 
+// ─── Initiative prefill (Hub × n8n-builder integration) ─────────────────────
+// Hub deep-links into chat-ui with a base64-encoded payload of this shape so
+// the conversation opens framed around the originating strategic_ideas row.
+
+export type ChatPrefillMode = 'building' | 'planning';
+
+export interface InitiativePrefill {
+  initiative_id: string;
+  mode: ChatPrefillMode;
+  initiative_metadata: {
+    title: string;
+    improvement_kpi?: string;
+    business_justification?: string;
+    department?: string;
+    department_id?: string;       // chat-ui canonical id (e.g. 'cs', 'cx')
+    current_state?: string;
+    data_sources?: string;
+    hub_url: string;              // deep-link back to the initiative detail
+  };
+  // Planning mode carries the user's draft so the AI knows which fields are
+  // already filled and which to interview about.
+  initiative_draft?: Record<string, unknown>;
+}
+
 // ─── Event types streamed to the client ──────────────────────────────────────
 
 export interface TokenUsage {

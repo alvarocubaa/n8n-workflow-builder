@@ -1,12 +1,12 @@
 'use client';
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
-import type { AssistantMode } from '@/lib/types';
+import type { AssistantMode, InitiativePrefill } from '@/lib/types';
 
 const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
 
@@ -48,6 +48,24 @@ interface ChatWindowProps {
   initialMode?: AssistantMode;
 }
 
+function decodePrefill(b64: string | null): InitiativePrefill | null {
+  if (!b64) return null;
+  try {
+    const utf8 = atob(b64);
+    // Mirror the encoder's UTF-8 round-trip (Hub encodes via unescape(encodeURIComponent(json))).
+    const json = decodeURIComponent(escape(utf8));
+    const parsed = JSON.parse(json) as InitiativePrefill;
+    if (!parsed.initiative_id || !parsed.mode || !parsed.initiative_metadata?.title) {
+      console.warn('Prefill payload is missing required fields, ignoring:', parsed);
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn('Failed to decode prefill param, ignoring:', err);
+    return null;
+  }
+}
+
 export default function ChatWindow({
   conversationId,
   initialMessages = [],
@@ -55,14 +73,35 @@ export default function ChatWindow({
   initialMode,
 }: ChatWindowProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Decode the Hub-supplied prefill on first mount only. After the first turn
+  // is sent, the prefill is persisted on the conversation doc server-side and
+  // travels with `conversationId`, so we don't need to resend it.
+  const [prefill, setPrefill] = useState<InitiativePrefill | null>(() => {
+    if (conversationId) return null; // existing conversation — server already knows
+    return decodePrefill(searchParams?.get('prefill') ?? null);
+  });
+  const prefillSentRef = useRef(false);
+
+  // Strip the URL params after decode so a refresh doesn't double-seed.
+  useEffect(() => {
+    if (prefill && searchParams?.get('prefill')) {
+      router.replace('/chat');
+    }
+  }, [prefill, searchParams, router]);
+
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [departmentId, setDepartmentId] = useState(initialDepartmentId ?? 'cx');
+  const [departmentId, setDepartmentId] = useState(
+    initialDepartmentId ?? prefill?.initiative_metadata?.department_id ?? 'cx',
+  );
   const [mode, setMode] = useState<AssistantMode>(initialMode ?? 'builder');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const [retryable, setRetryable] = useState(false);
-  const departmentLocked = useRef(!!conversationId || initialMessages.length > 0);
+  const departmentLocked = useRef(
+    !!conversationId || initialMessages.length > 0 || !!prefill?.initiative_metadata?.department_id,
+  );
   const modeLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const currentConvId = useRef<string | undefined>(conversationId);
@@ -153,6 +192,12 @@ export default function ChatWindow({
           encoding: fileToSend.encoding,
           mediaType: fileToSend.mediaType,
         };
+      }
+      // Send prefill exactly once — on the very first request of a Hub-initiated
+      // session. After that, server-side conversation state has the initiative_id.
+      if (prefill && !prefillSentRef.current && !currentConvId.current) {
+        requestBody.prefill = prefill;
+        prefillSentRef.current = true;
       }
 
       const res = await fetch('/api/chat', {
@@ -400,6 +445,28 @@ export default function ChatWindow({
             </svg>
             Retry last message
           </button>
+        </div>
+      )}
+
+      {/* Initiative pill — visible whenever a Hub-supplied prefill is in scope */}
+      {prefill && (
+        <div className="mx-auto max-w-3xl px-4 pb-1.5">
+          <a
+            href={prefill.initiative_metadata.hub_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full bg-guesty-100 px-3 py-1 text-xs text-guesty-400 hover:bg-guesty-100/70 transition"
+            title={`Open initiative in the Hub: ${prefill.initiative_metadata.title}`}
+          >
+            <span className="font-semibold uppercase tracking-wide">
+              {prefill.mode === 'planning' ? 'Planning' : 'Building'}
+            </span>
+            <span className="text-guesty-400/60">·</span>
+            <span className="max-w-[36ch] truncate">{prefill.initiative_metadata.title}</span>
+            <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </a>
         </div>
       )}
 
