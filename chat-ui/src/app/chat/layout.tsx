@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import ConversationList from '@/components/ConversationList';
 import SidebarToggle from '@/components/SidebarToggle';
 import AuthGate from '@/components/AuthGate';
@@ -8,7 +9,10 @@ import { getUserFromServerContext } from '@/lib/auth-server';
 
 /**
  * Shared layout for /chat and /chat/[id].
- * Renders the header (with user identity) and sidebar.
+ * Renders the header (with user identity) and sidebar — except in embed mode
+ * (Direction 3, Hub iframe), where chrome is suppressed and the Hub provides
+ * its own. Embed flag comes from src/middleware.ts which sets `x-embed` based
+ * on the URL's ?embed=true search param.
  */
 export default async function ChatLayout({
   children,
@@ -18,12 +22,23 @@ export default async function ChatLayout({
   // Resolve user via cookie (post-IAP) → IAP header (during dual-auth) → mock (dev).
   const user = await getUserFromServerContext();
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID ?? '';
+  const headerStore = await headers();
+  const isEmbed = headerStore.get('x-embed') === '1';
 
-  // Unauthenticated branch — render the GIS sign-in shell. Once the user signs
+  // Unauthenticated branch — render the sign-in shell. Once the user signs
   // in, /api/auth/exchange sets the cookie and reloads — server then re-renders
   // this layout with `user` populated and we hit the authenticated branch below.
+  // AuthGate reads ?embed=true client-side and switches to the postMessage flow.
   if (!user) {
     return <AuthGate clientId={clientId}>{null}</AuthGate>;
+  }
+
+  if (isEmbed) {
+    return (
+      <div className="flex h-screen flex-col bg-warm-50">
+        {children}
+      </div>
+    );
   }
 
   const email = user.email;

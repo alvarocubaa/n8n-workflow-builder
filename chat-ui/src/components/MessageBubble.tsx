@@ -8,6 +8,7 @@ import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import FeedbackButtons from './FeedbackButtons';
 import { getToolLabel } from '@/lib/tool-labels';
 import type { AssistantMode } from '@/lib/types';
+import { emitToParent, isEmbedMode } from '@/lib/embed';
 
 export interface Message {
   id?: string;
@@ -27,6 +28,9 @@ interface MessageBubbleProps {
   messageIndex?: number;
   mode?: AssistantMode;
   onCancel?: () => void;
+  // Direction 3 (embed): when present, deploy success postMessages the parent
+  // with workflow_deployed so the Hub can render an optimistic stats placeholder.
+  initiativeId?: string;
 }
 
 function DownloadButton({ json, filename }: { json: string; filename?: string }) {
@@ -71,7 +75,17 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function DeployButton({ json, conversationId, departmentId }: { json: string; conversationId?: string; departmentId?: string }) {
+function DeployButton({
+  json,
+  conversationId,
+  departmentId,
+  initiativeId,
+}: {
+  json: string;
+  conversationId?: string;
+  departmentId?: string;
+  initiativeId?: string;
+}) {
   const [state, setState] = useState<'idle' | 'deploying' | 'ok' | 'err'>('idle');
   const [workflowUrl, setWorkflowUrl] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -101,6 +115,19 @@ function DeployButton({ json, conversationId, departmentId }: { json: string; co
           setTransferWarning(data.transferError ?? 'Transfer to department project failed');
         }
         setState('ok');
+        if (isEmbedMode() && initiativeId && conversationId && data.workflowUrl) {
+          // Pull workflow id from the n8n URL: …/workflow/<id>
+          const idMatch = data.workflowUrl.match(/\/workflow\/([^/?#]+)/);
+          if (idMatch) {
+            emitToParent({
+              type: 'workflow_deployed',
+              initiative_id: initiativeId,
+              conversation_id: conversationId,
+              n8n_workflow_id: idMatch[1],
+              n8n_workflow_name: data.workflowName ?? '',
+            });
+          }
+        }
       }
     } catch (e) {
       setErrMsg(String(e));
@@ -209,7 +236,7 @@ function LiveActivity({
   );
 }
 
-function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel }: MessageBubbleProps) {
+function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel, initiativeId }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   if (isUser) {
@@ -295,7 +322,7 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
                       <div className="flex items-center justify-between rounded-t-lg bg-guesty-400 px-3 py-1.5">
                         <span className="text-xs font-medium text-guesty-100">{match[1].toUpperCase()}</span>
                         <div className="flex gap-2">
-                          {mode === 'builder' && isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} />}
+                          {mode === 'builder' && isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} initiativeId={initiativeId} />}
                           {mode === 'builder' && isWorkflow && <DownloadButton json={codeString} />}
                           <CopyButton text={codeString} />
                         </div>

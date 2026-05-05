@@ -39,7 +39,16 @@ export type ChatEvent =
   | { type: 'tool_call'; name: string; args: Record<string, unknown> }
   | { type: 'text_chunk'; text: string }
   | { type: 'done'; usage?: TokenUsage; truncated?: boolean; toolSummary?: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  // Embed-mode (Direction 3): server emits this after a planning-mode turn whose
+  // final reply parses cleanly. Client relays via postMessage to the Hub parent.
+  | {
+      type: 'extracted_fields';
+      initiative_id: string;
+      conversation_id: string;
+      extracted_fields: Record<string, string | number>;
+      extracted_fields_at: string;
+    };
 
 // ─── Analytics types ────────────────────────────────────────────────────────
 

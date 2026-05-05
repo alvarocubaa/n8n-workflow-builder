@@ -10,8 +10,10 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
+import { emitToParent, isAllowedParentOrigin, isEmbedMode } from '@/lib/embed';
 
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+const EMBED_AUTH_TIMEOUT_MS = 5000;
 
 interface CredentialResponse {
   credential: string; // the ID token
@@ -41,7 +43,15 @@ declare global {
   }
 }
 
-type Status = 'checking' | 'authed' | 'unauthed' | 'signing_in' | 'error';
+type Status =
+  | 'checking'
+  | 'authed'
+  | 'unauthed'
+  | 'signing_in'
+  | 'error'
+  // Direction-3 embed mode states (Hub iframe).
+  | 'awaiting_parent_token'
+  | 'embed_timeout';
 
 const AuthGate: React.FC<{
   clientId: string;
@@ -97,8 +107,45 @@ const AuthGate: React.FC<{
     }
   }, []);
 
+  // Direction-3 embed: when 'unauthed' inside an iframe, skip GIS entirely.
+  // Fire `auth_required` to the parent and wait up to EMBED_AUTH_TIMEOUT_MS for
+  // an `auth_token` message. On receipt, POST to /api/auth/exchange exactly as
+  // the GIS path does. On timeout, render the "open in new tab" fallback.
+  // initialised.current flag + an empty-deps effect prevent the React-effect
+  // cleanup from racing the timer when status transitions inside the effect.
+  useEffect(() => {
+    if (status !== 'unauthed') return;
+    if (!isEmbedMode()) return;
+    if (initialised.current) return;
+    initialised.current = true;
+
+    setStatus('awaiting_parent_token');
+    emitToParent({ type: 'auth_required' });
+
+    const onMessage = (event: MessageEvent) => {
+      if (!isAllowedParentOrigin(event.origin)) return;
+      const data = event.data as { type?: string; id_token?: string } | null;
+      if (!data || data.type !== 'auth_token' || typeof data.id_token !== 'string') return;
+      window.removeEventListener('message', onMessage);
+      window.clearTimeout(timer);
+      // Same exchange path as the GIS flow — single source of truth.
+      void handleCredentialResponse({ credential: data.id_token });
+    };
+    window.addEventListener('message', onMessage);
+
+    const timer = window.setTimeout(() => {
+      window.removeEventListener('message', onMessage);
+      setStatus((prev) => (prev === 'awaiting_parent_token' ? 'embed_timeout' : prev));
+    }, EMBED_AUTH_TIMEOUT_MS);
+
+    // Intentionally no cleanup return — the listener and timer self-clean on
+    // success or timeout. Re-running this effect (e.g. status transitions) is
+    // a no-op due to the initialised.current guard above.
+  }, [status, handleCredentialResponse]);
+
   useEffect(() => {
     if (status !== 'unauthed' && status !== 'error') return;
+    if (isEmbedMode()) return; // GIS button is hidden in embed mode.
     if (initialised.current) return;
     if (!clientId) return;
 
@@ -159,7 +206,33 @@ const AuthGate: React.FC<{
     return <>{children}</>;
   }
 
-  // unauthed | signing_in | error
+  // Embed-mode branches — Hub iframe, no GIS button.
+  if (status === 'awaiting_parent_token') {
+    return (
+      <div className="flex h-screen items-center justify-center bg-warm-50 px-6">
+        <p className="text-sm text-gray-500">Signing in…</p>
+      </div>
+    );
+  }
+  if (status === 'embed_timeout') {
+    const standaloneHref = typeof window !== 'undefined'
+      ? `${window.location.pathname}${window.location.search.replace(/[?&]embed=true/, '')}`
+      : '/chat';
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-warm-50 px-6 text-center">
+        <p className="text-sm text-gray-700 mb-3">Sign-in didn't reach the chat panel.</p>
+        <a
+          href={standaloneHref}
+          target="_top"
+          className="rounded-lg bg-guesty-300 px-4 py-2 text-sm font-medium text-white hover:bg-guesty-400 transition"
+        >
+          Open in a new tab
+        </a>
+      </div>
+    );
+  }
+
+  // unauthed | signing_in | error (standalone — non-embed)
   return (
     <div className="flex h-screen flex-col items-center justify-center bg-warm-50 px-6">
       <div className="flex flex-col items-center gap-5 max-w-md text-center">

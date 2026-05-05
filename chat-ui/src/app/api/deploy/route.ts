@@ -96,7 +96,11 @@ export async function POST(req: Request): Promise<Response> {
     (async () => {
       try {
         const conv = await getConversation(user.email, body.conversationId!);
-        if (conv?.initiativeId) {
+        // Direction-3 defense: refuse to write back if this conversation was
+        // never tied to the Hub. `source === 'standalone'` should be impossible
+        // when initiativeId is set (paired by the chat-ui server), but reject
+        // explicitly anyway.
+        if (conv?.initiativeId && conv.source && conv.source !== 'standalone') {
           await fetch(`${process.env.HUB_CALLBACK_URL}/n8n-builder-callback`, {
             method: 'POST',
             headers: {
@@ -109,6 +113,7 @@ export async function POST(req: Request): Promise<Response> {
               n8n_workflow_name: result.workflowName,
               deployed_by: user.email,
               deployed_at: new Date().toISOString(),
+              source: conv.source,
             }),
           });
         }

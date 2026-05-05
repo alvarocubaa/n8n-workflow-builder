@@ -151,10 +151,48 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
     const v = obj[key];
     if (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max) out[key] = v;
   };
+  const enumField = (key: string, allowed: readonly string[]): void => {
+    const v = obj[key];
+    if (typeof v === 'string' && allowed.includes(v)) out[key] = v;
+  };
 
+  // Mirrors the Hub StrategicIdea form. Source of truth for these enums:
+  // /Users/alvaro.cuba/Code/AI-Innovation-Hub-Vertex/types.ts (LevelOfImprovement,
+  // ImpactCategory, EffortLevel) — Edge Function n8n-conversation-callback
+  // re-validates the same lists.
+  const DEPARTMENTS = [
+    'Marketing',
+    'Customer Success',
+    'Customer Experience',
+    'Onboarding',
+    'Payments',
+    'Finance',
+    'Product',
+    'People',
+    'Information Systems',
+  ] as const;
+  const LEVEL_OF_IMPROVEMENT = ['Low', 'Medium', 'High', 'Very High'] as const;
+  const IMPACT_CATEGORY = [
+    'Time Savings',
+    'Improved Quality',
+    'Reduced Cost',
+    'Increased Revenue',
+    'Efficiency',
+    'Quality',
+    'Business',
+  ] as const;
+  const EFFORT = ['Low', 'Medium', 'High'] as const;
+
+  stringField('title', 200);
+  stringField('description', 2000);
   stringField('improvement_kpi', 500);
   stringField('business_justification', 1000);
   stringField('current_state', 1000);
+  enumField('department', DEPARTMENTS);
+  stringField('data_sources', 500);
+  enumField('level_of_improvement', LEVEL_OF_IMPROVEMENT);
+  enumField('impact_category', IMPACT_CATEGORY);
+  enumField('effort', EFFORT);
   numberField('current_process_minutes_per_run', 1, 1440);
   numberField('current_process_runs_per_month', 0, 100000);
   numberField('current_process_people_count', 0, 10000);
@@ -175,6 +213,10 @@ export async function POST(req: Request): Promise<Response> {
     mode?: AssistantMode;
     file?: { name: string; content: string; encoding: 'text' | 'base64'; mediaType: string };
     prefill?: InitiativePrefill;
+    // Direction-3: client signals embed mode in the body because middleware-set
+    // request headers (x-embed) only fire on the /chat/* page route and don't
+    // propagate to /api/chat XHRs.
+    embed?: boolean;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -182,7 +224,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { message, conversationId: existingConvId, file, prefill } = body;
+  const { message, conversationId: existingConvId, file, prefill, embed } = body;
   if (!message?.trim()) {
     return new Response('message is required', { status: 400 });
   }
@@ -198,6 +240,10 @@ export async function POST(req: Request): Promise<Response> {
   // Used at end-of-stream to fire the planning-mode JSON extraction callback.
   let initiativeId: string | undefined = prefill?.initiative_id;
   let initiativeMode: 'planning' | 'building' | undefined = prefill?.mode;
+  // Direction-3 source: set once at conversation creation, then read back on
+  // subsequent turns. Stale subsequent-turn requests cannot promote a standalone
+  // conversation into a Hub-write context.
+  let conversationSource: 'standalone' | 'hub_prefill' | 'hub_embed' | undefined;
 
   if (conversationId) {
     const conv = await getConversation(user.email, conversationId);
@@ -216,6 +262,7 @@ export async function POST(req: Request): Promise<Response> {
       if (conv.initiativeMode) {
         initiativeMode = conv.initiativeMode;
       }
+      conversationSource = conv.source;
     } else {
       conversationId = undefined;
     }
@@ -232,6 +279,15 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // Direction-3: derive the conversation source. Set once at creation, never
+  // mutated. Hub-write paths (n8n-conversation-callback) defensively reject
+  // 'standalone' so a misuse can't reach Hub data. On subsequent turns, the
+  // source is the one stored on the conversation doc — NOT re-derived from
+  // the request, so a standalone conv can never be promoted by a stale prefill.
+  const source: 'standalone' | 'hub_prefill' | 'hub_embed' =
+    conversationSource ??
+    (!prefill ? 'standalone' : embed ? 'hub_embed' : 'hub_prefill');
+
   if (!conversationId) {
     conversationId = await createConversation(
       user.email,
@@ -240,6 +296,7 @@ export async function POST(req: Request): Promise<Response> {
       mode,
       prefill?.initiative_id,
       prefill?.mode,
+      source,
     );
   }
 
@@ -269,6 +326,7 @@ export async function POST(req: Request): Promise<Response> {
         conversation_id: convId,
         mode: prefill.mode === 'planning' ? 'planning' : 'building',
         created_by: user.email,
+        source,
       }),
       signal: AbortSignal.timeout(5000),
     }).catch((err) => console.error('Hub conversation-callback failed:', err));
@@ -337,34 +395,42 @@ export async function POST(req: Request): Promise<Response> {
             }
 
             // Planning-mode auto-pop: when the assistant's reply contains a
-            // fenced ```json block at the end, parse + whitelist it and POST
-            // to the Hub's n8n-conversation-callback. The Edge Function
-            // upserts {extracted_fields, extracted_fields_at} on the
-            // initiative_chat_conversations row. Fire-and-forget; failures
-            // log only — never break the chat response.
-            if (
-              initiativeMode === 'planning' &&
-              initiativeId &&
-              process.env.HUB_CALLBACK_URL &&
-              process.env.HUB_CALLBACK_SECRET
-            ) {
+            // fenced ```json block at the end, parse + whitelist it. We do two
+            // things with the result: (a) emit an SSE event so embed-mode
+            // clients can postMessage it to the Hub parent (Direction 3), and
+            // (b) fire-and-forget POST to the Hub's n8n-conversation-callback
+            // Edge Function, which upserts {extracted_fields, extracted_fields_at}
+            // on the initiative_chat_conversations row. Failures log only —
+            // never break the chat response.
+            if (initiativeMode === 'planning' && initiativeId) {
               const extracted = extractAndValidatePlanningFields(modelChunks.join(''));
               if (extracted) {
-                fetch(`${process.env.HUB_CALLBACK_URL}/n8n-conversation-callback`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Hub-Secret': process.env.HUB_CALLBACK_SECRET,
-                  },
-                  body: JSON.stringify({
-                    initiative_id: initiativeId,
-                    conversation_id: convId,
-                    mode: 'planning',
-                    created_by: user.email,
-                    extracted_fields: extracted,
-                  }),
-                  signal: AbortSignal.timeout(5000),
-                }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
+                const extractedAt = new Date().toISOString();
+                enqueue({
+                  type: 'extracted_fields',
+                  initiative_id: initiativeId,
+                  conversation_id: convId,
+                  extracted_fields: extracted,
+                  extracted_fields_at: extractedAt,
+                });
+                if (process.env.HUB_CALLBACK_URL && process.env.HUB_CALLBACK_SECRET) {
+                  fetch(`${process.env.HUB_CALLBACK_URL}/n8n-conversation-callback`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'X-Hub-Secret': process.env.HUB_CALLBACK_SECRET,
+                    },
+                    body: JSON.stringify({
+                      initiative_id: initiativeId,
+                      conversation_id: convId,
+                      mode: 'planning',
+                      created_by: user.email,
+                      extracted_fields: extracted,
+                      source,
+                    }),
+                    signal: AbortSignal.timeout(5000),
+                  }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
+                }
               }
             }
 

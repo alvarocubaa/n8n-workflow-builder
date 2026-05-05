@@ -6,12 +6,19 @@ import type { AnalyticsEvent, AssistantMode, DeployEvent, FeedbackEntry } from '
 // Used when Firestore is unavailable and IDs are prefixed with "local-".
 // Survives within the same Node.js process (fine for local dev).
 
+// Direction-3: explicit source of the conversation. Set once on creation,
+// immutable thereafter. Hub-write callbacks (n8n-conversation-callback /
+// n8n-builder-callback) reject 'standalone' rows defensively. See
+// docs/direction-3-design.md.
+export type ConversationSource = 'standalone' | 'hub_prefill' | 'hub_embed';
+
 interface LocalConv {
   title: string;
   mode: AssistantMode;
   messages: DisplayMessage[];
   initiativeId?: string;
   initiativeMode?: 'planning' | 'building';
+  source?: ConversationSource;
 }
 const localStore = new Map<string, LocalConv>();
 
@@ -48,6 +55,7 @@ export interface Conversation {
   messages: DisplayMessage[];
   initiativeId?: string;
   initiativeMode?: 'planning' | 'building';
+  source?: ConversationSource;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -84,6 +92,7 @@ export async function createConversation(
   mode?: AssistantMode,
   initiativeId?: string,
   initiativeMode?: 'planning' | 'building',
+  source: ConversationSource = 'standalone',
 ): Promise<string> {
   const title =
     firstMessage.length > 60
@@ -99,6 +108,7 @@ export async function createConversation(
       createdAt: now,
       updatedAt: now,
       messages: [],
+      source,
     };
     if (initiativeId) {
       docPayload.initiativeId = initiativeId;
@@ -118,6 +128,7 @@ export async function createConversation(
         messages: [],
         initiativeId,
         initiativeMode,
+        source,
       });
       return id;
     }
@@ -190,6 +201,7 @@ export async function getConversation(
           messages: conv.messages,
           initiativeId: conv.initiativeId,
           initiativeMode: conv.initiativeMode,
+          source: conv.source,
         }
       : null;
   }
@@ -207,6 +219,8 @@ export async function getConversation(
       messages: (data.messages as DisplayMessage[]) ?? [],
       initiativeId: (data.initiativeId as string) ?? undefined,
       initiativeMode: (data.initiativeMode as 'planning' | 'building' | undefined) ?? undefined,
+      // Pre-v0.30 docs lack `source`; treat as 'standalone' for safety.
+      source: ((data.source as ConversationSource | undefined) ?? 'standalone'),
     };
   } catch (err) {
     if (isFirestoreUnavailable(err)) return null;

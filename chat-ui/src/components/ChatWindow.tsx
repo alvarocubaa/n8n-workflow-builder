@@ -7,6 +7,7 @@ import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
 import type { AssistantMode, InitiativePrefill } from '@/lib/types';
+import { emitToParent, isEmbedMode } from '@/lib/embed';
 
 const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
 
@@ -17,12 +18,14 @@ const MessageList = memo(function MessageList({
   departmentId,
   mode,
   onCancel,
+  initiativeId,
 }: {
   messages: Message[];
   conversationId?: string;
   departmentId: string;
   mode: AssistantMode;
   onCancel: () => void;
+  initiativeId?: string;
 }) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
@@ -35,6 +38,7 @@ const MessageList = memo(function MessageList({
           messageIndex={i}
           mode={mode}
           onCancel={msg.isStreaming ? onCancel : undefined}
+          initiativeId={initiativeId}
         />
       ))}
     </div>
@@ -199,6 +203,12 @@ export default function ChatWindow({
         requestBody.prefill = prefill;
         prefillSentRef.current = true;
       }
+      // Direction-3: the /chat/* page route's middleware sets x-embed:1, but
+      // that header doesn't propagate to /api/chat XHRs. Signal embed mode
+      // explicitly so the server can derive `source = 'hub_embed'`.
+      if (isEmbedMode()) {
+        requestBody.embed = true;
+      }
 
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -235,6 +245,10 @@ export default function ChatWindow({
             args?: Record<string, unknown>;
             message?: string;
             conversationId?: string;
+            initiative_id?: string;
+            conversation_id?: string;
+            extracted_fields?: Record<string, string | number>;
+            extracted_fields_at?: string;
           };
 
           try {
@@ -288,6 +302,26 @@ export default function ChatWindow({
               if (!event.conversationId.startsWith('local-')) {
                 router.replace(`/chat/${event.conversationId}`);
               }
+            }
+          } else if (event.type === 'extracted_fields') {
+            // Direction 3: when running inside the Hub iframe, relay the
+            // server-extracted planning fields up to the parent so the Hub
+            // form's apply-suggestions pill refreshes without waiting for the
+            // Supabase round trip. No-op outside embed mode.
+            if (
+              isEmbedMode() &&
+              event.initiative_id &&
+              event.conversation_id &&
+              event.extracted_fields &&
+              event.extracted_fields_at
+            ) {
+              emitToParent({
+                type: 'extracted_fields_updated',
+                initiative_id: event.initiative_id,
+                conversation_id: event.conversation_id,
+                extracted_fields: event.extracted_fields,
+                extracted_fields_at: event.extracted_fields_at,
+              });
             }
           } else if (event.type === 'error') {
             setMessages(prev => {
@@ -427,6 +461,7 @@ export default function ChatWindow({
               departmentId={departmentId}
               mode={mode}
               onCancel={cancelStream}
+              initiativeId={prefill?.initiative_id}
             />
             <div ref={bottomRef} />
           </>

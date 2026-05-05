@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>chat-ui embed harness</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, system-ui, sans-serif; background: #f8fafc; }
+  header { padding: 10px 14px; background: #1f2937; color: #fff; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 14px; margin: 0; flex: 1; }
+  header button, header textarea, header input { font-size: 12px; }
+  header button { padding: 4px 10px; background: #6366f1; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+  header button:hover { background: #4f46e5; }
+  main { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 48px); gap: 8px; padding: 8px; }
+  #frame-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; overflow: hidden; }
+  iframe { width: 100%; height: 100%; border: 0; }
+  #log-wrap { background: #0f172a; color: #e2e8f0; border-radius: 4px; overflow: auto; padding: 10px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  #log-wrap pre { margin: 0 0 8px 0; padding: 6px 8px; background: #1e293b; border-left: 3px solid #6366f1; border-radius: 2px; white-space: pre-wrap; word-break: break-all; }
+  #log-wrap pre.bad { border-left-color: #ef4444; }
+  #log-wrap pre.out { border-left-color: #10b981; }
+  textarea { min-width: 240px; height: 28px; padding: 4px 6px; border-radius: 4px; border: 1px solid #4b5563; background: #111827; color: #e5e7eb; }
+  input[type="text"] { padding: 4px 6px; border-radius: 4px; border: 1px solid #4b5563; background: #111827; color: #e5e7eb; min-width: 160px; }
+  label { font-size: 12px; opacity: 0.85; }
+</style>
+</head>
+<body>
+<header>
+  <h1>chat-ui embed harness — origin: <span id="my-origin"></span></h1>
+  <label>Initiative ID: <input id="initiative-id" type="text" value="00984539-dfab-4fee-8531-36e18ff5e429" /></label>
+  <label>Mode:
+    <select id="prefill-mode">
+      <option value="planning">planning</option>
+      <option value="building">building</option>
+    </select>
+  </label>
+  <button id="reload-btn">Reload iframe</button>
+  <button id="clear-cookie-btn" title="Tells iframe to clear gid_token by reloading + skipping cookie path">Force re-auth</button>
+  <textarea id="auth-token-input" placeholder="Paste Google ID token here (eyJ...)"></textarea>
+  <button id="send-token-btn">Send auth_token</button>
+  <button id="bad-origin-btn" title="Posts a message with the wrong type to test ignore">Send bad message</button>
+</header>
+<main>
+  <div id="frame-wrap"></div>
+  <div id="log-wrap"></div>
+</main>
+<script>
+  const myOrigin = window.location.origin;
+  document.getElementById('my-origin').textContent = myOrigin;
+
+  // chat-ui dev origin (different port → genuinely cross-origin postMessage).
+  // npm run dev binds to 3002 in this repo (see chat-ui/package.json scripts.dev).
+  const CHAT_UI_ORIGIN = 'http://localhost:3002';
+
+  function log(label, payload, cls) {
+    const pre = document.createElement('pre');
+    if (cls) pre.className = cls;
+    const t = new Date().toISOString().slice(11, 19);
+    pre.textContent = `[${t}] ${label}\n${typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)}`;
+    const wrap = document.getElementById('log-wrap');
+    wrap.prepend(pre);
+  }
+
+  function buildPrefill() {
+    const initId = document.getElementById('initiative-id').value.trim();
+    const mode = document.getElementById('prefill-mode').value;
+    const obj = {
+      initiative_id: initId,
+      mode,
+      initiative_metadata: {
+        title: 'Harness test initiative',
+        improvement_kpi: 'Reduce manual triage time by 60%',
+        business_justification: 'Manual triage takes 15 min × 40 tickets/day = 10 h/day across CS team.',
+        department: 'Customer Success',
+        department_id: 'cs',
+        current_state: 'CS leads manually classify tickets in Zendesk + ping Slack.',
+        data_sources: 'Zendesk tickets, Slack channels',
+        hub_url: 'http://localhost:3010/embed-host.html#initiative/' + initId,
+      },
+    };
+    const json = JSON.stringify(obj);
+    // Mirror Hub encoder: base64(unescape(encodeURIComponent(json)))
+    const utf8 = unescape(encodeURIComponent(json));
+    return btoa(utf8);
+  }
+
+  function mountIframe() {
+    const wrap = document.getElementById('frame-wrap');
+    wrap.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    const prefill = buildPrefill();
+    iframe.src = `${CHAT_UI_ORIGIN}/chat?prefill=${encodeURIComponent(prefill)}&embed=true`;
+    iframe.allow = 'identity-credentials-get'; // future GIS-in-iframe (non-blocking)
+    wrap.appendChild(iframe);
+    log('iframe mount', iframe.src, 'out');
+    return iframe;
+  }
+
+  let iframe = mountIframe();
+
+  document.getElementById('reload-btn').addEventListener('click', () => {
+    iframe = mountIframe();
+  });
+
+  document.getElementById('clear-cookie-btn').addEventListener('click', () => {
+    // We can't clear chat-ui's HttpOnly cookie from here; instruct the iframe
+    // to request re-auth by reloading. The iframe's /api/auth/me will return
+    // 200 if cookie still valid → no auth_required fires. To genuinely test
+    // the timeout/postMessage path, the operator should manually delete the
+    // gid_token cookie at chat-ui origin in DevTools first, then click this.
+    iframe = mountIframe();
+  });
+
+  document.getElementById('send-token-btn').addEventListener('click', () => {
+    const token = document.getElementById('auth-token-input').value.trim();
+    if (!token) {
+      log('send-token: NOOP (token field empty)', '', 'bad');
+      return;
+    }
+    iframe.contentWindow.postMessage({ type: 'auth_token', id_token: token }, CHAT_UI_ORIGIN);
+    log('parent → iframe', { type: 'auth_token', id_token: token.slice(0, 24) + '…' }, 'out');
+  });
+
+  document.getElementById('bad-origin-btn').addEventListener('click', () => {
+    iframe.contentWindow.postMessage({ type: 'auth_token', id_token: 'should-be-ignored' }, CHAT_UI_ORIGIN);
+    iframe.contentWindow.postMessage({ type: 'totally_unknown', payload: 1 }, CHAT_UI_ORIGIN);
+    log('parent → iframe (bad msg)', 'sent unknown type — chat-ui should ignore', 'out');
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== CHAT_UI_ORIGIN) {
+      log('IGNORED (wrong origin)', { origin: event.origin, data: event.data }, 'bad');
+      return;
+    }
+    log(`iframe → parent  [origin=${event.origin}]`, event.data);
+    // Convenience: when iframe asks for auth, auto-send the token in the textarea (if any).
+    if (event.data && event.data.type === 'auth_required') {
+      const token = document.getElementById('auth-token-input').value.trim();
+      if (token) {
+        iframe.contentWindow.postMessage({ type: 'auth_token', id_token: token }, CHAT_UI_ORIGIN);
+        log('auto-replied auth_token', { id_token: token.slice(0, 24) + '…' }, 'out');
+      }
+    }
+  });
+</script>
+</body>
+</html>
