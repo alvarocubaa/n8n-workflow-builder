@@ -148,7 +148,7 @@ deploy_chat_ui() {
         --region "$REGION" \
         --project "$PROJECT_ID" \
         --service-account "n8n-workflow-builder@${PROJECT_ID}.iam.gserviceaccount.com" \
-        --no-allow-unauthenticated \
+        --allow-unauthenticated \
         --port 8080 \
         --memory 512Mi \
         --cpu 1 \
