@@ -1,7 +1,10 @@
 # Phase-flow design: initiative-first → optional workflow
 
-**Status:** design (2026-05-06).
-**Goal:** one coherent journey from idea to deployed workflow, all started from "Plan with AI" inside the Innovation Hub. Eliminates the current mode contamination where the planning-mode AI cheerfully builds workflows when prompted.
+**Status:** **SUPERSEDED** by [`redesign-v2-server-write.md`](redesign-v2-server-write.md) on 2026-05-06.
+
+The Phase 1 (interview) rule it documents is still valid and live in the system prompt (Chunk A). Phase 2 (form auto-fill via postMessage) and Phase 3 (auto-save handoff) shipped as Chunks A-D today but are being **deleted** in redesign-v2 in favour of a server-side write through a new Edge Function. Read this doc only for the historical record — the new write path lives in the redesign doc.
+
+**Goal (original):** one coherent journey from idea to deployed workflow, all started from "Plan with AI" inside the Innovation Hub. Eliminates the current mode contamination where the planning-mode AI cheerfully builds workflows when prompted.
 
 For the wire protocol underneath, see [`protocol-contract.md`](protocol-contract.md). For the live plumbing this design assumes, see [`current-architecture.md`](current-architecture.md).
 
