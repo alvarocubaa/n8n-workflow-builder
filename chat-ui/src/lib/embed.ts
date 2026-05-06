@@ -1,5 +1,5 @@
 // Embed-mode helpers for Direction 3 (chat-ui rendered inside Hub iframe).
-// See docs/direction-3-design.md for the full protocol.
+// See docs/innovation-hub/protocol-contract.md for the full protocol.
 
 // Cloud Run exposes the same service under two URL formats (region-encoded
 // and project-number-encoded). Allow both so the iframe→parent postMessage

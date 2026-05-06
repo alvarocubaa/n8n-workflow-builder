@@ -9,7 +9,7 @@ import type { AnalyticsEvent, AssistantMode, DeployEvent, FeedbackEntry } from '
 // Direction-3: explicit source of the conversation. Set once on creation,
 // immutable thereafter. Hub-write callbacks (n8n-conversation-callback /
 // n8n-builder-callback) reject 'standalone' rows defensively. See
-// docs/direction-3-design.md.
+// docs/innovation-hub/protocol-contract.md.
 export type ConversationSource = 'standalone' | 'hub_prefill' | 'hub_embed';
 
 interface LocalConv {

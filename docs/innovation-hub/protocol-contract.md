@@ -1,6 +1,7 @@
-# Direction 3 — embedded chat panel inside the Hub
+# Direction 3 — embedded chat panel inside the Hub (protocol contract)
 
-**Status:** Design locked, implementation in progress (Session 4, 2026-05-04).
+**Status:** Live in production since Session 5 (2026-05-05). Originally `direction-3-design.md` — moved into this folder unchanged so the wire protocol lives next to its sister docs ([`current-architecture.md`](current-architecture.md), [`phase-flow-design.md`](phase-flow-design.md), [`pop-out-design.md`](pop-out-design.md)).
+
 **Goal:** chat-ui's chat surface lives **inside** the Hub via iframe (no new tab). User clicks "Plan with AI" or "Generate with AI" on a Hub initiative → drawer opens in-page → user converses → workflow ships → drawer closes.
 
 This document is the protocol contract between chat-ui (iframe) and the Hub (parent). Read this before adding any cross-frame messaging on either side.
