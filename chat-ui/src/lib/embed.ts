@@ -1,8 +1,12 @@
 // Embed-mode helpers for Direction 3 (chat-ui rendered inside Hub iframe).
 // See docs/direction-3-design.md for the full protocol.
 
+// Cloud Run exposes the same service under two URL formats (region-encoded
+// and project-number-encoded). Allow both so the iframe→parent postMessage
+// is delivered regardless of which URL the user is viewing the Hub at.
 const DEFAULT_PARENT_ORIGINS = [
   'https://ai-innovation-hub-hoepmeihvq-uc.a.run.app',
+  'https://ai-innovation-hub-721337864706.us-central1.run.app',
   'http://localhost:3010', // local test harness
 ];
 
