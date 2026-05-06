@@ -48,6 +48,16 @@ export type ChatEvent =
       conversation_id: string;
       extracted_fields: Record<string, string | number>;
       extracted_fields_at: string;
+    }
+  // Embed-mode (Direction 3, Phase 3 handoff): server emits this when the
+  // assistant's planning-mode reply contains the <request_workflow_handoff />
+  // sentinel. Client relays via postMessage so the Hub auto-saves the open
+  // form as a draft initiative; the new id is sent back via `initiative_saved`
+  // postMessage and used on the next /api/chat turn.
+  | {
+      type: 'request_workflow_handoff';
+      initiative_id: string;
+      conversation_id: string;
     };
 
 // ─── Analytics types ────────────────────────────────────────────────────────

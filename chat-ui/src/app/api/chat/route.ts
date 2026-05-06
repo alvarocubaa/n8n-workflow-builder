@@ -5,6 +5,7 @@ import {
   createConversation,
   appendMessages,
   getConversation,
+  updateConversationInitiativeId,
   logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
@@ -217,6 +218,12 @@ export async function POST(req: Request): Promise<Response> {
     // request headers (x-embed) only fire on the /chat/* page route and don't
     // propagate to /api/chat XHRs.
     embed?: boolean;
+    // Direction-3 Phase 3 handoff: when the Hub auto-saves a draft initiative
+    // mid-conversation, the client passes the new real UUID here. Server swaps
+    // the conversation's stored initiativeId from `__draft__` to this value
+    // and prepends a fresh <initiative_context> block so the AI continues
+    // with the right id for the workflow build phase.
+    current_initiative_id?: string;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -224,7 +231,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { message, conversationId: existingConvId, file, prefill, embed } = body;
+  const { message, conversationId: existingConvId, file, prefill, embed, current_initiative_id } = body;
   if (!message?.trim()) {
     return new Response('message is required', { status: 400 });
   }
@@ -302,6 +309,27 @@ export async function POST(req: Request): Promise<Response> {
 
   const convId = conversationId; // narrowed — always defined from here on
 
+  // Direction-3 Phase 3 handoff: client supplies the real initiative_id once
+  // the Hub has auto-saved the draft. Swap it on the conversation doc and
+  // prepend a fresh <initiative_context> note so the AI continues with the
+  // right id when it transitions to workflow building. Idempotent — only
+  // updates when the value actually changed.
+  let handoffNote = '';
+  if (
+    existingConvId &&
+    current_initiative_id &&
+    current_initiative_id !== '__draft__' &&
+    current_initiative_id !== initiativeId
+  ) {
+    await updateConversationInitiativeId(user.email, existingConvId, current_initiative_id);
+    initiativeId = current_initiative_id;
+    handoffNote =
+      `<initiative_context_update>\n` +
+      `The Hub auto-saved this initiative as a draft. The real initiative_id is now ${current_initiative_id}.\n` +
+      `Use this id for any workflow build / deploy in this conversation; the deploy callback will link the workflow to this initiative.\n` +
+      `</initiative_context_update>\n\n`;
+  }
+
   // Build department context prefix for the first message of new conversations
   const dept = getDepartment(departmentId);
   let enrichedMessage = message;
@@ -310,6 +338,8 @@ export async function POST(req: Request): Promise<Response> {
     // Initiative context goes ABOVE department context — initiative is the higher-level frame.
     const initiativePrefix = prefill ? `${buildInitiativeContext(prefill)}\n\n` : '';
     enrichedMessage = `${initiativePrefix}${contextPrefix}\n\n${message}`;
+  } else if (handoffNote) {
+    enrichedMessage = `${handoffNote}${message}`;
   }
 
   // Fire-and-forget: tell the Hub a conversation has started against this
@@ -402,6 +432,21 @@ export async function POST(req: Request): Promise<Response> {
             // Edge Function, which upserts {extracted_fields, extracted_fields_at}
             // on the initiative_chat_conversations row. Failures log only —
             // never break the chat response.
+            // Direction-3 Phase 3 handoff sentinel: when the assistant's
+            // planning-mode reply contains <request_workflow_handoff />, fire
+            // an SSE event the embed client relays as postMessage so the Hub
+            // auto-saves the draft initiative.
+            if (
+              initiativeMode === 'planning' &&
+              initiativeId &&
+              /<request_workflow_handoff\s*\/?>/i.test(modelChunks.join(''))
+            ) {
+              enqueue({
+                type: 'request_workflow_handoff',
+                initiative_id: initiativeId,
+                conversation_id: convId,
+              });
+            }
             if (initiativeMode === 'planning' && initiativeId) {
               const extracted = extractAndValidatePlanningFields(modelChunks.join(''));
               if (extracted) {

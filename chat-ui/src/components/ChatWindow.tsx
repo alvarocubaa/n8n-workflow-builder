@@ -7,7 +7,7 @@ import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
 import type { AssistantMode, InitiativePrefill } from '@/lib/types';
-import { emitToParent, isEmbedMode } from '@/lib/embed';
+import { emitToParent, isAllowedParentOrigin, isEmbedMode } from '@/lib/embed';
 
 const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
 
@@ -112,6 +112,11 @@ export default function ChatWindow({
   const abortRef = useRef<AbortController | null>(null);
   const lastEventAtRef = useRef<number>(0);
   const lastPromptRef = useRef<{ text: string; file: AttachedFile | null } | null>(null);
+  // Direction-3 Phase 3 handoff: when the Hub auto-saves a draft initiative
+  // and posts back `{ type: 'initiative_saved', initiative_id }`, we cache it
+  // here and pass it to /api/chat on the next turn so the server swaps the
+  // conversation's initiativeId from `__draft__` to the real UUID.
+  const handoffInitiativeIdRef = useRef<string | null>(null);
 
   // Scroll to bottom whenever messages update
   useEffect(() => {
@@ -121,6 +126,24 @@ export default function ChatWindow({
   // Abort in-flight request when the component unmounts
   useEffect(() => {
     return () => abortRef.current?.abort();
+  }, []);
+
+  // Direction-3 Phase 3 handoff (parent → iframe): listen for the Hub's
+  // `initiative_saved` postMessage. Cache the new id; the next /api/chat
+  // turn ships it as `current_initiative_id` and the server swaps the
+  // conversation's stored id.
+  useEffect(() => {
+    if (!isEmbedMode()) return;
+    const onMessage = (event: MessageEvent) => {
+      if (!isAllowedParentOrigin(event.origin)) return;
+      const data = event.data as { type?: string; initiative_id?: string } | null;
+      if (!data || data.type !== 'initiative_saved') return;
+      if (typeof data.initiative_id !== 'string' || !data.initiative_id) return;
+      if (data.initiative_id === '__draft__') return;
+      handoffInitiativeIdRef.current = data.initiative_id;
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   const cancelStream = useCallback(() => {
@@ -208,6 +231,13 @@ export default function ChatWindow({
       // explicitly so the server can derive `source = 'hub_embed'`.
       if (isEmbedMode()) {
         requestBody.embed = true;
+      }
+      // Direction-3 Phase 3 handoff: pass the Hub-issued real initiative_id
+      // once, so the server swaps the conversation's stored id from
+      // `__draft__` to the real UUID. Cleared after we send it.
+      if (handoffInitiativeIdRef.current) {
+        requestBody.current_initiative_id = handoffInitiativeIdRef.current;
+        handoffInitiativeIdRef.current = null;
       }
 
       const res = await fetch('/api/chat', {
@@ -321,6 +351,18 @@ export default function ChatWindow({
                 conversation_id: event.conversation_id,
                 extracted_fields: event.extracted_fields,
                 extracted_fields_at: event.extracted_fields_at,
+              });
+            }
+          } else if (event.type === 'request_workflow_handoff') {
+            // Direction-3 Phase 3: AI emitted the <request_workflow_handoff />
+            // sentinel. Ask the Hub to auto-save the draft initiative so the
+            // workflow can be linked to a real id. Hub replies via postMessage
+            // `initiative_saved` (handled in the message listener below).
+            if (isEmbedMode() && event.initiative_id && event.conversation_id) {
+              emitToParent({
+                type: 'request_save_initiative',
+                initiative_id: event.initiative_id,
+                conversation_id: event.conversation_id,
               });
             }
           } else if (event.type === 'error') {

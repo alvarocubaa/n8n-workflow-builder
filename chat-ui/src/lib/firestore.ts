@@ -184,6 +184,35 @@ export async function appendMessages(
 }
 
 /**
+ * Direction-3 Phase 3 handoff: when the Hub auto-saves a draft initiative
+ * and posts back the new id, the next /api/chat turn uses this to swap the
+ * conversation's initiative_id from `__draft__` to the real UUID. Idempotent.
+ */
+export async function updateConversationInitiativeId(
+  userEmail: string,
+  conversationId: string,
+  newInitiativeId: string,
+): Promise<void> {
+  if (conversationId.startsWith('local-')) {
+    const conv = localStore.get(conversationId);
+    if (conv) conv.initiativeId = newInitiativeId;
+    return;
+  }
+  try {
+    await convRef(userEmail, conversationId).set(
+      {
+        initiativeId: newInitiativeId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return;
+    throw err;
+  }
+}
+
+/**
  * Load a single conversation (title + messages).
  * Returns null if Firestore is unavailable or ID is local.
  */
