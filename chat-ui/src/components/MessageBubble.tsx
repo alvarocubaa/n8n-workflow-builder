@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -9,6 +9,18 @@ import FeedbackButtons from './FeedbackButtons';
 import { getToolLabel } from '@/lib/tool-labels';
 import type { AssistantMode } from '@/lib/types';
 import { emitToParent, isEmbedMode } from '@/lib/embed';
+
+// Keys of the planning_mode whitelist (mirrors chat-ui's
+// `extractAndValidatePlanningFields` and the Hub's ExtractedPlanningFields).
+// In embed mode the Hub auto-fills the form from these via postMessage, so
+// we strip the fenced JSON from the rendered message — the AI's narrative
+// summary above it stays.
+const PLANNING_FIELD_KEYS = new Set([
+  'title', 'description', 'improvement_kpi', 'business_justification',
+  'current_state', 'department', 'data_sources', 'level_of_improvement',
+  'impact_category', 'effort', 'current_process_minutes_per_run',
+  'current_process_runs_per_month', 'current_process_people_count',
+]);
 
 export interface Message {
   id?: string;
@@ -239,6 +251,24 @@ function LiveActivity({
 function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel, initiativeId }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
+  // In embed mode, drop fenced ```json blocks whose keys match the planning
+  // whitelist — the Hub auto-fills the form, so the JSON is redundant noise
+  // for the user. Standalone chat-ui keeps the block (copy-paste fallback).
+  const renderedContent = useMemo(() => {
+    if (!isEmbedMode()) return message.content;
+    if (message.role !== 'model') return message.content;
+    return message.content.replace(/```json\s*\n([\s\S]*?)\n```/g, (full, body: string) => {
+      try {
+        const parsed = JSON.parse(body) as Record<string, unknown>;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const hasPlanningKey = Object.keys(parsed).some((k) => PLANNING_FIELD_KEYS.has(k));
+          if (hasPlanningKey) return '';
+        }
+      } catch { /* unparseable / streaming partial — leave intact */ }
+      return full;
+    });
+  }, [message.content, message.role]);
+
   if (isUser) {
     return (
       <div className="flex justify-end animate-fadeIn">
@@ -350,7 +380,7 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
               },
             }}
           >
-            {message.content}
+            {renderedContent}
           </ReactMarkdown>
         </div>
 
