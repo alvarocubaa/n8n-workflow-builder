@@ -7,7 +7,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import FeedbackButtons from './FeedbackButtons';
 import { getToolLabel } from '@/lib/tool-labels';
-import type { AssistantMode } from '@/lib/types';
+import type { AssistantMode, PromoteContext } from '@/lib/types';
 import { emitToParent, isEmbedMode } from '@/lib/embed';
 
 // Keys of the planning_mode whitelist (mirrors chat-ui's
@@ -43,6 +43,9 @@ interface MessageBubbleProps {
   // Direction 3 (embed): when present, deploy success postMessages the parent
   // with workflow_deployed so the Hub can render an optimistic stats placeholder.
   initiativeId?: string;
+  // Take-to-Production: when present, the workflow CTA renders as "Apply Promotion"
+  // (POST /api/promote) instead of "Deploy to n8n" (POST /api/deploy).
+  promoteContext?: PromoteContext;
 }
 
 function DownloadButton({ json, filename }: { json: string; filename?: string }) {
@@ -192,6 +195,123 @@ function DeployButton({
   );
 }
 
+function PromoteButton({
+  json,
+  conversationId,
+  promoteContext,
+}: {
+  json: string;
+  conversationId?: string;
+  promoteContext: PromoteContext;
+}) {
+  const [state, setState] = useState<'idle' | 'promoting' | 'ok' | 'partial' | 'err'>('idle');
+  const [productionUrl, setProductionUrl] = useState<string | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [partialMsg, setPartialMsg] = useState<string | null>(null);
+
+  async function handlePromote() {
+    setState('promoting');
+    setErrMsg(null);
+    setPartialMsg(null);
+    try {
+      const res = await fetch('/api/promote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowId: promoteContext.workflow_id,
+          workflowJson: json,
+          departmentId: promoteContext.department_id,
+          innovationItemId: promoteContext.innovation_item_id,
+          initiativeId: promoteContext.initiative_id,
+          conversationId: conversationId ?? '',
+          activate: 'auto',
+        }),
+      });
+      const data = (await res.json()) as {
+        productionWorkflowUrl?: string;
+        message?: string;
+        error?: string;
+        detail?: string;
+        failures?: Array<{ nodeName: string; reason: string }>;
+        stage?: string;
+      };
+      if (res.status === 207) {
+        // Partial: transferred but activate failed
+        setProductionUrl(data.productionWorkflowUrl ?? null);
+        setPartialMsg(data.message ?? 'Workflow is in production but inactive — toggle in n8n when ready.');
+        setState('partial');
+      } else if (!res.ok || data.error) {
+        const failureLines = data.failures
+          ? '\n' + data.failures.map(f => `• ${f.nodeName}: ${f.reason}`).join('\n')
+          : '';
+        setErrMsg((data.detail ?? data.error ?? 'Promote failed') + failureLines);
+        setState('err');
+      } else {
+        setProductionUrl(data.productionWorkflowUrl ?? null);
+        setState('ok');
+        if (isEmbedMode()) {
+          emitToParent({
+            type: 'workflow_promoted',
+            initiative_id: promoteContext.initiative_id,
+            innovation_item_id: promoteContext.innovation_item_id,
+            conversation_id: conversationId ?? '',
+            n8n_workflow_id: promoteContext.workflow_id,
+            production_workflow_url: data.productionWorkflowUrl ?? '',
+          });
+        }
+      }
+    } catch (e) {
+      setErrMsg(String(e));
+      setState('err');
+    }
+  }
+
+  if ((state === 'ok' || state === 'partial') && productionUrl) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <a
+          href={productionUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-500 transition"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          {state === 'ok' ? 'Live in production' : 'In production (inactive)'}
+        </a>
+        {partialMsg && (
+          <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-700" title={partialMsg}>
+            Activate failed — toggle in n8n
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (state === 'err') {
+    return (
+      <span className="rounded-lg bg-coral-50 px-3 py-1 text-xs font-medium text-coral-300 ring-1 ring-coral-100" title={errMsg ?? undefined}>
+        Promote failed
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handlePromote}
+      disabled={state === 'promoting'}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50 transition"
+      title="Transfer this workflow to the production n8n project, swap to production credentials, and activate it."
+    >
+      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      </svg>
+      {state === 'promoting' ? 'Promoting...' : 'Apply Promotion'}
+    </button>
+  );
+}
+
 function TypingDots() {
   return (
     <div className="flex items-center gap-1">
@@ -248,7 +368,7 @@ function LiveActivity({
   );
 }
 
-function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel, initiativeId }: MessageBubbleProps) {
+function MessageBubbleInner({ message, conversationId, departmentId, messageIndex, mode = 'builder', onCancel, initiativeId, promoteContext }: MessageBubbleProps) {
   const isUser = message.role === 'user';
 
   // In embed mode, drop fenced ```json blocks whose keys match the planning
@@ -352,7 +472,11 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
                       <div className="flex items-center justify-between rounded-t-lg bg-guesty-400 px-3 py-1.5">
                         <span className="text-xs font-medium text-guesty-100">{match[1].toUpperCase()}</span>
                         <div className="flex gap-2">
-                          {mode === 'builder' && isWorkflow && !isSingleNode && <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} initiativeId={initiativeId} />}
+                          {mode === 'builder' && isWorkflow && !isSingleNode && (
+                            promoteContext
+                              ? <PromoteButton json={codeString} conversationId={conversationId} promoteContext={promoteContext} />
+                              : <DeployButton json={codeString} conversationId={conversationId} departmentId={departmentId} initiativeId={initiativeId} />
+                          )}
                           {mode === 'builder' && isWorkflow && <DownloadButton json={codeString} />}
                           <CopyButton text={codeString} />
                         </div>

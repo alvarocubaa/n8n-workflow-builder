@@ -12,6 +12,7 @@ import { callMcpTool, type RawMcpTool } from './mcp-bridge';
 import { getSystemPrompt } from './system-prompt';
 import { readSkill, readCompanySpec } from './knowledge';
 import { getDepartment, getDepartmentSpecKeys } from './departments';
+import { getWorkflowJson } from './n8n-deploy';
 import type { AssistantMode, ChatEvent, TokenUsage } from './types';
 
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6';
@@ -99,6 +100,28 @@ function getKnowledgeTools(departmentId?: string, mode: AssistantMode = 'builder
     },
   });
 
+  // Promote-to-Production tool — only in builder mode. The system prompt's
+  // <promote_to_production> rule instructs the AI to call this on the FIRST turn of any
+  // promote_context conversation so it can inspect the live workflow JSON before running
+  // the checklist. Cheap pass-through to n8n's GET /workflows/:id.
+  if (mode === 'builder') {
+    tools.push({
+      name: 'get_workflow_for_promotion',
+      description:
+        'Fetch the current JSON of an existing n8n workflow. Use ONLY in promote mode (when a <promote_context> block is in the conversation) to load the workflow that is about to be promoted to production. Returns the full workflow JSON as a string so you can inspect credentials, schedule, destructive nodes, and naming for the promotion checklist.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          workflow_id: {
+            type: 'string',
+            description: 'The n8n workflow id (matches workflow_id in <promote_context>).',
+          },
+        },
+        required: ['workflow_id'],
+      },
+    });
+  }
+
   return tools;
 }
 
@@ -111,9 +134,16 @@ function filterMcpToolsForMode(tools: Tool[], mode: AssistantMode): Tool[] {
   return tools.filter(t => DATA_MODE_MCP_TOOLS.has(t.name));
 }
 
-function handleKnowledgeTool(name: string, args: Record<string, unknown>, departmentId?: string): string | null {
+async function handleKnowledgeTool(name: string, args: Record<string, unknown>, departmentId?: string): Promise<string | null> {
   if (name === 'get_n8n_skill') return readSkill(args.skill as string, args.file as string | undefined);
   if (name === 'get_company_spec') return readCompanySpec(args.system as string, departmentId);
+  if (name === 'get_workflow_for_promotion') {
+    const id = String(args.workflow_id ?? '').trim();
+    if (!id) return 'Error: workflow_id is required';
+    const r = await getWorkflowJson(id);
+    if (r.error) return `Error fetching workflow ${id}: ${r.error}`;
+    return r.json ?? 'Error: workflow returned empty body';
+  }
   return null;
 }
 
@@ -433,7 +463,7 @@ export async function* streamWorkflowChat(
 
       let result: string;
       try {
-        const local = handleKnowledgeTool(tu.name, args, departmentId);
+        const local = await handleKnowledgeTool(tu.name, args, departmentId);
         result = local ?? await callMcpTool(tu.name, args);
       } catch (err) {
         result = `Error executing ${tu.name}: ${String(err)}`;

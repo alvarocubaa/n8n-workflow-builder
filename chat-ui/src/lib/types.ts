@@ -8,6 +8,21 @@ export type AssistantMode = 'builder' | 'data';
 
 export type ChatPrefillMode = 'building' | 'planning';
 
+// ─── Promote context (Hub Take-to-Production flow) ───────────────────────────
+// Hub deep-links into chat-ui with a base64-encoded PromoteContext when the user
+// clicks the "Take to Production" button on a PROJ modal. The conversation opens
+// scoped to that single workflow + linked initiative; the system prompt detects
+// the context block and runs the production checklist deterministically.
+
+export interface PromoteContext {
+  workflow_id: string;          // n8n_workflow_id from initiative_workflow_links
+  workflow_name?: string;       // denormalized snapshot from the same row
+  innovation_item_id: string;   // PROJ uuid (innovation_items.id)
+  initiative_id: string;        // INIT uuid (strategic_ideas.id, parent of PROJ)
+  department_id: string;        // chat-ui canonical id (e.g. 'cs', 'cx')
+  hub_url?: string;             // deep-link back to the PROJ detail modal
+}
+
 export interface InitiativePrefill {
   initiative_id: string;
   mode: ChatPrefillMode;

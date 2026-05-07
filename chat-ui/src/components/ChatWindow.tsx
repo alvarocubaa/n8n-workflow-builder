@@ -6,7 +6,7 @@ import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
-import type { AssistantMode, InitiativePrefill } from '@/lib/types';
+import type { AssistantMode, InitiativePrefill, PromoteContext } from '@/lib/types';
 import { emitToParent, isAllowedParentOrigin, isEmbedMode } from '@/lib/embed';
 
 const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
@@ -19,6 +19,7 @@ const MessageList = memo(function MessageList({
   mode,
   onCancel,
   initiativeId,
+  promoteContext,
 }: {
   messages: Message[];
   conversationId?: string;
@@ -26,6 +27,7 @@ const MessageList = memo(function MessageList({
   mode: AssistantMode;
   onCancel: () => void;
   initiativeId?: string;
+  promoteContext?: PromoteContext;
 }) {
   return (
     <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
@@ -39,6 +41,7 @@ const MessageList = memo(function MessageList({
           mode={mode}
           onCancel={msg.isStreaming ? onCancel : undefined}
           initiativeId={initiativeId}
+          promoteContext={promoteContext}
         />
       ))}
     </div>
@@ -70,6 +73,23 @@ function decodePrefill(b64: string | null): InitiativePrefill | null {
   }
 }
 
+function decodePromoteContext(b64: string | null): PromoteContext | null {
+  if (!b64) return null;
+  try {
+    const utf8 = atob(b64);
+    const json = decodeURIComponent(escape(utf8));
+    const parsed = JSON.parse(json) as PromoteContext;
+    if (!parsed.workflow_id || !parsed.innovation_item_id || !parsed.initiative_id || !parsed.department_id) {
+      console.warn('Promote payload is missing required fields, ignoring:', parsed);
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn('Failed to decode promote param, ignoring:', err);
+    return null;
+  }
+}
+
 export default function ChatWindow({
   conversationId,
   initialMessages = [],
@@ -81,30 +101,35 @@ export default function ChatWindow({
   // Decode the Hub-supplied prefill on first mount only. After the first turn
   // is sent, the prefill is persisted on the conversation doc server-side and
   // travels with `conversationId`, so we don't need to resend it.
-  const [prefill, setPrefill] = useState<InitiativePrefill | null>(() => {
+  const [prefill] = useState<InitiativePrefill | null>(() => {
     if (conversationId) return null; // existing conversation — server already knows
     return decodePrefill(searchParams?.get('prefill') ?? null);
   });
+  const [promoteContext] = useState<PromoteContext | null>(() => {
+    if (conversationId) return null;
+    return decodePromoteContext(searchParams?.get('promote') ?? null);
+  });
   const prefillSentRef = useRef(false);
+  const promoteContextSentRef = useRef(false);
 
   // Strip the URL params after decode so a refresh doesn't double-seed.
   useEffect(() => {
-    if (prefill && searchParams?.get('prefill')) {
+    if ((prefill && searchParams?.get('prefill')) || (promoteContext && searchParams?.get('promote'))) {
       router.replace('/chat');
     }
-  }, [prefill, searchParams, router]);
+  }, [prefill, promoteContext, searchParams, router]);
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [departmentId, setDepartmentId] = useState(
-    initialDepartmentId ?? prefill?.initiative_metadata?.department_id ?? 'cx',
+    initialDepartmentId ?? promoteContext?.department_id ?? prefill?.initiative_metadata?.department_id ?? 'cx',
   );
   const [mode, setMode] = useState<AssistantMode>(initialMode ?? 'builder');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const [retryable, setRetryable] = useState(false);
   const departmentLocked = useRef(
-    !!conversationId || initialMessages.length > 0 || !!prefill?.initiative_metadata?.department_id,
+    !!conversationId || initialMessages.length > 0 || !!prefill?.initiative_metadata?.department_id || !!promoteContext?.department_id,
   );
   const modeLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -127,6 +152,22 @@ export default function ChatWindow({
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);
+
+  // Take-to-Production: auto-fire the first turn when the page loads with a promote_context.
+  // The system prompt's <promote_to_production> rule is deterministic on the presence of
+  // <promote_context>, but the AI still needs SOMETHING to react to. The synthetic first
+  // user message just kicks off the checklist; the rule does the heavy lifting.
+  const promoteAutoFiredRef = useRef(false);
+  useEffect(() => {
+    if (!promoteContext) return;
+    if (conversationId) return;            // existing conversation already handled
+    if (promoteAutoFiredRef.current) return;
+    if (streaming) return;
+    promoteAutoFiredRef.current = true;
+    void runRequest('Run the production checklist for this workflow.', null, false);
+    // We intentionally only depend on promoteContext + conversationId; runRequest is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promoteContext, conversationId]);
 
   // Direction-3 Phase 3 handoff (parent → iframe): listen for the Hub's
   // `initiative_saved` postMessage. Cache the new id; the next /api/chat
@@ -225,6 +266,11 @@ export default function ChatWindow({
       if (prefill && !prefillSentRef.current && !currentConvId.current) {
         requestBody.prefill = prefill;
         prefillSentRef.current = true;
+      }
+      // Same one-shot semantics for the Take-to-Production promote_context payload.
+      if (promoteContext && !promoteContextSentRef.current && !currentConvId.current) {
+        requestBody.promote_context = promoteContext;
+        promoteContextSentRef.current = true;
       }
       // Direction-3: the /chat/* page route's middleware sets x-embed:1, but
       // that header doesn't propagate to /api/chat XHRs. Signal embed mode
@@ -503,7 +549,8 @@ export default function ChatWindow({
               departmentId={departmentId}
               mode={mode}
               onCancel={cancelStream}
-              initiativeId={prefill?.initiative_id}
+              initiativeId={prefill?.initiative_id ?? promoteContext?.initiative_id}
+              promoteContext={promoteContext ?? undefined}
             />
             <div ref={bottomRef} />
           </>

@@ -6,7 +6,13 @@
  * - Which n8n credentials are available for workflow generation
  * - Optional extra prompt rules injected as department context
  *
- * Credentials are tagged with env: 'sandbox' | 'production'.
+ * Credentials are tagged with env: 'sandbox' | 'production' AND a serviceKey.
+ * serviceKey groups sandbox/production credentials of the same canonical service so the
+ * "Take to Production" promote flow can pair them deterministically (e.g. swap a workflow's
+ * sandbox Salesforce credential for the matching production one). Two credentials with the
+ * same serviceKey MUST also share the same `type` — credential types are not interchangeable
+ * in n8n workflow JSON.
+ *
  * Default behavior: use sandbox credentials unless the user explicitly requests production.
  *
  * Adding a new department: add an entry to DEPARTMENTS below. No code changes needed.
@@ -16,6 +22,7 @@
 
 export interface Credential {
   service: string;
+  serviceKey: string;  // pairing key for sandbox↔production swap (e.g. 'salesforce', 'bigquery', 'slack_bot'). Lowercase.
   name: string;   // exact n8n credential name
   type: string;   // credential type key in workflow JSON (e.g., googleApi, slackApi)
   id: string;     // credential ID
@@ -30,12 +37,13 @@ export interface DepartmentConfig {
   credentials: Credential[];     // department-specific credentials
   promptRules?: string;          // optional extra XML rules for this department
   n8nProjectId?: string;         // n8n project to deploy workflows into (sandbox)
+  n8nProductionProjectId?: string;  // n8n project for the "Take to Production" promote flow. Absence = button hidden in Hub.
 }
 
 // ─── Shared resources (available to all departments) ──────────────────────────
 
 export const SHARED_CREDENTIALS: Credential[] = [
-  { service: 'BigQuery', name: 'Google BigQuery - N8N Service Account', type: 'googleApi', id: 'h7fJ82YhtOnUL58u', env: 'production' },
+  { service: 'BigQuery', serviceKey: 'bigquery', name: 'Google BigQuery - N8N Service Account', type: 'googleApi', id: 'h7fJ82YhtOnUL58u', env: 'production' },
 ];
 
 export const SHARED_SPECS = ['join_map'];
@@ -56,49 +64,49 @@ export const DEPARTMENTS: Record<string, DepartmentConfig> = {
     n8nProjectId: 'PkYJF1B9yVB8Imbl',
     credentials: [
       // Google Ads
-      { service: 'Google Ads', name: "Assaf's google ads api", type: 'googleAdsOAuth2Api', id: '7zPWAntoXHKpq6l7', env: 'sandbox' },
+      { service: 'Google Ads', serviceKey: 'google_ads', name: "Assaf's google ads api", type: 'googleAdsOAuth2Api', id: '7zPWAntoXHKpq6l7', env: 'sandbox' },
       // Google Drive
-      { service: 'Google Drive (Erik)', name: "Erik's Guesty Google Drive", type: 'googleDriveOAuth2Api', id: 'X2f4iJbsdyKh8JwR', env: 'sandbox' },
+      { service: 'Google Drive (Erik)', serviceKey: 'gdrive', name: "Erik's Guesty Google Drive", type: 'googleDriveOAuth2Api', id: 'X2f4iJbsdyKh8JwR', env: 'sandbox' },
       // Google Gemini
-      { service: 'Google Gemini (Marketing)', name: 'Google Gemini Guesty n8n Marketing', type: 'googlePalmApi', id: 'LL8fLgZSrUn8oZtV', env: 'sandbox' },
-      { service: 'Google Gemini (Content)', name: 'Gemini - Content team', type: 'googlePalmApi', id: 'n1zl0kqIiUBw8ZRC', env: 'sandbox' },
+      { service: 'Google Gemini (Marketing)', serviceKey: 'gemini', name: 'Google Gemini Guesty n8n Marketing', type: 'googlePalmApi', id: 'LL8fLgZSrUn8oZtV', env: 'sandbox' },
+      { service: 'Google Gemini (Content)', serviceKey: 'gemini', name: 'Gemini - Content team', type: 'googlePalmApi', id: 'n1zl0kqIiUBw8ZRC', env: 'sandbox' },
       // Google Sheets
-      { service: 'Google Sheets (Ron)', name: 'Google Sheets account 64', type: 'googleSheetsOAuth2Api', id: 'LaWDjKMsqe74XASy', env: 'sandbox' },
-      { service: 'Google Sheets (Assaf)', name: "Assaf's Gsheet", type: 'googleSheetsOAuth2Api', id: 'EDO1bmcTulXX52OG', env: 'sandbox' },
-      { service: 'Google Sheets (Erik)', name: 'Google Sheets - @erik.cohen', type: 'googleSheetsOAuth2Api', id: '4jA8N85DnTpkvyeV', env: 'sandbox' },
+      { service: 'Google Sheets (Ron)', serviceKey: 'gsheets', name: 'Google Sheets account 64', type: 'googleSheetsOAuth2Api', id: 'LaWDjKMsqe74XASy', env: 'sandbox' },
+      { service: 'Google Sheets (Assaf)', serviceKey: 'gsheets', name: "Assaf's Gsheet", type: 'googleSheetsOAuth2Api', id: 'EDO1bmcTulXX52OG', env: 'sandbox' },
+      { service: 'Google Sheets (Erik)', serviceKey: 'gsheets', name: 'Google Sheets - @erik.cohen', type: 'googleSheetsOAuth2Api', id: '4jA8N85DnTpkvyeV', env: 'sandbox' },
       // Facebook / Meta
-      { service: 'Facebook Graph', name: 'Facebook Graph account 2', type: 'facebookGraphApi', id: 'Ieb5eo9DMkpgO9gU', env: 'sandbox' },
+      { service: 'Facebook Graph', serviceKey: 'facebook_graph', name: 'Facebook Graph account 2', type: 'facebookGraphApi', id: 'Ieb5eo9DMkpgO9gU', env: 'sandbox' },
       // Trustpilot
-      { service: 'Trustpilot', name: 'Trustpilot', type: 'httpHeaderAuth', id: 'zLLyVK7WyGS5CrWO', env: 'sandbox' },
-      { service: 'Trustpilot (Ron)', name: 'Trustpilot1 - @ron.madar.hallevi - AI Team', type: 'httpHeaderAuth', id: '7myhqevBiXu7f4x0', env: 'sandbox' },
+      { service: 'Trustpilot', serviceKey: 'trustpilot', name: 'Trustpilot', type: 'httpHeaderAuth', id: 'zLLyVK7WyGS5CrWO', env: 'sandbox' },
+      { service: 'Trustpilot (Ron)', serviceKey: 'trustpilot', name: 'Trustpilot1 - @ron.madar.hallevi - AI Team', type: 'httpHeaderAuth', id: '7myhqevBiXu7f4x0', env: 'sandbox' },
       // Modjo
-      { service: 'Modjo', name: 'Modjo - Cross Dept', type: 'httpHeaderAuth', id: '0hrsL4YxOAvva28w', env: 'sandbox' },
+      { service: 'Modjo', serviceKey: 'modjo', name: 'Modjo - Cross Dept', type: 'httpHeaderAuth', id: '0hrsL4YxOAvva28w', env: 'sandbox' },
       // Firecrawl
-      { service: 'Firecrawl', name: 'firecrawl', type: 'httpBearerAuth', id: 'ngaBlIhFMFTZFajQ', env: 'sandbox' },
+      { service: 'Firecrawl', serviceKey: 'firecrawl', name: 'firecrawl', type: 'httpBearerAuth', id: 'ngaBlIhFMFTZFajQ', env: 'sandbox' },
       // HiBob
-      { service: 'HiBob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'sandbox' },
+      { service: 'HiBob', serviceKey: 'hibob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'sandbox' },
       // Monday.com (per-user credentials)
-      { service: 'Monday.com (Erik)', name: 'Monday.com - @erik.cohen - AI Team', type: 'mondayComApi', id: 'RB7E9LHIgTSUCl1b', env: 'sandbox' },
-      { service: 'Monday.com (Ron)', name: 'Monday.com - @ron.madar.hallevi - AI Team', type: 'mondayComApi', id: 'XNWtLaeE4VtX26uQ', env: 'sandbox' },
-      { service: 'Monday.com (Samuel)', name: 'Monday.com - @samuel.green', type: 'mondayComApi', id: 'WNVVcnekSFyRZwnW', env: 'sandbox' },
+      { service: 'Monday.com (Erik)', serviceKey: 'monday', name: 'Monday.com - @erik.cohen - AI Team', type: 'mondayComApi', id: 'RB7E9LHIgTSUCl1b', env: 'sandbox' },
+      { service: 'Monday.com (Ron)', serviceKey: 'monday', name: 'Monday.com - @ron.madar.hallevi - AI Team', type: 'mondayComApi', id: 'XNWtLaeE4VtX26uQ', env: 'sandbox' },
+      { service: 'Monday.com (Samuel)', serviceKey: 'monday', name: 'Monday.com - @samuel.green', type: 'mondayComApi', id: 'WNVVcnekSFyRZwnW', env: 'sandbox' },
       // HubSpot
-      { service: 'HubSpot', name: 'HubSpot Developer', type: 'hubspotDeveloperApi', id: '1AM3RFd0UdBtfZR6', env: 'sandbox' },
+      { service: 'HubSpot', serviceKey: 'hubspot', name: 'HubSpot Developer', type: 'hubspotDeveloperApi', id: '1AM3RFd0UdBtfZR6', env: 'sandbox' },
       // Salesforce
-      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'sandbox' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'sandbox' },
       // Slack
-      { service: 'Slack (Assaf)', name: "Assaf's Slack Connection", type: 'slackOAuth2Api', id: '5Ii5X9IFid1S8rIE', env: 'sandbox' },
-      { service: 'Slack (Samuel)', name: 'Slack - @samuel.green', type: 'slackApi', id: '90UBEYY1Sx6LQvEk', env: 'sandbox' },
+      { service: 'Slack (Assaf)', serviceKey: 'slack_oauth', name: "Assaf's Slack Connection", type: 'slackOAuth2Api', id: '5Ii5X9IFid1S8rIE', env: 'sandbox' },
+      { service: 'Slack (Samuel)', serviceKey: 'slack_bot', name: 'Slack - @samuel.green', type: 'slackApi', id: '90UBEYY1Sx6LQvEk', env: 'sandbox' },
       // Gmail
-      { service: 'Gmail (Samuel)', name: 'Gmail - @samuel.green', type: 'gmailOAuth2', id: 'iBtVNhsfWnnbxLtl', env: 'sandbox' },
+      { service: 'Gmail (Samuel)', serviceKey: 'gmail', name: 'Gmail - @samuel.green', type: 'gmailOAuth2', id: 'iBtVNhsfWnnbxLtl', env: 'sandbox' },
       // OpenAI
-      { service: 'OpenAI', name: 'OpenAI Marketing Shareable', type: 'openAiApi', id: '2S9DHTC48wRxBERm', env: 'sandbox' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'OpenAI Marketing Shareable', type: 'openAiApi', id: '2S9DHTC48wRxBERm', env: 'sandbox' },
       // Cohere
-      { service: 'Cohere', name: 'Cohere API (Shareable)', type: 'cohereApi', id: 'g7Jo4o2OHWPqyYlq', env: 'sandbox' },
+      { service: 'Cohere', serviceKey: 'cohere', name: 'Cohere API (Shareable)', type: 'cohereApi', id: 'g7Jo4o2OHWPqyYlq', env: 'sandbox' },
       // Supabase
-      { service: 'Supabase (Marketing RAG)', name: 'Supabase - Marketing RAG', type: 'supabaseApi', id: 'VyqopKE3idqjqBQK', env: 'sandbox' },
-      { service: 'Supabase (Modjo)', name: 'Supabase - Modjo Calls RAG', type: 'supabaseApi', id: 'aWfCfVlZn2EvsdYI', env: 'sandbox' },
+      { service: 'Supabase (Marketing RAG)', serviceKey: 'supabase', name: 'Supabase - Marketing RAG', type: 'supabaseApi', id: 'VyqopKE3idqjqBQK', env: 'sandbox' },
+      { service: 'Supabase (Modjo)', serviceKey: 'supabase', name: 'Supabase - Modjo Calls RAG', type: 'supabaseApi', id: 'aWfCfVlZn2EvsdYI', env: 'sandbox' },
       // Postgres
-      { service: 'Postgres (RAG)', name: 'Postgres RAG - @erik.cohen', type: 'postgres', id: 'bU98iAG5WzDTF0lf', env: 'sandbox' },
+      { service: 'Postgres (RAG)', serviceKey: 'postgres', name: 'Postgres RAG - @erik.cohen', type: 'postgres', id: 'bU98iAG5WzDTF0lf', env: 'sandbox' },
     ],
     promptRules: `<department_rules>
 Avoid Code nodes — Marketing users are non-technical.
@@ -117,30 +125,31 @@ For Google Sheets operations, prefer the Google Sheets node with googleSheetsOAu
     description: 'Customer success management, health scores, and account workflows',
     specs: ['salesforce', 'csm', 'hibob', 'jira', 'marketplace', 'zendesk'],
     n8nProjectId: 'kh5kTQJhrQ8KNoSC',
+    n8nProductionProjectId: 'HSINMLm9Tt4FHjL3',
     credentials: [
       // ── Sandbox ──
-      { service: 'Salesforce (Sandbox)', name: 'Salesforce Partial Sandbox', type: 'salesforceOAuth2Api', id: 'aBjJNGRAjYF66z5F', env: 'sandbox' },
-      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'sandbox' },
-      { service: 'Google Sheets (CX auto)', name: 'Google Sheets - cx_automations@guesty.com', type: 'googleSheetsOAuth2Api', id: '7ORQ8IRh8B5Gh30x', env: 'sandbox' },
-      { service: 'Google Sheets (Roni)', name: 'Google Sheets - Roni Shif', type: 'googleSheetsOAuth2Api', id: 'RPi7Ecm1B3utIhYr', env: 'sandbox' },
-      { service: 'Google Sheets', name: 'Google Sheets account 55', type: 'googleSheetsOAuth2Api', id: 'YYBfN3jdWCRUKtmb', env: 'sandbox' },
-      { service: 'Google Docs', name: 'Google Docs account 8', type: 'googleDocsOAuth2Api', id: 'M9Nr0Z9BWYCgb3a4', env: 'sandbox' },
-      { service: 'Google Drive (Roni)', name: 'Google Drive - @ronishif - CS', type: 'googleDriveOAuth2Api', id: 'buZzVXa0qB706qpQ', env: 'sandbox' },
-      { service: 'Google Drive (Ron)', name: 'Google Drive account - ron.madar.hallevi', type: 'googleDriveOAuth2Api', id: '0dsR60mVu0IfoZ2N', env: 'sandbox' },
+      { service: 'Salesforce (Sandbox)', serviceKey: 'salesforce', name: 'Salesforce Partial Sandbox', type: 'salesforceOAuth2Api', id: 'aBjJNGRAjYF66z5F', env: 'sandbox' },
+      { service: 'Google Gemini (AI Team)', serviceKey: 'gemini', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'sandbox' },
+      { service: 'Google Sheets (CX auto)', serviceKey: 'gsheets', name: 'Google Sheets - cx_automations@guesty.com', type: 'googleSheetsOAuth2Api', id: '7ORQ8IRh8B5Gh30x', env: 'sandbox' },
+      { service: 'Google Sheets (Roni)', serviceKey: 'gsheets', name: 'Google Sheets - Roni Shif', type: 'googleSheetsOAuth2Api', id: 'RPi7Ecm1B3utIhYr', env: 'sandbox' },
+      { service: 'Google Sheets', serviceKey: 'gsheets', name: 'Google Sheets account 55', type: 'googleSheetsOAuth2Api', id: 'YYBfN3jdWCRUKtmb', env: 'sandbox' },
+      { service: 'Google Docs', serviceKey: 'gdocs', name: 'Google Docs account 8', type: 'googleDocsOAuth2Api', id: 'M9Nr0Z9BWYCgb3a4', env: 'sandbox' },
+      { service: 'Google Drive (Roni)', serviceKey: 'gdrive', name: 'Google Drive - @ronishif - CS', type: 'googleDriveOAuth2Api', id: 'buZzVXa0qB706qpQ', env: 'sandbox' },
+      { service: 'Google Drive (Ron)', serviceKey: 'gdrive', name: 'Google Drive account - ron.madar.hallevi', type: 'googleDriveOAuth2Api', id: '0dsR60mVu0IfoZ2N', env: 'sandbox' },
       // ── Production ──
-      { service: 'Salesforce', name: 'Salesforce Production Read - Cross Dept', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
-      { service: 'Modjo', name: 'Modjo', type: 'httpHeaderAuth', id: '0hrsL4YxOAvva28w', env: 'production' },
-      { service: 'HiBob', name: 'HiBob Service Account - Cross Dept', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
-      { service: 'Google Gemini (CSM)', name: 'Google Gemini - Guesty - CS', type: 'googlePalmApi', id: 'w2UVOXsARkCmAsOu', env: 'production' },
-      { service: 'Zendesk (OAuth2)', name: 'Zendesk Production - Read - OAuth2 Generic - Cross Dept', type: 'oAuth2Api', id: 'B1ksdYFDJ8LJKaTJ', env: 'production' },
-      { service: 'BigQuery (CS Read)', name: 'Google Service Account n8n-ai-cx-read - Cross Dept', type: 'googleApi', id: 'VQ7CU7dKViVcv8Ah', env: 'production' },
-      { service: 'BigQuery (n8n CS)', name: 'n8n CS Read', type: 'googleApi', id: 'IPuoHnXTeledx3UW', env: 'production' },
-      { service: 'Google Sheets 69', name: 'Google Sheets account 69', type: 'googleSheetsOAuth2Api', id: 'q3XVQiSUNn6QTd3Y', env: 'production' },
-      { service: 'Google Sheets Trigger (Roni)', name: 'Google Sheets Trigger - @RoniShif', type: 'googleSheetsTriggerOAuth2Api', id: '6LuTruhh0yhTE5F3', env: 'production' },
-      { service: 'Slack', name: 'Slack - @Who App - AI Team', type: 'slackApi', id: '7H6auF31TpX7Wk7M', env: 'production' },
-      { service: 'Slack (Roni)', name: 'Slack - @ronishif - CS', type: 'slackOAuth2Api', id: 'wg7EWUJRwvP0yB5c', env: 'production' },
-      { service: 'Gmail', name: 'Gmail - @Ronishif - CS', type: 'gmailOAuth2', id: '3XKWZw8KuGVggGEH', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read - Cross Dept', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'Modjo', serviceKey: 'modjo', name: 'Modjo', type: 'httpHeaderAuth', id: '0hrsL4YxOAvva28w', env: 'production' },
+      { service: 'HiBob', serviceKey: 'hibob', name: 'HiBob Service Account - Cross Dept', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
+      { service: 'Google Gemini (CSM)', serviceKey: 'gemini', name: 'Google Gemini - Guesty - CS', type: 'googlePalmApi', id: 'w2UVOXsARkCmAsOu', env: 'production' },
+      { service: 'Zendesk (OAuth2)', serviceKey: 'zendesk_oauth', name: 'Zendesk Production - Read - OAuth2 Generic - Cross Dept', type: 'oAuth2Api', id: 'B1ksdYFDJ8LJKaTJ', env: 'production' },
+      { service: 'BigQuery (CS Read)', serviceKey: 'bigquery', name: 'Google Service Account n8n-ai-cx-read - Cross Dept', type: 'googleApi', id: 'VQ7CU7dKViVcv8Ah', env: 'production' },
+      { service: 'BigQuery (n8n CS)', serviceKey: 'bigquery', name: 'n8n CS Read', type: 'googleApi', id: 'IPuoHnXTeledx3UW', env: 'production' },
+      { service: 'Google Sheets 69', serviceKey: 'gsheets', name: 'Google Sheets account 69', type: 'googleSheetsOAuth2Api', id: 'q3XVQiSUNn6QTd3Y', env: 'production' },
+      { service: 'Google Sheets Trigger (Roni)', serviceKey: 'gsheets_trigger', name: 'Google Sheets Trigger - @RoniShif', type: 'googleSheetsTriggerOAuth2Api', id: '6LuTruhh0yhTE5F3', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_bot', name: 'Slack - @Who App - AI Team', type: 'slackApi', id: '7H6auF31TpX7Wk7M', env: 'production' },
+      { service: 'Slack (Roni)', serviceKey: 'slack_oauth', name: 'Slack - @ronishif - CS', type: 'slackOAuth2Api', id: 'wg7EWUJRwvP0yB5c', env: 'production' },
+      { service: 'Gmail', serviceKey: 'gmail', name: 'Gmail - @Ronishif - CS', type: 'gmailOAuth2', id: '3XKWZw8KuGVggGEH', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
     ],
     promptRules: `<department_rules>
 Prefer the native Salesforce node over BigQuery for direct Salesforce CRM operations (owner, pipeline, opportunities).
@@ -162,43 +171,44 @@ Avoid Code nodes -- CS users are non-technical.
     description: 'Support operations, ticket management, and customer workflows',
     specs: ['zendesk', 'salesforce', 'jira', 'marketplace'],
     n8nProjectId: 'EuTGww8zaCWPb8Cr',
+    n8nProductionProjectId: 'W62G9hxuK9c7cKwo',
     credentials: [
       // ── Sandbox ──
-      { service: 'Zendesk (Sandbox)', name: 'Zendesk Sandbox - Info@guesty', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },
-      { service: 'Google Gemini (CX)', name: 'Google Gemini Guesty n8n CX', type: 'googlePalmApi', id: 'JrzPwNiVhZibKlAr', env: 'sandbox' },
-      { service: 'Google Translate', name: 'Google Service Account - CX translate', type: 'googleApi', id: 'PAAimNTryrvB72dp', env: 'sandbox' },
-      { service: 'Google Sheets (Inbal)', name: 'Inbal - Google Sheets', type: 'googleSheetsOAuth2Api', id: 'vkdgHYUQNhtG8jsq', env: 'sandbox' },
+      { service: 'Zendesk (Sandbox)', serviceKey: 'zendesk', name: 'Zendesk Sandbox - Info@guesty', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },
+      { service: 'Google Gemini (CX)', serviceKey: 'gemini', name: 'Google Gemini Guesty n8n CX', type: 'googlePalmApi', id: 'JrzPwNiVhZibKlAr', env: 'sandbox' },
+      { service: 'Google Translate', serviceKey: 'gtranslate', name: 'Google Service Account - CX translate', type: 'googleApi', id: 'PAAimNTryrvB72dp', env: 'sandbox' },
+      { service: 'Google Sheets (Inbal)', serviceKey: 'gsheets', name: 'Inbal - Google Sheets', type: 'googleSheetsOAuth2Api', id: 'vkdgHYUQNhtG8jsq', env: 'sandbox' },
       // ── Production: Zendesk ──
-      { service: 'Zendesk', name: 'Zendesk production - info@guesty.com', type: 'zendeskApi', id: 'I0sSUZvS0LVHjO2J', env: 'production' },
-      { service: 'Zendesk (CX AI Agent)', name: 'CX AI Agent', type: 'zendeskApi', id: '1YeTFsUZflTUgSAL', env: 'production' },
-      { service: 'Zendesk (Automations)', name: 'cx_automations@guesty.com', type: 'zendeskApi', id: 'kJ5WD6rCXzB0uyKa', env: 'production' },
-      { service: 'Zendesk (Main)', name: 'Zendesk account', type: 'zendeskApi', id: 'cFdFPhADfsxMmPFC', env: 'production' },
+      { service: 'Zendesk', serviceKey: 'zendesk', name: 'Zendesk production - info@guesty.com', type: 'zendeskApi', id: 'I0sSUZvS0LVHjO2J', env: 'production' },
+      { service: 'Zendesk (CX AI Agent)', serviceKey: 'zendesk', name: 'CX AI Agent', type: 'zendeskApi', id: '1YeTFsUZflTUgSAL', env: 'production' },
+      { service: 'Zendesk (Automations)', serviceKey: 'zendesk', name: 'cx_automations@guesty.com', type: 'zendeskApi', id: 'kJ5WD6rCXzB0uyKa', env: 'production' },
+      { service: 'Zendesk (Main)', serviceKey: 'zendesk', name: 'Zendesk account', type: 'zendeskApi', id: 'cFdFPhADfsxMmPFC', env: 'production' },
       // ── Production: Zuora ──
-      { service: 'Zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
+      { service: 'Zuora', serviceKey: 'zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
       // ── Production: Google AI ──
-      { service: 'Google Gemini (PaLM 2)', name: 'Google Gemini(PaLM) Api account 2', type: 'googlePalmApi', id: 'bvrV6UBbFgHdfx0G', env: 'production' },
-      { service: 'Google Gemini (PaLM)', name: 'Google Gemini(PaLM) Api account', type: 'googlePalmApi', id: 'zLbU4Ppa0sCk3avU', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
-      { service: 'OpenAI (NSAT)', name: 'NSAT N8N only', type: 'openAiApi', id: 'IqN9B2jFalWegjur', env: 'production' },
-      { service: 'LiteLLM', name: 'LiteLLM', type: 'openAiApi', id: '27qQ13au01z8Ufs7', env: 'production' },
+      { service: 'Google Gemini (PaLM 2)', serviceKey: 'gemini', name: 'Google Gemini(PaLM) Api account 2', type: 'googlePalmApi', id: 'bvrV6UBbFgHdfx0G', env: 'production' },
+      { service: 'Google Gemini (PaLM)', serviceKey: 'gemini', name: 'Google Gemini(PaLM) Api account', type: 'googlePalmApi', id: 'zLbU4Ppa0sCk3avU', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'OpenAI (NSAT)', serviceKey: 'openai', name: 'NSAT N8N only', type: 'openAiApi', id: 'IqN9B2jFalWegjur', env: 'production' },
+      { service: 'LiteLLM', serviceKey: 'litellm', name: 'LiteLLM', type: 'openAiApi', id: '27qQ13au01z8Ufs7', env: 'production' },
       // ── Production: Google Workspace ──
-      { service: 'Gmail (CX Automations)', name: 'Gmail - cx_automations@guesty.com', type: 'gmailOAuth2', id: '4BConxQW0qmylDKE', env: 'production' },
-      { service: 'Google Sheets (CX)', name: 'Google Sheets - cx_automations@guesty.com', type: 'googleSheetsOAuth2Api', id: '7ORQ8IRh8B5Gh30x', env: 'production' },
-      { service: 'Google Sheets (Kurt)', name: 'Google Sheets account - Kurt P', type: 'googleSheetsOAuth2Api', id: 'LwIN9HXxRfbtb0xy', env: 'production' },
-      { service: 'Google Sheets Trigger (Kurt)', name: 'Google Sheets Trigger - Kurt', type: 'googleSheetsTriggerOAuth2Api', id: 'Muib6cP4QYhqDyQy', env: 'production' },
-      { service: 'Google Docs (CX)', name: 'CX Automation', type: 'googleDocsOAuth2Api', id: 'vFQAQugW0DywClzX', env: 'production' },
-      { service: 'Google Drive (CX)', name: 'CXAutomations - Drive access', type: 'googleDriveOAuth2Api', id: 'QF9qQq5kC8xrZ2EA', env: 'production' },
+      { service: 'Gmail (CX Automations)', serviceKey: 'gmail', name: 'Gmail - cx_automations@guesty.com', type: 'gmailOAuth2', id: '4BConxQW0qmylDKE', env: 'production' },
+      { service: 'Google Sheets (CX)', serviceKey: 'gsheets', name: 'Google Sheets - cx_automations@guesty.com', type: 'googleSheetsOAuth2Api', id: '7ORQ8IRh8B5Gh30x', env: 'production' },
+      { service: 'Google Sheets (Kurt)', serviceKey: 'gsheets', name: 'Google Sheets account - Kurt P', type: 'googleSheetsOAuth2Api', id: 'LwIN9HXxRfbtb0xy', env: 'production' },
+      { service: 'Google Sheets Trigger (Kurt)', serviceKey: 'gsheets_trigger', name: 'Google Sheets Trigger - Kurt', type: 'googleSheetsTriggerOAuth2Api', id: 'Muib6cP4QYhqDyQy', env: 'production' },
+      { service: 'Google Docs (CX)', serviceKey: 'gdocs', name: 'CX Automation', type: 'googleDocsOAuth2Api', id: 'vFQAQugW0DywClzX', env: 'production' },
+      { service: 'Google Drive (CX)', serviceKey: 'gdrive', name: 'CXAutomations - Drive access', type: 'googleDriveOAuth2Api', id: 'QF9qQq5kC8xrZ2EA', env: 'production' },
       // ── Production: BigQuery ──
-      { service: 'BigQuery (SA)', name: 'Google Service Account account', type: 'googleApi', id: '2EJkTXIICSEva3cQ', env: 'production' },
+      { service: 'BigQuery (SA)', serviceKey: 'bigquery', name: 'Google Service Account account', type: 'googleApi', id: '2EJkTXIICSEva3cQ', env: 'production' },
       // ── Production: Slack ──
-      { service: 'Slack (Bot)', name: 'Slack account - BotToken', type: 'slackApi', id: 'RdxjTWVc6DaiNrIY', env: 'production' },
-      { service: 'Slack (App User)', name: 'Slack - App_UserOAuth Token', type: 'slackApi', id: 'oaJpbo4QLikJ3j8c', env: 'production' },
-      { service: 'Slack (UserMain)', name: 'Slack - UserMain', type: 'slackOAuth2Api', id: 'AePQZCpFJGTgbQj7', env: 'production' },
+      { service: 'Slack (Bot)', serviceKey: 'slack_bot', name: 'Slack account - BotToken', type: 'slackApi', id: 'RdxjTWVc6DaiNrIY', env: 'production' },
+      { service: 'Slack (App User)', serviceKey: 'slack_bot', name: 'Slack - App_UserOAuth Token', type: 'slackApi', id: 'oaJpbo4QLikJ3j8c', env: 'production' },
+      { service: 'Slack (UserMain)', serviceKey: 'slack_oauth', name: 'Slack - UserMain', type: 'slackOAuth2Api', id: 'AePQZCpFJGTgbQj7', env: 'production' },
       // ── Production: Jira ──
-      { service: 'Jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
+      { service: 'Jira', serviceKey: 'jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
       // ── Production: Other ──
-      { service: 'Airtable', name: 'Airtable Read Only', type: 'airtableTokenApi', id: 'v24j1xVtP1ISlLfG', env: 'production' },
-      { service: 'n8n (self)', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
+      { service: 'Airtable', serviceKey: 'airtable', name: 'Airtable Read Only', type: 'airtableTokenApi', id: 'v24j1xVtP1ISlLfG', env: 'production' },
+      { service: 'n8n (self)', serviceKey: 'n8n_self', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
     ],
     promptRules: `<department_rules>
 Prefer native Zendesk and Salesforce nodes over BigQuery for direct CRM/ticket operations.
@@ -222,14 +232,14 @@ Avoid Code nodes -- CX users are non-technical.
     n8nProjectId: 'Yh0x22sXaF1PEsGT',
     credentials: [
       // ── Production ──
-      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
-      { service: 'Zendesk', name: 'Zendesk production - info@guesty.com', type: 'zendeskApi', id: 'I0sSUZvS0LVHjO2J', env: 'production' },
-      { service: 'Zendesk (OAuth2)', name: 'Zendesk Production - Read - OAuth2 Generic', type: 'oAuth2Api', id: 'B1ksdYFDJ8LJKaTJ', env: 'production' },
-      { service: 'Modjo (OB)', name: 'OB - Modjo - AI Team v2', type: 'httpHeaderAuth', id: '86AbuOAwd0fFd1k6', env: 'production' },
-      { service: 'Google Gemini', name: 'Gemini - AI Team', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
-      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
-      { service: 'BigQuery (OB SA)', name: '(OB) Service Account - AI Team', type: 'googleApi', id: 'jTPSwPeDuM4ipl69', env: 'production' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'Zendesk', serviceKey: 'zendesk', name: 'Zendesk production - info@guesty.com', type: 'zendeskApi', id: 'I0sSUZvS0LVHjO2J', env: 'production' },
+      { service: 'Zendesk (OAuth2)', serviceKey: 'zendesk_oauth', name: 'Zendesk Production - Read - OAuth2 Generic', type: 'oAuth2Api', id: 'B1ksdYFDJ8LJKaTJ', env: 'production' },
+      { service: 'Modjo (OB)', serviceKey: 'modjo', name: 'OB - Modjo - AI Team v2', type: 'httpHeaderAuth', id: '86AbuOAwd0fFd1k6', env: 'production' },
+      { service: 'Google Gemini', serviceKey: 'gemini', name: 'Gemini - AI Team', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_oauth', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+      { service: 'BigQuery (OB SA)', serviceKey: 'bigquery', name: '(OB) Service Account - AI Team', type: 'googleApi', id: 'jTPSwPeDuM4ipl69', env: 'production' },
     ],
     promptRules: `<department_rules>
 Prefer native Salesforce and Zendesk nodes over BigQuery for direct CRM/ticket operations.
@@ -239,8 +249,9 @@ Avoid Code nodes -- Onboarding users are non-technical.
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PAYMENTS — n8n project: ahDlEt5r1gShUBKY (11 workflows)
-  // Has a sandbox Slack channel for testing.
+  // PAYMENTS — sandbox: ahDlEt5r1gShUBKY | production: eieaMOSUdvEI07s3
+  // Has a sandbox Slack channel for testing. Production project verified via
+  // live n8n API: contains GuestyPay Prod workflows, ask-pay V2.1 prod, etc.
   // ═══════════════════════════════════════════════════════════════════════════
   payments: {
     id: 'payments',
@@ -248,19 +259,20 @@ Avoid Code nodes -- Onboarding users are non-technical.
     description: 'Payment processing, billing, and fee reconciliation workflows',
     specs: ['zuora', 'salesforce', 'admin_data'],
     n8nProjectId: 'ahDlEt5r1gShUBKY',
+    n8nProductionProjectId: 'eieaMOSUdvEI07s3',
     credentials: [
       // ── Sandbox ──
-      { service: 'Slack (Test)', name: 'Slack ask-pay-test', type: 'slackApi', id: '0l2bJ3SquNB8nyFd', env: 'sandbox' },
+      { service: 'Slack (Test)', serviceKey: 'slack_bot', name: 'Slack ask-pay-test', type: 'slackApi', id: '0l2bJ3SquNB8nyFd', env: 'sandbox' },
       // ── Production ──
-      { service: 'Zendesk', name: 'Zendesk account', type: 'zendeskApi', id: 'cFdFPhADfsxMmPFC', env: 'production' },
-      { service: 'Google Gemini (Payments)', name: 'Payments', type: 'googlePalmApi', id: 'p77YTdHfPZTSa9e9', env: 'production' },
-      { service: 'OpenAI', name: 'Gil OpenAi account', type: 'openAiApi', id: 'FyoNWUsGsy9o6xdh', env: 'production' },
-      { service: 'Google Drive (Payments)', name: 'n8n-payments', type: 'googleApi', id: 'aLlYQkLWrmANkfFZ', env: 'production' },
-      { service: 'Google Sheets Trigger', name: 'Google Sheets Elena Chechik', type: 'googleSheetsTriggerOAuth2Api', id: 'W6Zn2BYAkgmc1t8W', env: 'production' },
-      { service: 'Slack', name: 'Slack ask-pay', type: 'slackApi', id: '87t2GgsbEJDItDs7', env: 'production' },
+      { service: 'Zendesk', serviceKey: 'zendesk', name: 'Zendesk account', type: 'zendeskApi', id: 'cFdFPhADfsxMmPFC', env: 'production' },
+      { service: 'Google Gemini (Payments)', serviceKey: 'gemini', name: 'Payments', type: 'googlePalmApi', id: 'p77YTdHfPZTSa9e9', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'Gil OpenAi account', type: 'openAiApi', id: 'FyoNWUsGsy9o6xdh', env: 'production' },
+      { service: 'Google Drive (Payments)', serviceKey: 'gdrive_sa', name: 'n8n-payments', type: 'googleApi', id: 'aLlYQkLWrmANkfFZ', env: 'production' },
+      { service: 'Google Sheets Trigger', serviceKey: 'gsheets_trigger', name: 'Google Sheets Elena Chechik', type: 'googleSheetsTriggerOAuth2Api', id: 'W6Zn2BYAkgmc1t8W', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_bot', name: 'Slack ask-pay', type: 'slackApi', id: '87t2GgsbEJDItDs7', env: 'production' },
       // Note: Zuora (GbVP08J912cXYfH4) and Salesforce (fCB6gfK7EaGpMnZy) accessed via CX project
-      { service: 'Zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
-      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'Zuora', serviceKey: 'zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
     ],
     promptRules: `<department_rules>
 Avoid Code nodes — Payments users are non-technical.
@@ -272,7 +284,8 @@ For BigQuery queries, ALWAYS use the shared BigQuery credential (Payments has no
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // FINANCE — sandbox: WrQXt2ZvpTq5Lkzo | production: EuTGww8zaCWPb8Cr (22 workflows)
+  // FINANCE — sandbox: WrQXt2ZvpTq5Lkzo (no separate production project — workflows
+  // promote in-place or run from the CX project where applicable).
   // Has Zendesk sandbox credential for testing.
   // ═══════════════════════════════════════════════════════════════════════════
   finance: {
@@ -283,19 +296,19 @@ For BigQuery queries, ALWAYS use the shared BigQuery credential (Payments has no
     n8nProjectId: 'WrQXt2ZvpTq5Lkzo',
     credentials: [
       // ── Sandbox ──
-      { service: 'Zendesk (Sandbox)', name: 'Zendesk Sandbox - Info@guesty.com', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },
+      { service: 'Zendesk (Sandbox)', serviceKey: 'zendesk', name: 'Zendesk Sandbox - Info@guesty.com', type: 'zendeskApi', id: 'OTFp18SnDgGUSn9u', env: 'sandbox' },
       // ── Production ──
-      { service: 'Zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
-      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
-      { service: 'Salesforce (Finance)', name: 'Salesforce account 17', type: 'salesforceOAuth2Api', id: 'kajhw4Ar6xiRUWS6', env: 'production' },
-      { service: 'HiBob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
-      { service: 'Zendesk (Read Only)', name: 'Zendesk Production - read only', type: 'oAuth2Api', id: '1SdAw6N3Ln7Y9Myw', env: 'production' },
-      { service: 'Google Gemini', name: 'Google Gemini Guesty n8n CX', type: 'googlePalmApi', id: 'JrzPwNiVhZibKlAr', env: 'production' },
-      { service: 'Docebo', name: 'Docebo Bearer Access Token', type: 'httpHeaderAuth', id: 'FoTHzLs4zV4PF4Qw', env: 'production' },
-      { service: 'Google Sheets', name: 'Google Sheets account 70', type: 'googleSheetsOAuth2Api', id: 'iA1JZiIZhXYHkVaS', env: 'production' },
-      { service: 'Google Sheets Trigger', name: 'Google Sheets Trigger account 17', type: 'googleSheetsTriggerOAuth2Api', id: 'g9QbIBYSVEyY4z5L', env: 'production' },
-      { service: 'Google Calendar', name: 'Google Calendar account 106', type: 'googleCalendarOAuth2Api', id: 'uWNZXrR1NCrZ1xr0', env: 'production' },
-      { service: 'Slack', name: 'bot_user_oauth_token_slack_app_workflows_builder', type: 'slackApi', id: 'g3NQlNzyjFofD87l', env: 'production' },
+      { service: 'Zuora', serviceKey: 'zuora', name: 'zuora', type: 'oAuth2Api', id: 'GbVP08J912cXYfH4', env: 'production' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'Salesforce (Finance)', serviceKey: 'salesforce', name: 'Salesforce account 17', type: 'salesforceOAuth2Api', id: 'kajhw4Ar6xiRUWS6', env: 'production' },
+      { service: 'HiBob', serviceKey: 'hibob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
+      { service: 'Zendesk (Read Only)', serviceKey: 'zendesk_oauth', name: 'Zendesk Production - read only', type: 'oAuth2Api', id: '1SdAw6N3Ln7Y9Myw', env: 'production' },
+      { service: 'Google Gemini', serviceKey: 'gemini', name: 'Google Gemini Guesty n8n CX', type: 'googlePalmApi', id: 'JrzPwNiVhZibKlAr', env: 'production' },
+      { service: 'Docebo', serviceKey: 'docebo', name: 'Docebo Bearer Access Token', type: 'httpHeaderAuth', id: 'FoTHzLs4zV4PF4Qw', env: 'production' },
+      { service: 'Google Sheets', serviceKey: 'gsheets', name: 'Google Sheets account 70', type: 'googleSheetsOAuth2Api', id: 'iA1JZiIZhXYHkVaS', env: 'production' },
+      { service: 'Google Sheets Trigger', serviceKey: 'gsheets_trigger', name: 'Google Sheets Trigger account 17', type: 'googleSheetsTriggerOAuth2Api', id: 'g9QbIBYSVEyY4z5L', env: 'production' },
+      { service: 'Google Calendar', serviceKey: 'gcalendar', name: 'Google Calendar account 106', type: 'googleCalendarOAuth2Api', id: 'uWNZXrR1NCrZ1xr0', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_bot', name: 'bot_user_oauth_token_slack_app_workflows_builder', type: 'slackApi', id: 'g3NQlNzyjFofD87l', env: 'production' },
     ],
     promptRules: `<department_rules>
 Avoid Code nodes — Finance users are non-technical.
@@ -315,12 +328,12 @@ For cross-source fee/invoice analysis, BigQuery is preferred (zuora_analytics + 
     n8nProjectId: 'cC2MXxyCdYtzY46e',
     credentials: [
       // ── Production (no dedicated sandbox envs yet) ──
-      { service: 'Salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
-      { service: 'HubSpot', name: 'HubSpot Developer', type: 'hubspotDeveloperApi', id: '1AM3RFd0UdBtfZR6', env: 'production' },
-      { service: 'Jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
-      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
-      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+      { service: 'Salesforce', serviceKey: 'salesforce', name: 'Salesforce Production Read', type: 'salesforceOAuth2Api', id: 'fCB6gfK7EaGpMnZy', env: 'production' },
+      { service: 'HubSpot', serviceKey: 'hubspot', name: 'HubSpot Developer', type: 'hubspotDeveloperApi', id: '1AM3RFd0UdBtfZR6', env: 'production' },
+      { service: 'Jira', serviceKey: 'jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
+      { service: 'Google Gemini (AI Team)', serviceKey: 'gemini', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_oauth', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
     ],
     promptRules: `<department_rules>
 Avoid Code nodes — Product users are PMs and non-technical.
@@ -343,11 +356,11 @@ For BigQuery queries, use the shared credential (id: h7fJ82YhtOnUL58u, name: "Go
     n8nProjectId: 'GG87KkXICRSZxeQu',
     credentials: [
       // ── Production (no dedicated sandbox envs yet) ──
-      { service: 'HiBob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
-      { service: 'Docebo', name: 'Docebo Bearer Access Token', type: 'httpHeaderAuth', id: 'FoTHzLs4zV4PF4Qw', env: 'production' },
-      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
-      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+      { service: 'HiBob', serviceKey: 'hibob', name: 'HiBob Service Account', type: 'httpBasicAuth', id: 'i1wp4rmLyhytsxPj', env: 'production' },
+      { service: 'Docebo', serviceKey: 'docebo', name: 'Docebo Bearer Access Token', type: 'httpHeaderAuth', id: 'FoTHzLs4zV4PF4Qw', env: 'production' },
+      { service: 'Google Gemini (AI Team)', serviceKey: 'gemini', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_oauth', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
     ],
     promptRules: `<department_rules>
 Avoid Code nodes — People users are HR business partners and non-technical.
@@ -375,13 +388,14 @@ HiBob data contains employee PII: compensation, home address, personal contact i
     description: 'IT automation: access requests, service desk ticket flows, account provisioning, internal tooling',
     specs: ['jira', 'admin_data'],
     n8nProjectId: '3wBiKLqcGT5en7HH',
+    // n8nProductionProjectId: 'UCEMQoFhrGZ3FChz',  // CANDIDATE — workflows match IS prod profile (SaaS Manager Bot, Okta Groups, GitHub Users). Awaiting manager confirmation before enabling Take to Production button.
     credentials: [
       // ── Production (no dedicated sandbox envs yet) ──
-      { service: 'Jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
-      { service: 'Google Gemini (AI Team)', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
-      { service: 'OpenAI', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
-      { service: 'Slack', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
-      { service: 'n8n (self)', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
+      { service: 'Jira', serviceKey: 'jira', name: 'Jira SW Cloud Training', type: 'jiraSoftwareCloudApi', id: 'kCkJqmNJ9XOn9knx', env: 'production' },
+      { service: 'Google Gemini (AI Team)', serviceKey: 'gemini', name: 'Gemini - AI Team - Cross Dept', type: 'googlePalmApi', id: 'FSUdg9cOOhjJ5bfh', env: 'production' },
+      { service: 'OpenAI', serviceKey: 'openai', name: 'AI Team - OpenAI', type: 'openAiApi', id: 'sibRkht3HDN1V5lW', env: 'production' },
+      { service: 'Slack', serviceKey: 'slack_oauth', name: 'Slack - AI Team (Kurt)', type: 'slackOAuth2Api', id: 'BXeGv4HZaOauuct6', env: 'production' },
+      { service: 'n8n (self)', serviceKey: 'n8n_self', name: 'n8n account', type: 'n8nApi', id: 'UXyTfYKFugulfWX2', env: 'production' },
     ],
     promptRules: `<department_rules>
 Team IS users are technical — Code nodes, JavaScript/Python, and raw HTTP requests are acceptable.
@@ -411,6 +425,39 @@ export function getDepartmentList(): Array<{ id: string; displayName: string; de
 /** Get all spec keys available for a department (own + shared + credentials). */
 export function getDepartmentSpecKeys(dept: DepartmentConfig): string[] {
   return [...new Set([...dept.specs, ...SHARED_SPECS, 'credentials'])];
+}
+
+/**
+ * Group a department's credentials (own + shared) by `serviceKey`.
+ * Used by the promote flow + by the system prompt's department_context block to give the
+ * AI a structured map of sandbox↔production pairs.
+ *
+ * Within a serviceKey, sandbox creds and production creds are kept in separate buckets so
+ * the swap is unambiguous. If a serviceKey has only sandbox credentials, the workflow cannot
+ * promote to production until an admin adds the missing prod cred — surfaced explicitly in
+ * the promote checklist.
+ */
+export interface ServiceKeyBucket {
+  serviceKey: string;
+  type: string;  // shared by all entries in this bucket; types are not interchangeable
+  sandbox: Credential[];
+  production: Credential[];
+}
+
+export function getDepartmentCredentialsByServiceKey(dept: DepartmentConfig): ServiceKeyBucket[] {
+  const allCreds = [...dept.credentials, ...SHARED_CREDENTIALS];
+  const grouped = new Map<string, ServiceKeyBucket>();
+  for (const c of allCreds) {
+    const key = `${c.serviceKey}::${c.type}`;  // distinguish e.g. slack_bot vs slack_oauth even if serviceKey is shared
+    let bucket = grouped.get(key);
+    if (!bucket) {
+      bucket = { serviceKey: c.serviceKey, type: c.type, sandbox: [], production: [] };
+      grouped.set(key, bucket);
+    }
+    if (c.env === 'sandbox') bucket.sandbox.push(c);
+    else bucket.production.push(c);
+  }
+  return Array.from(grouped.values()).sort((a, b) => a.serviceKey.localeCompare(b.serviceKey));
 }
 
 // Common wrong credential types for JSON examples (observed hallucination patterns)
@@ -486,8 +533,8 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
   const sandboxCreds = allCreds.filter(c => c.env === 'sandbox');
   const productionCreds = allCreds.filter(c => c.env === 'production');
 
-  const header = '| Service | n8n Credential Name | Credential JSON Key | ID |';
-  const divider = '|---------|---------------------|---------------------|-----|';
+  const header = '| Service | Service Key | n8n Credential Name | Credential JSON Key | ID |';
+  const divider = '|---------|-------------|---------------------|---------------------|-----|';
 
   const sections: string[] = [];
 
@@ -496,7 +543,7 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
       '### Sandbox (default)',
       header,
       divider,
-      ...sandboxCreds.map(c => `| ${c.service} | ${c.name} | \`${c.type}\` | \`${c.id}\` |`),
+      ...sandboxCreds.map(c => `| ${c.service} | \`${c.serviceKey}\` | ${c.name} | \`${c.type}\` | \`${c.id}\` |`),
     );
   }
 
@@ -506,7 +553,7 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
       '### Production (use only when user requests production)',
       header,
       divider,
-      ...productionCreds.map(c => `| ${c.service} | ${c.name} | \`${c.type}\` | \`${c.id}\` |`),
+      ...productionCreds.map(c => `| ${c.service} | \`${c.serviceKey}\` | ${c.name} | \`${c.type}\` | \`${c.id}\` |`),
     );
   }
 
@@ -515,6 +562,7 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
     '**IMPORTANT: Use ONLY credentials from the tables above.** Default to **sandbox** credentials. Only use production when the user explicitly requests it.',
     'The "Credential JSON Key" column is the key to use in workflow JSON: `"credentials": { "<key>": { "id": "...", "name": "..." } }`',
     'Always include both `id` and `name` in credential JSON. The `id` is authoritative for resolution.',
+    'The "Service Key" column groups sandbox/production pairs of the same canonical service. The promote-to-production flow uses this column to swap a sandbox credential for its production counterpart.',
   );
 
   // Add programmatic JSON examples for commonly confused credential types
@@ -525,4 +573,36 @@ export function getDepartmentCredentialsMarkdown(dept: DepartmentConfig): string
   }
 
   return sections.join('\n');
+}
+
+/**
+ * Render the structured `<credentials_by_service_key>` block used by the promote checklist.
+ * Each line shows a serviceKey with its sandbox and production credentials side-by-side, so
+ * the AI can deterministically map a workflow's sandbox cred to its production counterpart
+ * during the "yes promote" cred swap.
+ */
+export function getDepartmentServiceKeyBlock(dept: DepartmentConfig): string {
+  const buckets = getDepartmentCredentialsByServiceKey(dept);
+  if (buckets.length === 0) return '';
+
+  const lines: string[] = ['<credentials_by_service_key>'];
+  for (const b of buckets) {
+    lines.push(`  ${b.serviceKey} (type: ${b.type}):`);
+    if (b.sandbox.length === 0) {
+      lines.push('    sandbox:    (none — workflows in this department default to production for this service)');
+    } else {
+      for (const c of b.sandbox) {
+        lines.push(`    sandbox:    ${c.name} (id: ${c.id})`);
+      }
+    }
+    if (b.production.length === 0) {
+      lines.push('    production: (NONE — workflows referencing this service CANNOT promote until an admin adds a production credential)');
+    } else {
+      for (const c of b.production) {
+        lines.push(`    production: ${c.name} (id: ${c.id})`);
+      }
+    }
+  }
+  lines.push('</credentials_by_service_key>');
+  return lines.join('\n');
 }
