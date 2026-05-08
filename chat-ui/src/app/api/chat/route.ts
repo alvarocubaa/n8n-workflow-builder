@@ -159,7 +159,7 @@ current JSON, call the get_workflow_for_promotion tool with the workflow_id abov
  *
  * Defense-in-depth: the Edge Function re-validates these same bounds.
  */
-function extractAndValidatePlanningFields(text: string): Record<string, string | number> | null {
+function extractAndValidatePlanningFields(text: string): Record<string, string | number | string[]> | null {
   // Match the LAST ```json … ``` block — Claude may emit a draft mid-conversation
   // and a final at the end; we want the final.
   const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
@@ -176,7 +176,7 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
 
   const obj = parsed as Record<string, unknown>;
-  const out: Record<string, string | number> = {};
+  const out: Record<string, string | number | string[]> = {};
 
   const stringField = (key: string, max: number): void => {
     const v = obj[key];
@@ -189,6 +189,18 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   const enumField = (key: string, allowed: readonly string[]): void => {
     const v = obj[key];
     if (typeof v === 'string' && allowed.includes(v)) out[key] = v;
+  };
+  const arrayPatternField = (key: string, pattern: RegExp, maxLen: number): void => {
+    const v = obj[key];
+    if (!Array.isArray(v)) return;
+    const cleaned: string[] = [];
+    for (const item of v) {
+      if (typeof item !== 'string') continue;
+      const trimmed = item.trim().toUpperCase();
+      if (pattern.test(trimmed) && !cleaned.includes(trimmed)) cleaned.push(trimmed);
+      if (cleaned.length >= maxLen) break;
+    }
+    if (cleaned.length > 0) out[key] = cleaned;
   };
 
   // Mirrors the Hub StrategicIdea form. Source of truth for these enums:
@@ -231,6 +243,7 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   numberField('current_process_minutes_per_run', 1, 1440);
   numberField('current_process_runs_per_month', 0, 100000);
   numberField('current_process_people_count', 0, 10000);
+  arrayPatternField('jira_ticket_ids', /^[A-Z][A-Z0-9_]+-\d+$/, 5);
 
   return Object.keys(out).length > 0 ? out : null;
 }

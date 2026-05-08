@@ -61,7 +61,7 @@ export type ChatEvent =
       type: 'extracted_fields';
       initiative_id: string;
       conversation_id: string;
-      extracted_fields: Record<string, string | number>;
+      extracted_fields: Record<string, string | number | string[]>;
       extracted_fields_at: string;
     }
   // Embed-mode (Direction 3, Phase 3 handoff): server emits this when the
