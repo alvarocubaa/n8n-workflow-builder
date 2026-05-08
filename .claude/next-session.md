@@ -1,116 +1,69 @@
-# Next session brief — redesign-v2 (server-write architecture)
+# Next session brief — Sync-hub coverage fix (n8n-ops stub-row push)
 
-**Last touched:** 2026-05-06 EOD. Chunks A–D shipped end-to-end today; the form-fill mechanism they built is now scheduled for **deletion** in favour of a server-write architecture. Drafted plan + design docs await execution.
+**Last touched:** 2026-05-08 (post-Session 6 Jira ship). Re-derived from `.claude/session-queue.md` HEAD.
 
 ## What you're picking up
 
-The Direction-3 embed (drawer + iframe + auth + popup) is solid and stays. The piece that's being **replaced** is how a Plan-with-AI / Edit-with-AI conversation populates the initiative card.
+Workflow `MJhuTMoNzvfC3V3G` ("Article translations sub-workflow") is `active: false, isArchived: true`. Zero executions in 14 days → no rows in `daily_workflow_stats` → `wfStats` empty in [n8n-ops/src/routes/sync-hub.ts:96](../../Agentic%20Workflows/services/n8n-ops/src/routes/sync-hub.ts) → vanishes from the Hub WorkflowHealthCard. Diagnosed in Session 2 ([docs/sync-hub-coverage-fix.md](../docs/sync-hub-coverage-fix.md)).
 
-- **Old (today's mechanism):** AI emits planning JSON → chat-ui parses → SSE event → postMessage to Hub → modal callback → `applyExtractedFields` writes to React state → user clicks Save → Supabase row.
-- **New (your job):** AI emits planning JSON + `<create_initiative />` sentinel → chat-ui server validates → POST to a new Hub Edge Function `n8n-initiative-upsert` → service-role write to `strategic_ideas` → SSE response with the new id + URL → ChatWindow renders an inline "Open in Hub" link.
+The fix is small (~12 lines): when `wfStats.length === 0`, push a stub row for today with all-null/zero metrics. The Hub aggregator already returns `health: 'unknown'` for null `success_rate_pct`, so the card renders cleanly without further changes.
 
-The chat is the single owner of the write. The Hub becomes a read view. No more two-system coordination.
+## Quick context
 
-**Why we're doing this:** the form-fill path failed twice in real testing today — once because `mode='building'` skipped the server-side gate, once because no target modal was open. Each bug had a code fix, but the architecture itself was the source of the fragility.
-
-## Read these in order before coding
-
-1. **[`docs/innovation-hub/redesign-v2-server-write.md`](../docs/innovation-hub/redesign-v2-server-write.md)** — the technical design. New flow, new sentinel, Edge Function spec, deletion list (chat-ui + Hub), verification checklist, phased rollout strategy. Your primary brief.
-2. **[`docs/innovation-hub/current-architecture.md`](../docs/innovation-hub/current-architecture.md)** — what's deployed now (Chunks A-D). The "Goes (delete)" section in the redesign doc references file paths from this map.
-3. **[`docs/innovation-hub/protocol-contract.md`](../docs/innovation-hub/protocol-contract.md)** — wire-level postMessage shapes. Stays valid for `workflow_deployed` + `auth_required` + `auth_token`. The `extracted_fields_updated` half is being deleted.
-4. **[`docs/innovation-hub/pop-out-design.md`](../docs/innovation-hub/pop-out-design.md)** — popup contract. Unaffected by redesign-v2.
-5. **[`docs/innovation-hub/phase-flow-design.md`](../docs/innovation-hub/phase-flow-design.md)** — **superseded**. Read only for historical context if you want to know why we're here.
-6. **[`docs/innovation-hub/promote-design.md`](../docs/innovation-hub/promote-design.md)** — secondary track ("Take to Production" button). **Don't start until redesign-v2 ships** — both touch the system-prompt mode structure. Includes a critical-review pass with 6 load-bearing items.
+The Hub's `WorkflowHealthCard` has been the focus of multiple sessions because workflows that get archived or stop running fall off the dashboard entirely instead of degrading gracefully. This fix closes that final coverage gap so the demo trio (3 linked workflows) all show stats even when one is archived.
 
 ## Order of operations
 
-1. **Read the redesign-v2 doc fully.** Ask the user any clarifying questions before coding.
-2. **Smoke Chunks A–D first** to confirm the embed/auth/popup layers are healthy. The redesign-v2 plan **builds on top of** that infrastructure — don't rewrite it.
-3. **Implement redesign-v2** in the phased order from the doc:
-   - chat-ui: SSE event types + sentinel detection + Edge Function call helper
-   - Hub: `n8n-initiative-upsert` Edge Function (defense-in-depth, idempotent, service-role)
-   - chat-ui: system-prompt rewrite of Phase 2 (replace "form auto-fills" with "ask before write" pattern)
-   - chat-ui: ChatWindow renders inline "Open in Hub" link from `initiative_upserted` SSE event
-4. **Smoke** all 8 verification cases from the redesign doc.
-5. **Ship deletion PR** removing `applyExtractedFields` + pill UI + Chunk D handlers (only after the new path is stable).
-6. **Then** start promote-design.md if the user approves.
+1. **Verify the diagnosis still holds.** Quick BQ query against `daily_workflow_stats` for `MJhuTMoNzvfC3V3G` confirms zero rows.
+2. **Edit [n8n-ops/src/routes/sync-hub.ts](../../Agentic%20Workflows/services/n8n-ops/src/routes/sync-hub.ts).** When iterating workflow links, if a workflow id has no stats rows, synthesize a stub row `{ workflow_id, period_date: today, total_runs: 0, success_runs: 0, error_runs: 0, success_rate_pct: null, p95_duration_sec: null, last_run_at: null, synced_at: now }`. Insert via the same upsert path the cron uses.
+3. **Manual cron re-run.** Hit the `/sync-hub` endpoint manually (auth via the n8n-ops service) and confirm all 3 demo workflows now have a row in `initiative_workflow_stats`.
+4. **Verify in Hub.** Open the demo initiative; the WorkflowHealthCard now lists all linked workflows including the archived one (with "no data" / unknown health).
 
-## Don't re-explore
+## Files
 
-- **Why redesign-v2 over fixing the form-fill bugs:** we tried that approach across Chunks A–D today. The remaining bugs are architectural (mode gating, modal coordination, no acknowledgement) — they'd compound rather than resolve.
-- **chat-ui auth model:** app-level Google OAuth via GIS + ID-token verification. Cross-origin iframe / popup uses cookie path (`SameSite=None; Secure; HttpOnly`) with postMessage `auth_required`/`auth_token` fallback for partitioned cookies. Hub uses Supabase Auth + Google provider — token shapes differ; the GIS handler in `EmbeddedChatPanel.tsx` exists to acquire a Google ID token chat-ui will accept.
-- **Why `IdeaDetailModal` is read-only:** intentional — the editing surface is `AddStrategicIdeaModal` in edit mode. Don't add form-fill to the detail modal; the redesign uses the chat as the editing surface for AI-driven changes.
-- **Why we shipped Chunk D earlier today even knowing it would be deleted:** it correctly identified the problem (planning conv lacks a real id at write time) and we needed to verify the symptom before pivoting. Sunk cost; the pattern (sentinel detection + SSE + Edge Function call) is reused.
+- `Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts` (the only edit)
+- Optional: `Agentic Workflows/services/n8n-ops/src/services/bigquery.ts` if the stub-insert path needs a helper
 
-## Pending on user's side
+## Out of scope
 
-- (Optional cleanup, no urgency) Delete the unused IAP-flavored OAuth client `535171325336-fhsjk06js2...` in Cloud Console.
-- Decide whether `promote-design.md`'s "department has prod project = low-risk" is the right gate, or if a per-PROJ `requires_committee_review` flag is needed (open question in the promote doc).
+- Backfilling historical periods for `MJhuTMoNzvfC3V3G` — only today's stub is needed; older windows can stay empty.
+- Distinguishing archived from genuinely-zero-runs workflows in the Hub UI — leave as `health='unknown'`. UI changes are a separate session if anyone wants finer-grained "archived" pill.
 
-## User preferences (learned over this and prior sessions)
+## Adjacent items also worth picking up if time permits
 
-- **Direct + terse responses.** No fluff, no pre-amble, no end-of-turn summaries unless meaningful.
-- **"Go ahead in order"** = autonomous progression through phases. User won't micro-approve each step.
-- **Will commit + push autonomously** when given approval; will rebase if the remote diverged.
-- **`gcloud auth` expires periodically.** When deploys fail with "Reauthentication failed", user re-auths interactively. Vertex AI auth: `gcloud auth application-default login`.
-- **Uses VPN for `thehub.gue5ty.com`.** The `*.run.app` URLs work without VPN — useful for testing.
-- **Loops:** the user is comfortable with `<<autonomous-loop-dynamic>>` wakeups for waiting on long builds. Use ScheduleWakeup for cloud builds (~3-5 min) rather than poll-sleep.
-- **Quality bar:** trace bugs to root cause from code, not from logs alone. Surface architectural issues as architectural issues, not as "it broke".
-- **Honest about capacity.** Say "I'm tight on context" and recommend a fresh session rather than push through degraded.
+- **Feedback-loop harvest.** Last harvest was 2026-04-15, weekly cadence — currently ~23 days overdue per [feedback-loop/STATE.md](../feedback-loop/STATE.md). Run `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`. The 51 candidates from Apr 15 are still pending review; this session would compound on top of that.
+- **Legacy `strategic_ideas.jira_link` migration.** Session 6 left the legacy single-column `jira_link` alongside the new multi-link `initiative_jira_links` table. UX confusion ("which field?") is real but acceptable for MVP — track this as a small follow-up to backfill into the new table and drop the column once usage data justifies it.
+- **Jira write-path verification.** Session 6 end-of-session data check: `initiative_jira_links` has 0 rows. The picker UI was demonstrated live (CXAU-247 fetched via Edge Function — visible in screenshot) but the user didn't click Save, so the write path through `replaceJiraLinksForInitiative` hasn't been exercised by real user flow yet. Quick smoke any time: open an initiative → add a real ticket → save → re-open and confirm the JiraTicketCard renders. Should take 60 seconds.
+
+## User preferences (carried forward from prior sessions)
+
+- **Direct + terse.** No fluff, no end-of-turn summaries unless meaningful.
+- **"Go ahead in order"** = autonomous progression through phases.
+- **Will commit + push autonomously** when given approval.
+- **`gcloud auth` expires periodically.** When deploys fail with "Reauthentication failed", user re-auths interactively.
+- **Loops:** comfortable with `<<autonomous-loop-dynamic>>` wakeups for waiting on long builds.
+- **Quality bar:** trace bugs to root cause from code, not from logs alone.
 
 ## Quick reference
 
 ```
 Live URLs
   Hub (VPN):           https://thehub.gue5ty.com/
-  Hub (no VPN):        https://ai-innovation-hub-721337864706.us-central1.run.app
-  chat-ui:             https://n8n-chat-ui-535171325336.europe-west1.run.app
+  Hub (no VPN):        https://ai-innovation-hub-721337864706.us-central1.run.app  (revision ai-innovation-hub-00098-xdx as of 2026-05-08)
+  chat-ui:             https://n8n-chat-ui-535171325336.europe-west1.run.app  (revision n8n-chat-ui-00044-ncm as of 2026-05-08)
+  n8n-ops:             https://n8n-ops-fhehssni7q-ew.a.run.app
   Hub repo (sibling):  /Users/alvaro.cuba/code/AI-Innovation-Hub-Vertex
-  Hub remote:          kurtpabilona-code/AI-Innovation-Hub-Vertex (alvarocubaa has push)
   Hub Supabase:        ilhlkseqwparwdwhzcek
+  n8n-ops repo:        Agentic Workflows/services/n8n-ops/
 
-Hub Cloud Build approval
-  gcloud beta builds list --project=ai-innovation-484111 --limit=3 \
-    --format="value(id,status,substitutions.COMMIT_SHA)"
+Hub Cloud Build approval (when needed)
+  gcloud beta builds list --project=ai-innovation-484111 --limit=3 --format="value(id,status,substitutions.COMMIT_SHA)"
   gcloud beta builds approve <id> --project=ai-innovation-484111
 
-OAuth client (chat-ui)
-  535171325336-lohp54d4kp8npumfp8bgm4bttnlg6v48.apps.googleusercontent.com
-  JS Origins include: chat-ui prod URL + both Hub URL forms
-  Console: https://console.cloud.google.com/apis/credentials/oauthclient/<above-id>?project=agentic-workflows-485210
-
-chat-ui deploy
-  ./deploy-cloudrun.sh --ui-only
-  (mktemp gotcha on macOS: rm -f /tmp/cloudbuild-chat-*.yaml if it complains File exists)
-
-Rollback (chat-ui)
-  gcloud run services update-traffic n8n-chat-ui --region=europe-west1 \
-    --to-revisions=<prev-revision>=100
-
-Rollback (Hub)
-  gcloud run services update-traffic ai-innovation-hub --region=us-central1 \
-    --project=ai-innovation-484111 --to-revisions=<prev-revision>=100
+n8n-ops trigger
+  curl -X POST "https://n8n-ops-fhehssni7q-ew.a.run.app/sync-hub" -H "Authorization: Bearer $TOKEN"
 ```
 
-## Today's commits (for diff context)
+## Estimated effort
 
-- chat-ui:
-  - `d586745` Chunk C — `https://thehub.gue5ty.com` allowed as parent origin
-  - `f1c0951` Chunk C — hide planning JSON in embed mode (will be deleted by redesign-v2)
-  - `d043e43` Chunk A — three-phase planning system prompt
-  - `b1473f4` Chunk C — popout-window auth routing + thehub.gue5ty.com allowlist
-  - `b9a43f8` Chunk D — auto-save handoff (will be deleted by redesign-v2)
-- Hub:
-  - `8f1a648` Chunk A initial — z-index + GIS auth_required handler
-  - `01382ac` Chunk B — z-index regression + form preserve on close
-  - `1d4b386` Chunk C — pop-out window with handoff-and-restore
-  - `b193bf6` Chunk D — Phase 3 handoff (will be deleted by redesign-v2)
-
-## Don't break
-
-- The Phase 1 interview rule in `<rule name="planning_mode">` (Chunk A) — the AI's behaviour when interviewing the user is correct and load-bearing.
-- The pop-out window (Chunk C) — works end-to-end with `window.opener` postMessage routing.
-- The auth flow (drawer + popup) — adding origins to the allowlist requires both `chat-ui/src/lib/embed.ts` AND the OAuth client's "Authorized JavaScript origins" in Cloud Console.
-- The `n8n-builder-callback` Edge Function — it links workflows to initiatives on every deploy. Untouched by redesign-v2.
-
-Once redesign-v2 ships and is verified, you can move to `promote-design.md` — but do address its 6 load-bearing review items before starting that implementation.
+30 min code + manual cron re-run + verify. If the harvest is bundled, add 1–2 h.
