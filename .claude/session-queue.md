@@ -4,25 +4,81 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Jira ticket display + Take-to-Production automation are LIVE as of 2026-05-08 — Hub revision `ai-innovation-hub-00098-xdx` + chat-ui v0.32 (`n8n-chat-ui-00044-ncm`). Adjacent ecosystem integrations are caught up. Next focus shifts to **deferred infra polish** (sync-hub coverage fix) and the **overdue feedback-loop harvest** (last harvest Apr 15, ~23 days overdue).
+**Current focus track:** Time Saved KPI rollup pipeline shipped end-to-end today (2026-05-08, Session 7) — Marketing's Time Saved KPI now auto-populated from BigQuery → Hub via `kpi-webhook-ingest`. April 37h, May 90.5h-and-counting visible in Hub. Code lives in `Agentic Workflows/services/n8n-ops/` but **not yet deployed**. Next focus = single bundled n8n-ops v0.2 deploy (Time Saved rollup + zombie sweeper + alert fixes + the deferred sync-hub stub-row coverage fix).
 
 ---
 
 ## Queue
 
-### 1. [HEAD] Sync-hub coverage fix — n8n-ops stub-row push (deferred from Session 2 Phase 5)
+### 1. [HEAD] n8n-ops v0.2 deploy — bundle Time Saved KPI rollup + zombie sweeper + alert fixes + sync-hub stub-row
 
-**Goal:** Workflow `MJhuTMoNzvfC3V3G` (Article translations sub-workflow) is `active: false, isArchived: true`. Zero executions in 14 days → no rows in `daily_workflow_stats` → `wfStats` empty in `n8n-ops/src/routes/sync-hub.ts:96` → vanishes from Hub WorkflowHealthCard. Diagnosed in Session 2 ([docs/sync-hub-coverage-fix.md](../docs/sync-hub-coverage-fix.md)).
+**Goal:** One deploy ships everything coded in Sessions 2 (sync-hub diagnosis) + 7 (Time Saved KPI + zombie sweeper). Single `cd "Agentic Workflows/services/n8n-ops" && ./deploy.sh` rebuilds Cloud Run + idempotently creates/updates 6 schedulers (4 existing + 2 new: `n8n-ops-kpi-rollup` `0 2 1 * *` UTC, `n8n-ops-sweep-zombies` `*/30 * * * *` UTC).
 
-**Fix (~12 lines):** when `wfStats.length === 0`, push a stub row for today with all-null/zero metrics. Hub aggregator already returns `health: 'unknown'` for null `success_rate_pct`.
+**Prereqs:**
+- `Agentic Workflows` is NOT git-tracked — code lives on Drive only. Verify the working tree at `Agentic Workflows/services/n8n-ops/src/` matches MEMORY.md description before deploying.
+- `gcloud auth` valid + project `agentic-workflows-485210` selected.
+- Optional but recommended: still-pending sync-hub stub-row fix (~12 lines in `src/routes/sync-hub.ts`) — bundle into the same deploy. See [docs/sync-hub-coverage-fix.md](../docs/sync-hub-coverage-fix.md).
 
-**Prereqs:** None. Fully self-contained in n8n-ops repo (sibling: `Agentic Workflows/services/n8n-ops/`).
+**Order of operations:**
+1. **Stub-row fix in sync-hub.ts** (if not already done): when `wfStats.length === 0` for a workflow, push `{ workflow_id, period_date: today, total_runs: 0, success_runs: 0, error_runs: 0, success_rate_pct: null, p50_duration_sec: null, p95_duration_sec: null, last_run_at: null, ...alerts: 0 }`. Hub aggregator already renders `health: 'unknown'` for null success_rate_pct.
+2. **Run deploy:** `cd "Agentic Workflows/services/n8n-ops" && ./deploy.sh`. Watch for `gcloud builds submit` success and 6 scheduler create/update lines.
+3. **Smoke `/kpi-rollup` dry-run for Apr 2026:**
+   ```
+   SVC_URL=$(gcloud run services describe n8n-ops --region=europe-west1 --project=agentic-workflows-485210 --format='value(status.url)')
+   TOKEN=$(gcloud auth print-identity-token --audiences=${SVC_URL})
+   curl -X POST "${SVC_URL}/kpi-rollup" -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+     -d '{"kpiId":"e6f47f5b-5de7-4630-84b5-441741270e53","periodDate":"2026-04-01","dryRun":true}'
+   ```
+   Expect `total_hours: 37.0`, byInitiative + byWorkflow populated. (Live push for Apr/May already done manually in Session 7 — `kpi_measurements` has both rows.)
+4. **Smoke `/sweep-zombies` dry-run:** `curl -X POST "${SVC_URL}/sweep-zombies" -d '{"dryRun":true}'`. Should return 0 candidates (we cleared the 3 known zombies in Session 7).
+5. **Smoke `/sync-hub`** post-stub-row-fix: `curl -X POST "${SVC_URL}/sync-hub"`. Verify `MJhuTMoNzvfC3V3G` (archived demo workflow) now appears in `initiative_workflow_stats` for today's date.
+6. **Verify Hub UI:** open `/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53` — chart should show Apr 37h + May 90.5h. WorkflowHealthCard for the demo initiative should now list all 3 linked workflows including the archived one.
 
-**Files:** `Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts`.
+**Files:**
+- New deploy: all of `Agentic Workflows/services/n8n-ops/src/{routes/kpi-rollup.ts, routes/sweep-zombies.ts, services/secret-manager.ts}` + extended `services/supabase.ts` + modified `services/n8n.ts` + modified `routes/loop-alerts.ts` + modified `index.ts` + modified `deploy.sh` + updated README.md.
+- Stub-row fix: `Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts` (~12 lines).
 
-**Estimated effort:** 30 min code + manual cron re-run + verify all 3 demo workflows show stats.
+**Estimated effort:** 45 min if stub-row not yet done (15 min code + 20 min build/deploy + 10 min smoke). 25 min if stub-row already done.
 
-**Note:** Feedback-loop harvest is ~23 days overdue (last Apr 15 — weekly cadence). Consider running the harvester after this fix lands, or promoting it to HEAD if the user wants to reset the cadence first.
+**After-deploy followups (separate sessions):**
+- Confirm with Ron Madar-Hallevi the PFR meaning + per-run minute estimates (15 PFR / 30 ORM) are right.
+- Post the Slack message drafted in Session 7 (see MEMORY.md `Where We Left Off`).
+- Feedback-loop harvest — Apr 15 last run, weekly cadence — currently overdue ~23 days.
+
+---
+
+### ✅ SHIPPED 2026-05-08 — Session 7 — Time Saved KPI rollup ship + n8n-ops zombie-alert fix
+
+> **Outcome:** Phase 5 of Hub roadmap shipped. Marketing's "Time Saved" canonical KPI (`e6f47f5b-5de7-4630-84b5-441741270e53`) is now auto-populated from BigQuery → Hub via `kpi-webhook-ingest`. April 2026 = 37.0 h, May 2026 (1-8 partial) = 90.5 h, both visible in Hub `kpi_measurements`.
+>
+> **What's coded** (all in `Agentic Workflows/services/n8n-ops/`, NOT YET DEPLOYED — see HEAD session):
+> - `src/routes/kpi-rollup.ts` — new `POST /kpi-rollup`. Reads `kpis` + `initiative_kpis` + `strategic_ideas` + `initiative_workflow_links` from Hub Supabase, sums `success_runs` from BQ for the period, multiplies by `current_process_minutes_per_run` (defaults 30), POSTs to Hub `kpi-webhook-ingest`. Per-KPI bearer from Secret Manager `kpi-webhook-token-<kpi_id>`. Dry-run mode.
+> - `src/routes/sweep-zombies.ts` — new `POST /sweep-zombies`. Reconciles BQ rows stuck `running >6h` against n8n's per-execution API.
+> - `src/services/secret-manager.ts` — ADC-auth Secret Manager reader (5-min cache).
+> - `src/services/n8n.ts` — added `getExecutionById`.
+> - `src/services/supabase.ts` — added `listN8nWebhookKpis`, `getKpiById`, `listKpiInitiativeBindings`.
+> - `src/routes/loop-alerts.ts` — capped stuck-running at 24h, collapsed multi-execution alerts per workflow.
+> - `deploy.sh` — added 5th + 6th schedulers.
+> - `tsc` clean.
+>
+> **What's live in Hub today** (manual writes via service-role REST):
+> - `kpis.data_source_label` set to "n8n Workflow Builder (alvaro.cuba)".
+> - 7 rows in `initiative_workflow_links` (3 PFR + 4 ORM workflows mapped to the 2 linked initiatives).
+> - 2 `strategic_ideas` rows updated with `current_process_minutes_per_run` (15 + 30) and `current_process_runs_per_month` (120 + 80).
+> - 1 fresh row in `kpi_webhook_tokens` with raw token in GCP Secret Manager `kpi-webhook-token-e6f47f5b-...`.
+> - 2 measurements in `kpi_measurements`.
+>
+> **Critical schema correction (caught only because user pushed back):** Hub's Phase 2 spec named the linking table `kpi_initiative_contributions`. The migration actually extended `initiative_kpis` with a `kpi_id` FK column. The named table never existed. Fixed before deploy.
+>
+> **IAM win — no IT ticket:** SA `n8n-workflow-builder@…` already has project-wide `roles/secretmanager.secretAccessor`. README onboarding step trimmed to just `gcloud secrets create`.
+>
+> **Track B (zombie alert spam):** `#n8n-ops` Slack was getting hourly "Stuck running workflow" alerts for 3 zombie executions on `CkmAmA31lNYVprOE`. One-time `bq UPDATE` marked them `abandoned` (silenced today's spam); permanent fixes in `loop-alerts.ts` (24h cap + GROUP BY workflow_id) + new `/sweep-zombies` route.
+>
+> **Decisions logged:** [docs/decision-log.md](../docs/decision-log.md) — colocate-in-n8n-ops, Phase-2-table-rename, label-vs-secret gate, project-wide SA accessor, first-binding-wins attribution, default 30 min/run, 24h stuck-running cap.
+>
+> **Plan file:** [.claude/plans/2026-05-08-time-saved-kpi-rollup.md](plans/2026-05-08-time-saved-kpi-rollup.md) (migrated from `~/.claude/plans/`).
+>
+> **Memory updates:** new `Where We Left Off` block in MEMORY.md.
 
 ---
 
