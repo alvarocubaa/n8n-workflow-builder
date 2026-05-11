@@ -374,10 +374,17 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
   // In embed mode, drop fenced ```json blocks whose keys match the planning
   // whitelist — the Hub auto-fills the form, so the JSON is redundant noise
   // for the user. Standalone chat-ui keeps the block (copy-paste fallback).
+  // Also drop the redesign-v2 sentinels (<create_initiative />,
+  // <update_initiative />, <request_workflow_handoff />) — they're parsed
+  // server-side and meaningless to the user.
   const renderedContent = useMemo(() => {
-    if (!isEmbedMode()) return message.content;
     if (message.role !== 'model') return message.content;
-    return message.content.replace(/```json\s*\n([\s\S]*?)\n```/g, (full, body: string) => {
+    let out = message.content.replace(
+      /<(?:create_initiative|update_initiative|request_workflow_handoff)\s*\/?>/gi,
+      '',
+    );
+    if (!isEmbedMode()) return out;
+    out = out.replace(/```json\s*\n([\s\S]*?)\n```/g, (full, body: string) => {
       try {
         const parsed = JSON.parse(body) as Record<string, unknown>;
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -387,6 +394,7 @@ function MessageBubbleInner({ message, conversationId, departmentId, messageInde
       } catch { /* unparseable / streaming partial — leave intact */ }
       return full;
     });
+    return out;
   }, [message.content, message.role]);
 
   if (isUser) {

@@ -18,6 +18,7 @@ import {
   type DepartmentConfig,
 } from '@/lib/departments';
 import type { ChatEvent } from '@/lib/types';
+import { callHubInitiativeUpsert, type InitiativeUpsertFields } from '@/lib/hub-callback';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -539,6 +540,62 @@ export async function POST(req: Request): Promise<Response> {
                     }),
                     signal: AbortSignal.timeout(5000),
                   }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
+                }
+
+                // Redesign-v2 server-write path:
+                // <create_initiative /> / <update_initiative /> sentinels.
+                // When present, call the Hub Edge Function directly and emit
+                // initiative_upserted (or initiative_upsert_failed). Decoupled
+                // from the workflow handoff — saving an initiative does NOT
+                // require the user to continue into Phase 3.
+                const fullReply = modelChunks.join('');
+                const wantsCreate = /<create_initiative\s*\/?>/i.test(fullReply);
+                const wantsUpdate = /<update_initiative\s*\/?>/i.test(fullReply);
+                if (wantsCreate || wantsUpdate) {
+                  const isDraft = initiativeId === '__draft__';
+                  const upsertMode: 'create' | 'update' = wantsUpdate && !isDraft ? 'update' : 'create';
+                  // Strip the array-typed jira_ticket_ids — the Edge Function
+                  // contract only takes scalar fields. (Jira links are written
+                  // separately via the existing extracted_fields callback.)
+                  const scalarFields: InitiativeUpsertFields = {};
+                  for (const [k, v] of Object.entries(extracted)) {
+                    if (Array.isArray(v)) continue;
+                    (scalarFields as Record<string, string | number>)[k] = v;
+                  }
+                  const result = await callHubInitiativeUpsert({
+                    mode: upsertMode,
+                    conversation_id: convId,
+                    initiative_id: upsertMode === 'update' ? initiativeId : undefined,
+                    created_by: user.email,
+                    fields: scalarFields,
+                  });
+                  if (result.ok) {
+                    // If we just created a real row from a __draft__, swap the
+                    // id on the conversation doc so subsequent turns build the
+                    // workflow against the real initiative_id.
+                    if (upsertMode === 'create' && isDraft && result.data.initiative_id !== initiativeId) {
+                      try {
+                        await updateConversationInitiativeId(user.email, convId, result.data.initiative_id);
+                        initiativeId = result.data.initiative_id;
+                      } catch (err) {
+                        console.error('Failed to swap initiativeId after upsert:', err);
+                      }
+                    }
+                    enqueue({
+                      type: 'initiative_upserted',
+                      initiative_id: result.data.initiative_id,
+                      url: result.data.url,
+                      action: result.data.action,
+                      updated_fields: result.data.updated_fields,
+                    });
+                  } else {
+                    console.error('Initiative upsert failed:', result.reason);
+                    enqueue({
+                      type: 'initiative_upsert_failed',
+                      reason: result.reason,
+                      mode: upsertMode,
+                    });
+                  }
                 }
               }
             }

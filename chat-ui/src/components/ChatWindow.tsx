@@ -325,6 +325,12 @@ export default function ChatWindow({
             conversation_id?: string;
             extracted_fields?: Record<string, string | number>;
             extracted_fields_at?: string;
+            // Redesign-v2 server-write events:
+            url?: string;
+            action?: 'created' | 'updated' | 'no_changes';
+            updated_fields?: string[];
+            reason?: string;
+            mode?: string;
           };
 
           try {
@@ -411,6 +417,44 @@ export default function ChatWindow({
                 conversation_id: event.conversation_id,
               });
             }
+          } else if (event.type === 'initiative_upserted') {
+            // Redesign-v2 server-write: chat-ui's backend already created /
+            // updated the initiative in the Hub. Append a synthetic assistant
+            // message with the deep link and cache the new id for any
+            // subsequent workflow build in this conversation.
+            if (event.initiative_id && event.url) {
+              handoffInitiativeIdRef.current = event.initiative_id;
+              const verb = event.action === 'updated'
+                ? 'updated'
+                : event.action === 'no_changes'
+                  ? 'already saved'
+                  : 'created';
+              const linkMsg: Message = {
+                id: crypto.randomUUID(),
+                role: 'model',
+                content: `✓ Initiative ${verb}. **[Open in Hub →](${event.url})**`,
+              };
+              setMessages(prev => [...prev, linkMsg]);
+              // Tell the Hub iframe parent so it can refresh its list / nav.
+              if (isEmbedMode()) {
+                emitToParent({
+                  type: 'initiative_saved',
+                  initiative_id: event.initiative_id,
+                  url: event.url,
+                  action: event.action ?? 'created',
+                });
+              }
+            }
+          } else if (event.type === 'initiative_upsert_failed') {
+            // Show the failure inline so the user knows the AI's "Saving now…"
+            // didn't take. The AI's next turn can recover conversationally.
+            const reason = event.reason ?? 'Unknown error.';
+            const errMsg: Message = {
+              id: crypto.randomUUID(),
+              role: 'model',
+              content: `⚠ Couldn't save the initiative: ${reason}`,
+            };
+            setMessages(prev => [...prev, errMsg]);
           } else if (event.type === 'error') {
             setMessages(prev => {
               const updated = [...prev];

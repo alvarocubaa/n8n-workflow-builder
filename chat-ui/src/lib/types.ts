@@ -73,6 +73,24 @@ export type ChatEvent =
       type: 'request_workflow_handoff';
       initiative_id: string;
       conversation_id: string;
+    }
+  // Redesign-v2 server-write path: when the assistant emits the literal
+  // sentinel `<create_initiative />` or `<update_initiative />` alongside the
+  // 13-key JSON, the chat-ui server calls the Hub's n8n-initiative-upsert
+  // Edge Function directly. On success it emits this event; the client renders
+  // an inline "Open in Hub →" link and caches the id for downstream workflow
+  // builds in the same conversation.
+  | {
+      type: 'initiative_upserted';
+      initiative_id: string;
+      url: string;                     // absolute URL into the Hub
+      action: 'created' | 'updated' | 'no_changes';
+      updated_fields?: string[];
+    }
+  | {
+      type: 'initiative_upsert_failed';
+      reason: string;
+      mode: 'create' | 'update';
     };
 
 // ─── Analytics types ────────────────────────────────────────────────────────
