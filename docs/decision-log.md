@@ -4,6 +4,38 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-12 — Time Saved KPI v2: n8n-native settings as source of truth (replaces Hub initiative baseline fields)
+
+**Context:** Ron + Kurt requested simpler initiative creation (remove `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` from the StrategicIdea form) and a new source-of-truth: per-execution time-saved should be read from each n8n workflow's own settings. If absent, fall back to the initiative's `expected_impact` (the "Expected Output / Expected Impact" the user already types per (initiative, KPI) pair).
+
+**Discovery:** n8n already has these fields natively. Every workflow's `settings` object can hold `timeSavedMode` (`fixed` | `dynamic`) and `timeSavedPerExecution` (number, in minutes). Owners populate them via the workflow Settings panel (gear icon → "Time saved per execution"). Surveyed all 957 workflows on `guesty.app.n8n.cloud`: 41 already have fixed values set (2, 5, 10, 15, 30, 105, 360 — sensible only as minutes), 92 have `fixed` mode with no value yet, 4 have `dynamic` mode, 820 have nothing set.
+
+**Decision:** Refactor `/kpi-rollup` to read from n8n workflow settings instead of `strategic_ideas.current_process_minutes_per_run`. Per-workflow algorithm:
+- `mode='fixed' AND value > 0` → `workflow_hours = success_runs × value / 60` (`source = 'workflow:fixed'`)
+- `mode='dynamic'` → contribute 0 (`source = 'workflow:dynamic_skipped'` — dynamic semantics TBD)
+- anything else → contribute 0 (`source = 'workflow:unset'`)
+
+Per-initiative algorithm (audit finding A — refined from initial draft):
+- If **any** linked workflow has a configured fixed value → `Σ workflow_hours` (`source = 'workflow_sum'`). A configured workflow with 0 executions reports honest 0 and suppresses the fallback.
+- Else → fallback to `initiative_kpis.expected_impact` normalised to hours by `(impact_period, kpi.unit)` (`source = 'initiative:expected_impact_fallback'`).
+- If fallback unusable (NULL expected_impact, non-monthly period, non-time-shaped unit) → contribute 0 (`source = 'initiative:no_data'`).
+
+**Alternatives:**
+- *Proportional fallback* (workflow-level expected_impact split) — more accurate when only some workflows are configured, but ambiguous (no per-workflow expected_impact field exists). All-or-nothing is the simplest reading of "if a workflow has it, use it; otherwise fall back to initiative." Re-litigate if Ron pushes back.
+- *Custom tags / sticky notes / description parsing* — discarded the moment n8n's native fields were discovered. No conventions needed.
+- *Live n8n API at rollup time* — discarded; we read from BQ workflows dim (refreshed every 15 min by `/ingest`). Acceptable staleness for a monthly cron; avoids 4 paginated API calls during the rollup.
+
+**BQ schema:** additive nullable columns on `n8n_ops.workflows` dim — `time_saved_mode STRING`, `time_saved_per_execution_min NUMERIC`. Migration committed at `Agentic Workflows/workflows/n8n_kpi_ingestion/migration_v2_time_saved_settings.sql`. Applied to prod 2026-05-12 (963 rows in dim, all NULL until next `/ingest` after deploy). SCD2 close-out diff extended to detect changes in these two fields.
+
+**Observable consequence (April + May re-push after deploy):**
+- April: was `37.0 h` (v1 with hand-populated `current_process_minutes_per_run=15/30` on initiatives) → becomes `25.0 h` (PFR initiative falls back to expected_impact=20, ORM to 5; only PFR LinkedIn has a fixed value but 0 April runs).
+- May (1-8 partial): was `90.5 h` → becomes `25.0 h` (same fallback path).
+- Numbers will rise back as workflow owners populate `timeSavedPerExecution` in their workflow settings. Methodology change spelled out in the webhook payload's `notes` field on each push for full audit.
+
+**Outcome:** Code complete + `tsc` clean. Deploy pending. After deploy + `/ingest` once, ~137 workflows will populate the new dim fields automatically. Re-push for April + May to overwrite the v1 values once Slack message has set expectations.
+
+---
+
 ## 2026-05-08 — Time Saved KPI rollup colocates in `services/n8n-ops`, not `chat-ui`
 
 **Context:** Phase 5 of the Hub roadmap ("n8n Time-Saved consumption with Alvaro") needed a new monthly cron pushing `total_time_saved_hours` per canonical KPI to the Hub's `kpi-webhook-ingest` Edge Function. The natural homes were chat-ui (already had BigQuery client) or the existing `n8n-ops` Cloud Run service.
@@ -96,12 +128,17 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 Items below are decisions made but NOT yet verified end-to-end. Once verified, move to a dated entry above.
 
-- [ ] **Deploy n8n-ops v0.2.** Run `./deploy.sh` from `Agentic Workflows/services/n8n-ops/`. Expect 6 Cloud Schedulers (4 existing updated + 2 new). Smoke each via `gcloud scheduler jobs run …`.
-- [ ] **First scheduled `/kpi-rollup` fires June 1, 02:00 UTC** for May 2026. Confirm next-month measurement lands automatically (separate from today's manual May push).
-- [ ] **`/sweep-zombies` first run** reconciles ≥0 zombies cleanly. Check `[sweep-zombies] reconciled N abandoned M` log line.
-- [ ] **Confirm with Ron Madar-Hallevi:** PFR full name + per-run minute estimates (15 PFR / 30 ORM) are right.
-- [ ] **Slack message draft** in MEMORY.md `Where We Left Off` — post when ready.
-- [ ] **Sync-hub stub-row coverage fix** (deferred since Session 2) ships in the same n8n-ops v0.2 deploy.
+- [ ] **Deploy n8n-ops v0.3** (supersedes the v0.2 entry below). Same `./deploy.sh` ships everything: v0.2 work (Time Saved KPI v1 + `/sweep-zombies` + 24h-cap alert fixes + sync-hub stub-row) AND v2 (n8n-native time-saved settings as source of truth). Expect 6 schedulers idempotently created/updated.
+- [ ] **First `/ingest` post-deploy** populates the new BQ dim columns. Verify with `SELECT time_saved_mode, COUNT(*) FROM n8n_ops.workflows WHERE valid_to IS NULL GROUP BY 1` — expect ~133 rows with non-NULL values (fixed/dynamic mix).
+- [ ] **Second `/ingest`** is idempotent — no further SCD2 close-outs from the new fields (audit finding H).
+- [ ] **`/kpi-rollup` dry-run for April 2026** returns expected source breakdown: PFR LinkedIn `workflow:fixed`, other 6 workflows `workflow:unset`/`workflow:dynamic_skipped`, both initiatives `initiative:expected_impact_fallback`, total_hours = 25.0.
+- [ ] **Live re-push for April + May** (only AFTER Slack methodology message has gone out). Overwrites prior values 37.0 → 25.0 and 90.5 → 25.0.
+- [ ] **First scheduled `/kpi-rollup` fires June 1, 02:00 UTC** for May 2026.
+- [ ] **`/sweep-zombies` first run** reconciles ≥0 zombies cleanly.
+- [ ] **Confirm with Ron Madar-Hallevi:** PFR full name + per-execution minute estimates (the 5-min PFR LinkedIn value already lives in n8n; he can confirm or adjust at the source).
+- [ ] **Slack message to workflow owners** — explain the methodology change (gear icon → Time saved per execution), set expectations for the April number temporarily dropping to 25 h until owners populate.
+- [ ] **chat-ui follow-up** — stop auto-extracting `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` in the planning whitelist (audit finding J — harmless drift, fix in a separate PR once Kurt removes the form inputs).
+- [ ] **Investigate `timeSavedMode='dynamic'` semantics** — n8n public docs don't describe it. Currently treated as "skip + fallback eligible". Schema is unaffected if it turns out to mean "real execution duration" — additive change to `/kpi-rollup` only.
 
 ---
 
