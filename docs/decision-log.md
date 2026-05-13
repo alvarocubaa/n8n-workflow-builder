@@ -45,11 +45,28 @@ Marketing Time Saved KPI live in Hub:
 - Top April contributor: "Product Release - @aviv - PMM" (20.7 h, 31 executions, complex-pipeline 40-min tier)
 - Top May contributor: "ORM - Reviews per source - @ron.madar.hallevi" (20.8 h, 50 executions)
 
-### Open follow-ups
-- 24 errored workflows: investigate the 403s (likely need a key with broader write scope) and the 1 webhook-conflict. Until then those workflows contribute 0 hours.
-- Kurt notification: deploy is live; he can strip the 3 baseline inputs from the StrategicIdea form whenever.
-- chat-ui follow-up: stop extracting `current_process_minutes_per_run` from planning whitelist (harmless drift).
-- `tools/bulk-estimate-time-saved.ts` eligibility check still uses `mode==='fixed'` to detect "already set" — workflows we populated show up as eligible again on re-runs (no-op writes; harmless but noisy).
+### 24-error breakdown (investigated 2026-05-13)
+
+| Cohort | Count | Root cause | Resolution path |
+|---|---:|---|---|
+| **IS production** project (`UCEMQoFhrGZ3FChz`) | 21 | API key has READ scope but not WRITE on this project. All 21 workflows on the project errored uniformly with `HTTP 403 Forbidden`. | Owner (Louie / IS team) must either (a) grant our n8n API key project-editor role, OR (b) set each value manually in n8n UI. |
+| **Cura** (Product) project (`Wh25Z3w6AZxTFnWf`) | 2 | Same scope issue (HTTP 403). One workflow also carries an `editor` share row from the excluded Alvaro-personal project `4cZ5YxoOT53ysz3Y` — interesting metadata but doesn't unblock write. | Same — ask Cura team / IT for editor grant on the project. |
+| **Upsell Detection 2.1** (CS, `lxx8tAERgQNsVz14`) | 1 | Self-conflicting webhook: workflow has TWO webhook nodes both with `path='upsell-approval'`. The workflow runs internally, but n8n's public PUT API re-validates webhook uniqueness and rejects the PUT with `400 "There is a conflict with one of the webhooks."` | Ronishif fixes one of the two webhook paths (or sets the value via n8n UI, which uses a different code path and accepts the existing state). |
+| **2 × HTTP 404** (within the IS cohort above) | 2 (subset) | Workflow id present in LIST endpoint but not in GET-by-id — likely transient state or deleted between list and PUT. | Re-run on the next bulk pass; or skip silently. |
+
+**Net impact on KPI numbers:**
+- The 21 IS workflows would have contributed an estimated 21 × ~12 min/exec avg × actual executions per month. Without a real execution count handy for IS production, rough order of magnitude is **15-30 h/month**. Not catastrophic; an IS Time Saved KPI in Hub would see 0 until resolved.
+- The 2 Cura workflows are tiny (3-4 nodes) and rarely run; contribution likely <2 h/month.
+- The 1 Upsell Detection workflow is 142 nodes and probably high-firing — could be 10+ h/month for the CS KPI. Worth Ronishif resolving the dup webhook.
+
+**Not fixable from our side via the public API surface today.** Documented for follow-up rather than ad-hoc unblocking.
+
+### Open follow-ups (post-v3 ship)
+- IS / Cura write-scope: needs a key with broader project access. Defer until there's an actual IS or Cura Time Saved KPI created in Hub.
+- Ronishif: fix `Upsell Detection 2.1` dup webhook OR set value via UI — only matters once a CS Time Saved KPI lands in Hub.
+- chat-ui whitelist cleanup: stop extracting `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` from planning mode (harmless drift today; cleaner once Kurt removes the form inputs).
+- `tools/bulk-estimate-time-saved.ts` eligibility check still uses `mode==='fixed'` — workflows we populated via API have `mode=null + value=N` so they show up as eligible on re-runs. Idempotent (no-op writes) but noisy in dry-run output. Minor follow-up.
+- Kurt notification: DM drafted in `kurt.pabilona`'s Slack drafts (channel `D0A9V1YRRQT`), pending review-and-send by alvaro.
 
 ---
 
