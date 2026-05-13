@@ -4,6 +4,30 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-13 — Three v2 enrichments after Ron shared n8n's Insights API docs
+
+**Context:** Ron forwarded the n8n public API docs for `/insights/summary` and confirmed dynamic mode = "Time Saved nodes" placed inside the workflow (n8n computes server-side, path-dependent). Probed the API surface live to see what we should consume.
+
+**Findings ruled in:**
+- `/insights/summary` works end-to-end with URL-encoded `startDate`/`endDate` + optional `projectId`. April 2026 instance-wide = 20,609 min ≈ 343 h.
+- Dynamic-mode workflows ARE captured by Insights server-side; n8n's REST API does NOT expose per-workflow Insights, so our rollup can't see them. Treating `mode=dynamic` as `workflow:dynamic_skipped` (contributes 0) is the right call until n8n adds per-workflow Insights.
+
+**Findings ruled out:**
+- `/insights/summary?workflowId=…` — not supported.
+- `/insights/by-workflow`, `/insights/by-time` — 404 on this n8n version.
+- `/executions/{id}` — no time-saved field on the execution object.
+- `/projects` — 403 with our API key.
+
+**Enrichments shipped (all additive, no rework of v2 core):**
+
+1. **`/insights/summary` sanity-check** baked into `/kpi-rollup` response — new `instance_sanity_check` block with `time_saved_minutes` / `time_saved_hours` / `executions` / `failure_rate` for the same date window. Best-effort (logs + nulls on failure, never breaks the rollup). Helper added at `services/n8n.ts::getInsightsSummary()`.
+2. **README clarification on `dynamic` mode** — explains Time Saved nodes vs fixed mode; recommends fixed-mode for KPI-fed workflows; points to the bulk helper for API-driven setting.
+3. **Bulk-onboarding helper** at `services/n8n-ops/tools/set-time-saved.ts` — CSV-driven (`workflow_id,minutes`) `tsx` script that PUTs `settings.timeSavedMode='fixed' + timeSavedPerExecution=<n>` per row. Dry-run default; `--apply` to commit. Separate `tools/tsconfig.json` for IDE typing (not part of the deployed build).
+
+**Outcome:** Code complete + `tsc` clean for both `npm run build` (main service) and `npx tsc -p tools/tsconfig.json` (helper). Same deploy ships v2 + these 3 enrichments together — no schema change.
+
+---
+
 ## 2026-05-12 — Time Saved KPI v2: n8n-native settings as source of truth (replaces Hub initiative baseline fields)
 
 **Context:** Ron + Kurt requested simpler initiative creation (remove `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` from the StrategicIdea form) and a new source-of-truth: per-execution time-saved should be read from each n8n workflow's own settings. If absent, fall back to the initiative's `expected_impact` (the "Expected Output / Expected Impact" the user already types per (initiative, KPI) pair).
