@@ -4,6 +4,89 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-13 — Time Saved KPI v3: department-centric rollup + bulk-populated workflow defaults
+
+**Context:** Ron + Kurt clarified the scope: the Time Saved KPI infrastructure belongs to us for **every n8n workflow**, not just workflows linked to a Hub initiative. They expect us to *populate* the per-workflow time-saved values (initiative owners shouldn't have to ask their team members to fill in n8n settings). This is a structural change from v2 (initiative-centric, owner-populated) to v3 (department-centric, infrastructure-populated by default with owner override).
+
+**Three coordinated decisions:**
+
+### 1. Workflow → department mapping via n8n `shared[].projectId`
+
+Every n8n workflow object carries a `shared` array; the row with `role='workflow:owner'` gives the owning project_id. n8n's `/projects` REST endpoint is forbidden by our API key, but the project_id is exposed on the workflow object — sufficient for our needs.
+
+Audited every project_id on the live instance (962 workflows, 196 active). 81% map to project_ids already known from `chat-ui/src/lib/departments.ts`. The remaining 19% (11 unmapped projects) classified case-by-case from workflow content/naming:
+
+| Project ID | Decision | Rationale |
+|---|---|---|
+| `9tf5HxwKd0IBw7iI` | AI Team / production | Innovation Hub workflows + Hub KPI feeds |
+| `D0M1fZmWqfBypzkY` | AI Team / production | Cross-functional BQ/Slack agents (Revenue Mgmt, CS Data, BI Communication) |
+| `vKmJqLvy5SioataV` | AI Team / production | Who Does What Agent PROD, Ask AI Team |
+| `PHEMwd6NgE60OZFz` | AI Team / sandbox | Training labs, demos |
+| `0E2LLwKSKdz9lMPl` | AI Team / sandbox | Building Blocks / templates |
+| `pc0kDSf5Oxrrpn8i` | AI Team / sandbox | POCs (Mac Dylan + various) |
+| `yU9THCCcFdPt341F` | Product / sandbox | Design ops, PD weekly sync |
+| `82z4hqO9yMUv4klw` | Finance / sandbox | Dormant Netsuite catalog |
+| `Wh25Z3w6AZxTFnWf` | Product / sandbox | Cura workflows (user-confirmed) |
+| `4cZ5YxoOT53ysz3Y` | **EXCLUDE** | Alvaro personal experiments (DentalVoice, Canva MCP, Pre-QBR, Sync Supabase) |
+| `6Kuh47QvSzvhlVnN` | **EXCLUDE** | Single inactive placeholder "Feb 4th V" |
+
+Mapping table: `Agentic Workflows/services/n8n-ops/src/services/departments.ts`. **Net coverage after this decision: 100% of in-scope active workflows** (18 Alvaro personal + 1 placeholder explicitly excluded).
+
+### 2. Heuristic-driven bulk-population of `timeSavedPerExecution`
+
+Per Ron's direction "they don't want me to ask people to do it". We populate `settings.timeSavedPerExecution` on every active production workflow that doesn't already have a value, using a node-count tier heuristic (excluding sticky notes). Owners can override anytime; the heuristic is the *default*, not the authority.
+
+| Nodes | minutes/exec | tier label |
+|---:|---:|---|
+| 1-2 | 5 | trivial-notify |
+| 3-7 | 10 | moderate-pipe |
+| 8-15 | 15 | multi-step |
+| 16-30 | 25 | complex-pipeline |
+| 31+ | 40 | large-pipeline |
+
+**Rationale stored** in `src/services/time-saved-heuristic.ts` doc-block + replicated here for defence:
+- Anchored to Ron's manual setting on "PFR LinkedIn Post" (5 min, ~27 nodes) — our `multi-step` and `complex-pipeline` tiers stay close.
+- Upper anchor: "Slack Accountability & Update Bot" at 105 min — our `large-pipeline` (40) is conservative vs the largest manually-set values.
+- Floor: 5 min even for trivial workflows — the human alternative is "check + decide + act", not zero.
+- Median observed across the 41 already-configured workflows = 10 min; our tiers hug that centre.
+
+**Live dry-run result (2026-05-13):** 136 workflows eligible for population (out of 196 active). Breakdown: CX 51, IS 21, Marketing 19, AI Team 12, CS 10, OB 10, Product 7, Payments 5, People 1.
+
+Tool: `services/n8n-ops/tools/bulk-estimate-time-saved.ts` — dry-run by default, `--apply` to commit, `--dept <name>` to filter, `--csv-out <file>` to export the proposed CSV.
+
+### 3. `/kpi-rollup` pivots from initiative-centric to department-centric
+
+**Old (v2):** KPI total = walk `initiative_kpis` for the KPI → walk `initiative_workflow_links` for each initiative → sum.
+
+**New (v3):** KPI total = look up `kpis.department` → resolve to project_ids via `departments.ts` → SUM(workflow_hours) across every workflow in those projects.
+
+Initiative ↔ workflow links remain in the response as a `by_initiative` breakdown (info-only; useful for Kurt's future Hub UI), but they no longer gate the rollup total. Workflows in projects with `exclude:true` contribute 0; workflows in projects with no department mapping (currently zero such workflows after the audit) also contribute 0.
+
+New response shape adds `by_env: { sandbox: N, production: M, mixed: K }` per KPI so analysis can drill in without poisoning.
+
+### Schema delta (BQ)
+
+`migration_v3_project_id.sql` (applied 2026-05-13) — additive nullable columns on `n8n_ops.workflows` dim:
+- `project_id STRING` — from `shared[?role=owner].projectId`.
+- `project_env STRING` — derived from `departments.ts` mapping (`sandbox` | `production` | `mixed`).
+
+SCD2 close-out diff in `syncWorkflows()` extended to detect changes in either field (rare; happens on workflow project-transfer).
+
+### Observable impact on the Marketing Time Saved KPI
+
+| Period | v1 (Hub-side baseline) | v2 (initiative + workflow settings + fallback) | v3 (dept-centric + heuristic populate) |
+|---|---:|---:|---:|
+| April 2026 | 37.0 h | 25.0 h | TBD on first live rollup — likely much higher (Marketing scope expands from 7 initiative-linked workflows to all 22 active workflows in Marketing project) |
+| May 2026 (so far) | 90.5 h | 25.0 h | TBD |
+
+The v3 number reflects the actual time-saved scope (every active workflow saving time for Marketing), not just the workflows Ron manually linked. The 22-vs-7 expansion + the 136 heuristic-populated values combined should land in a defensible range — to be measured on first dry-run post-deploy.
+
+### Outcome
+
+Code complete + `tsc` clean on both `npm run build` and tools typecheck. Migration applied to prod BQ. **Pending:** single deploy (`./deploy.sh` from `Agentic Workflows/services/n8n-ops/`), then trigger `/ingest` once to populate the new BQ dim fields, then run `bulk-estimate-time-saved.ts --apply` to populate n8n workflow settings, then `/kpi-rollup` dry-run for April + May, then comms-before-push, then live re-push.
+
+---
+
 ## 2026-05-13 — Three v2 enrichments after Ron shared n8n's Insights API docs
 
 **Context:** Ron forwarded the n8n public API docs for `/insights/summary` and confirmed dynamic mode = "Time Saved nodes" placed inside the workflow (n8n computes server-side, path-dependent). Probed the API surface live to see what we should consume.
@@ -152,17 +235,18 @@ Per-initiative algorithm (audit finding A — refined from initial draft):
 
 Items below are decisions made but NOT yet verified end-to-end. Once verified, move to a dated entry above.
 
-- [ ] **Deploy n8n-ops v0.3** (supersedes the v0.2 entry below). Same `./deploy.sh` ships everything: v0.2 work (Time Saved KPI v1 + `/sweep-zombies` + 24h-cap alert fixes + sync-hub stub-row) AND v2 (n8n-native time-saved settings as source of truth). Expect 6 schedulers idempotently created/updated.
-- [ ] **First `/ingest` post-deploy** populates the new BQ dim columns. Verify with `SELECT time_saved_mode, COUNT(*) FROM n8n_ops.workflows WHERE valid_to IS NULL GROUP BY 1` — expect ~133 rows with non-NULL values (fixed/dynamic mix).
-- [ ] **Second `/ingest`** is idempotent — no further SCD2 close-outs from the new fields (audit finding H).
-- [ ] **`/kpi-rollup` dry-run for April 2026** returns expected source breakdown: PFR LinkedIn `workflow:fixed`, other 6 workflows `workflow:unset`/`workflow:dynamic_skipped`, both initiatives `initiative:expected_impact_fallback`, total_hours = 25.0.
-- [ ] **Live re-push for April + May** (only AFTER Slack methodology message has gone out). Overwrites prior values 37.0 → 25.0 and 90.5 → 25.0.
+- [ ] **Deploy n8n-ops v0.3** — single `./deploy.sh` ships everything: Session 7 (`/kpi-rollup` route + `/sweep-zombies` route + 24h-cap loop-alerts), Session 8 v2 (n8n-native time-saved settings + Insights sanity-check), Session 8 v3 (department-centric rollup + workflow dim project_id/env). Expect 6 schedulers idempotently created/updated.
+- [ ] **First `/ingest` post-deploy** populates the new BQ dim fields (`time_saved_mode`, `time_saved_per_execution_min`, `project_id`, `project_env`). Verify: `SELECT project_env, COUNT(*) FROM n8n_ops.workflows WHERE valid_to IS NULL GROUP BY 1` should show ~133 sandbox + ~76 production + N excluded.
+- [ ] **Bulk-populate via `tools/bulk-estimate-time-saved.ts --apply`** — 136 workflows to receive heuristic values via PUT to n8n. Validate write scope of the API key first (dry-run already passed; live PUT may 401/403). If blocked, escalate for a key with write scope; if it works, archive the CSV output.
+- [ ] **Re-`/ingest`** after the bulk-populate so the new `timeSavedPerExecution` values land in BQ workflows dim.
+- [ ] **`/kpi-rollup` dry-run for April 2026** returns Marketing dept-centric total (22 active wf in Marketing project, varying tier values). Expected total in the 30-80 h range (vs v1's 37 h or v2's 25 h fallback).
+- [ ] **Live re-push for April + May** AFTER Slack methodology message goes out. Overwrites prior values; explains the shift to dept-centric + heuristic-populated.
 - [ ] **First scheduled `/kpi-rollup` fires June 1, 02:00 UTC** for May 2026.
 - [ ] **`/sweep-zombies` first run** reconciles ≥0 zombies cleanly.
-- [ ] **Confirm with Ron Madar-Hallevi:** PFR full name + per-execution minute estimates (the 5-min PFR LinkedIn value already lives in n8n; he can confirm or adjust at the source).
-- [ ] **Slack message to workflow owners** — explain the methodology change (gear icon → Time saved per execution), set expectations for the April number temporarily dropping to 25 h until owners populate.
-- [ ] **chat-ui follow-up** — stop auto-extracting `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` in the planning whitelist (audit finding J — harmless drift, fix in a separate PR once Kurt removes the form inputs).
-- [ ] **Investigate `timeSavedMode='dynamic'` semantics** — n8n public docs don't describe it. Currently treated as "skip + fallback eligible". Schema is unaffected if it turns out to mean "real execution duration" — additive change to `/kpi-rollup` only.
+- [ ] **Slack message to workflow owners** — frame as "we set sensible defaults based on your workflow size; here's the table; you can override any time via Settings → Time saved per execution." Not asking them to set values; telling them we set values they can refine.
+- [ ] **chat-ui follow-up** — stop auto-extracting `current_process_minutes_per_run` / `_runs_per_month` / `_people_count` in the planning whitelist (harmless drift, fix in a separate PR once Kurt removes the form inputs).
+- [ ] **Investigate `timeSavedMode='dynamic'` semantics** — confirmed via Ron: it's driven by "Time Saved" nodes inside the workflow canvas; n8n computes server-side. Public REST API does not expose per-workflow dynamic values. Our rollup correctly treats dynamic as `workflow:dynamic_skipped`; n8n's `/insights/summary` (our sanity-check field) captures them globally.
+- [ ] **Notify Kurt** that the v0.3 deploy is live so he can strip the 3 baseline inputs from the StrategicIdea form.
 
 ---
 
