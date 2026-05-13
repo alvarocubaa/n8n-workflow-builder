@@ -4,6 +4,55 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-13 — Time Saved KPI v3 SHIPPED to production
+
+End-to-end execution of the v3 plan completed today. Live outcome:
+
+| Period | v1 (manual baseline) | v2 (fallback-only) | **v3 (dept-centric + heuristic)** |
+|---|---:|---:|---:|
+| April 2026 (full) | 37.0 h | 25.0 h | **38.08 h** |
+| May 2026 (1-13 partial) | 90.5 h | 25.0 h | **87.57 h** |
+
+Whole-instance Insights sanity check: April 358 h, May (to date) 223 h. Marketing = 10.6% of April company-wide total — a sensible proportion.
+
+### Deploy chain
+- Cloud Run revisions: `n8n-ops-00006-87s` (initial v3 ship) → `n8n-ops-00007-tmm` (mode-null-tolerant rollup tweak after PUT-schema discovery).
+- BQ migration v3 applied; `n8n_ops.workflows` SCD2 dim now carries `project_id`, `project_env`, `time_saved_mode`, `time_saved_per_execution_min` end to end.
+- /ingest cron refreshes all five fields on each 15-min tick.
+
+### Workflow population
+- **111 workflows applied** the node-count heuristic via `tools/bulk-estimate-time-saved.ts --apply` (Marketing 19, IS 21, CX 33+18 sandbox, CS 8+2, OB 10, AI Team 12, Product 7, Payments 5, People 1).
+- **24 workflows errored** (~18% of the 135 eligible):
+  - Most: `HTTP 403 Forbidden` from `PUT /workflows/{id}` — n8n's per-workflow ACL blocks our API key for those specific workflows (cross-project share edge cases).
+  - 2 × `HTTP 404 Not Found` — workflows present in LIST endpoint but missing from GET-by-id (deleted between fetch and write).
+  - 1 × `HTTP 400 "There is a conflict with one of the webhooks"` — a workflow whose webhook URL collides with another; modifying the resource triggers n8n's webhook-uniqueness check.
+- Net: 159 workflows in BQ dim now have `time_saved_per_execution_min > 0` (up from 46 pre-bulk).
+
+### Surfaced schema limitation: n8n public API PUT
+1. `PUT /api/v1/workflows/{id}` rejects unknown `settings` keys with `"settings must NOT have additional properties"`. The LIST endpoint returns extra keys (`binaryMode`, `availableInMCP`, `callerPolicy`) but PUT won't accept them. **Fix:** tools whitelist only the public-API-documented settings keys; n8n re-derives the rest server-side.
+2. `PUT` also rejects `settings.timeSavedMode` (only `timeSavedPerExecution` is in the schema). **Fix:** `/kpi-rollup` semantic relaxed to treat `value > 0` as configured regardless of `mode` (numeric value IS fixed mode by definition). Workflows owned via API have `mode=null + value=N`; workflows owned via n8n UI have both. Both correctly count.
+
+### Validated end-to-end on TrustPilot test write
+- Pre-PUT: `settings={executionOrder, binaryMode, availableInMCP}`, no `timeSavedPerExecution`.
+- Single PUT: only `timeSavedPerExecution=5` added to settings.
+- Post-PUT: nodes hash unchanged, connections hash unchanged, name/active unchanged. Only settings differs (additive).
+- SCD2 close-out worked correctly (3 generations of TrustPilot rows now in dim).
+
+### Final outcome numbers
+Marketing Time Saved KPI live in Hub:
+- April 2026 = 38.08 h (21 of 184 in-scope workflows configured, 1 dynamic, 162 unset)
+- May 2026 = 87.57 h (same scope distribution; partial month)
+- Top April contributor: "Product Release - @aviv - PMM" (20.7 h, 31 executions, complex-pipeline 40-min tier)
+- Top May contributor: "ORM - Reviews per source - @ron.madar.hallevi" (20.8 h, 50 executions)
+
+### Open follow-ups
+- 24 errored workflows: investigate the 403s (likely need a key with broader write scope) and the 1 webhook-conflict. Until then those workflows contribute 0 hours.
+- Kurt notification: deploy is live; he can strip the 3 baseline inputs from the StrategicIdea form whenever.
+- chat-ui follow-up: stop extracting `current_process_minutes_per_run` from planning whitelist (harmless drift).
+- `tools/bulk-estimate-time-saved.ts` eligibility check still uses `mode==='fixed'` to detect "already set" — workflows we populated show up as eligible again on re-runs (no-op writes; harmless but noisy).
+
+---
+
 ## 2026-05-13 — Time Saved KPI v3: department-centric rollup + bulk-populated workflow defaults
 
 **Context:** Ron + Kurt clarified the scope: the Time Saved KPI infrastructure belongs to us for **every n8n workflow**, not just workflows linked to a Hub initiative. They expect us to *populate* the per-workflow time-saved values (initiative owners shouldn't have to ask their team members to fill in n8n settings). This is a structural change from v2 (initiative-centric, owner-populated) to v3 (department-centric, infrastructure-populated by default with owner override).
