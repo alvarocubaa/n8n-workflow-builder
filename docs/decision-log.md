@@ -4,6 +4,31 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-14 — Baseline-metric form-input strip shipped (both repos + Edge Function)
+
+Cleanup landed for the deprecated `current_process_minutes_per_run / _runs_per_month / _people_count` triplet — surplus surface area after the v3 dept-centric rollup ship made these fields no longer drive any downstream metric.
+
+**chat-ui side** — commit `adc7b18` on PR #2:
+- `chat-ui/src/app/api/chat/route.ts` — `numberField()` helper + 3 whitelist registrations dropped; system prompt narrative trimmed.
+- `chat-ui/src/lib/system-prompt.ts` — JSON-shape example + numeric-bounds rule dropped.
+- `chat-ui/src/lib/hub-callback.ts` — 3 fields off `InitiativeUpsertFields` interface.
+- `chat-ui/src/components/MessageBubble.tsx` — 3 fields off the planning-block hide whitelist.
+- `tsc` clean.
+
+**Hub side** — [PR #51](https://github.com/kurtpabilona-code/AI-Innovation-Hub-Vertex/pull/51) on `kurtpabilona-code/AI-Innovation-Hub-Vertex`, branch `feat/strip-baseline-metrics-form-inputs`, commit `4f4da47`:
+- `components/AddStrategicIdeaModal.tsx` — strip across 6 reference sites: 3 useState hooks, editIdea-load setters, apply-AI-suggestions handlers, save-payload entries (×2: upsert + autosave), useCallback deps, resetForm setters, JSX "Baseline Metrics" section (3 number inputs).
+- `components/ROIBusinessImpactCard.tsx` — no-baseline branch copy updated. Previously: "No ROI baseline set… Set ROI baseline →" (button called `onEdit` which now leads to a form without those inputs). Now: prose pointing users to the Business AI KPIs page.
+- `supabase/functions/n8n-conversation-callback/index.ts` — `numberSpec` map emptied. Unknown keys hit the existing "drop silently" else branch — provably correct fall-through, no 400.
+- `tsc` clean. DB schema + `types.ts` + `services/api.ts` passthroughs preserved (existing initiatives with values still render the full ROI breakdown unchanged in `ROIBusinessImpactCard`).
+
+**Edge Function deployed**: `supabase functions deploy n8n-conversation-callback --project-ref ilhlkseqwparwdwhzcek --no-verify-jwt` ran clean; version bumped 9 → 10 (verified via `supabase functions list`). Deployed from the feature branch's local copy ahead of merge — forward-compatible since chat-ui has already stopped sending those fields.
+
+**Smoke test deferred**: a runtime smoke against the new Edge Function (POST with a deprecated key, confirm 200 + key dropped silently from `extracted_fields`) was blocked mid-script when the gcloud user token expired. Code path is provably correct (`numberSpec` empty → `else if (k in numberSpec)` false → falls through to `// else: unknown key, drop silently`) but a confirming smoke would be cheap once gcloud is re-auth'd. Not blocking — the deploy itself succeeded and is live.
+
+**What's pending on Kurt's side**: review + merge PR #51. The Cloud Build path auto-deploys the React app on merge; the Edge Function is already live.
+
+---
+
 ## 2026-05-13 — Time Saved KPI v3 SHIPPED to production
 
 End-to-end execution of the v3 plan completed today. Live outcome:
