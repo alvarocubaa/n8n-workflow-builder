@@ -94,9 +94,7 @@ You are in PLANNING mode. The user is drafting this initiative in the Hub and cl
      prioritising the highest-impact gaps.
   3. After 3-5 turns of refinement, propose a JSON block with the form-fill values:
        \`\`\`json
-       { "improvement_kpi": "...", "business_justification": "...", "current_state": "...",
-         "current_process_minutes_per_run": <number>, "current_process_runs_per_month": <number>,
-         "current_process_people_count": <number> }
+       { "improvement_kpi": "...", "business_justification": "...", "current_state": "..." }
        \`\`\`
   4. Tell the user they can copy these into the Hub form (Session 2 will auto-populate).
 
@@ -183,10 +181,6 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
     const v = obj[key];
     if (typeof v === 'string' && v.length > 0 && v.length <= max) out[key] = v;
   };
-  const numberField = (key: string, min: number, max: number): void => {
-    const v = obj[key];
-    if (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max) out[key] = v;
-  };
   const enumField = (key: string, allowed: readonly string[]): void => {
     const v = obj[key];
     if (typeof v === 'string' && allowed.includes(v)) out[key] = v;
@@ -241,9 +235,12 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   enumField('level_of_improvement', LEVEL_OF_IMPROVEMENT);
   enumField('impact_category', IMPACT_CATEGORY);
   enumField('effort', EFFORT);
-  numberField('current_process_minutes_per_run', 1, 1440);
-  numberField('current_process_runs_per_month', 0, 100000);
-  numberField('current_process_people_count', 0, 10000);
+  // 2026-05-13: current_process_minutes_per_run / _runs_per_month /
+  // _people_count removed — n8n-ops Time Saved KPI v3 reads
+  // settings.timeSavedPerExecution directly from n8n workflow settings;
+  // these baseline fields no longer feed anything. Hub UI form inputs
+  // removed in the same release. DB columns left intact for historical
+  // records.
   arrayPatternField('jira_ticket_ids', /^[A-Z][A-Z0-9_]+-\d+$/, 5);
 
   return Object.keys(out).length > 0 ? out : null;

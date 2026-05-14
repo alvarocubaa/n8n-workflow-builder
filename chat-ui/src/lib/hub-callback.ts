@@ -30,9 +30,6 @@ export interface InitiativeUpsertFields {
     | 'Quality'
     | 'Business';
   effort?: 'Low' | 'Medium' | 'High';
-  current_process_minutes_per_run?: number;
-  current_process_runs_per_month?: number;
-  current_process_people_count?: number;
 }
 
 export interface InitiativeUpsertRequest {

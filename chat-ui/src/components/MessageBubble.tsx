@@ -18,8 +18,7 @@ import { emitToParent, isEmbedMode } from '@/lib/embed';
 const PLANNING_FIELD_KEYS = new Set([
   'title', 'description', 'improvement_kpi', 'business_justification',
   'current_state', 'department', 'data_sources', 'level_of_improvement',
-  'impact_category', 'effort', 'current_process_minutes_per_run',
-  'current_process_runs_per_month', 'current_process_people_count',
+  'impact_category', 'effort',
 ]);
 
 export interface Message {

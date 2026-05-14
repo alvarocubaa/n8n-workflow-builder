@@ -213,9 +213,6 @@ Form-values JSON shape (all keys optional; emit only what the conversation has c
   "level_of_improvement": "Low | Medium | High | Very High",
   "impact_category": "Time Savings | Improved Quality | Reduced Cost | Increased Revenue | Efficiency | Quality | Business",
   "effort": "Low | Medium | High",
-  "current_process_minutes_per_run": 0,
-  "current_process_runs_per_month": 0,
-  "current_process_people_count": 0,
   "jira_ticket_ids": ["array of Jira issue keys, each matching ^[A-Z][A-Z0-9_]+-[0-9]+$, max 5 entries"]
 }
 \`\`\`
@@ -223,7 +220,6 @@ Form-values JSON shape (all keys optional; emit only what the conversation has c
 JSON rules:
 - Emit at most ONE final block per reply (drafts mid-conversation are fine; only the LAST block per turn is parsed).
 - Enum values must match the listed strings character-for-character. Any other value is silently dropped.
-- Numbers must be plain integers/finite numbers, not strings. Out-of-bounds values are dropped (minutes_per_run [1-1440], runs_per_month [0-100000], people_count [0-10000]).
 - Use the Hub display name for "department" (e.g. "Customer Success", not "cs").
 - Only emit "jira_ticket_ids" if the user explicitly mentions a Jira ticket (e.g. "tracked in CXAU-247", "see JIRA SUP-12"). Don't invent. Use uppercase keys.
 
