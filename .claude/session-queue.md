@@ -4,13 +4,91 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Time Saved KPI rollup pipeline shipped end-to-end today (2026-05-08, Session 7) — Marketing's Time Saved KPI now auto-populated from BigQuery → Hub via `kpi-webhook-ingest`. April 37h, May 90.5h-and-counting visible in Hub. Code lives in `Agentic Workflows/services/n8n-ops/` but **not yet deployed**. Next focus = single bundled n8n-ops v0.2 deploy (Time Saved rollup + zombie sweeper + alert fixes + the deferred sync-hub stub-row coverage fix).
+**Current focus track:** Time Saved KPI infrastructure shipped end-to-end across Sessions 7-8 (2026-05-08 → 2026-05-14). Marketing Time Saved KPI live at [`/business-kpis/e6f47f5b-…`](https://thehub.gue5ty.com/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53) showing April 38 h / May 88 h. Next focus = Session 9, **auto-fill the per-initiative "Contributes to KPI" card** so initiative owners never type Expected Impact (Hours) themselves.
+
+---
+
+## Plan files index (this multi-session arc)
+
+All plans live in [`.claude/plans/`](plans/). Read the most recent first if you're new to this track:
+
+| Date | Plan file | Status |
+|---|---|---|
+| 2026-05-15 | [`2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md) | **Active HEAD** — designed; execution in fresh session |
+| 2026-05-13 | [`2026-05-13-time-saved-kpi-v3-dept-centric.md`](plans/2026-05-13-time-saved-kpi-v3-dept-centric.md) | ✅ Shipped Session 8 |
+| 2026-05-12 | [`2026-05-12-time-saved-kpi-v2.md`](plans/2026-05-12-time-saved-kpi-v2.md) | ✅ Shipped Session 8 (superseded by v3 same week) |
+| 2026-05-08 | [`2026-05-08-time-saved-kpi-rollup.md`](plans/2026-05-08-time-saved-kpi-rollup.md) | ✅ Shipped Session 7 (initial v1) |
+
+Architecture history + every design decision is captured in [`docs/decision-log.md`](../docs/decision-log.md) — entries 2026-05-08 through 2026-05-15 cover the whole journey from v1 → v2 → v3 → auto-sync planning.
 
 ---
 
 ## Queue
 
-### 1. [HEAD] n8n-ops v0.2 deploy — bundle Time Saved KPI rollup + zombie sweeper + alert fixes + sync-hub stub-row
+### 1. [HEAD] Session 9 — Auto-fill per-initiative `initiative_kpis` rows from our data
+
+**Goal:** When an initiative has linked workflow(s), auto-populate its "Contributes to KPI" card so the user never has to type Expected Impact (Hours). Daily cron folded into `/sync-hub`.
+
+**Full plan + decisions + verification:** [`.claude/plans/2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md).
+
+**Decision locked** (2026-05-15): Option A — auto-overwrite. Measured data is the authority. `initiative_kpis` has no `created_by` column (verified live) so no discriminator needed; cron rewrites every eligible row every morning. Manual UI edits last until the next sync.
+
+**Upstream data flow (already shipped — DO NOT rebuild):**
+- `initiative_workflow_links` rows are auto-written by `n8n-builder-callback` Edge Function on every chat-ui Builder deploy that has an `initiative_id` (Direction-2, 2026-05-04).
+- `innovation_items.solution_url` (PoC mirror, PR #52, 2026-05-15) is informational — NOT the rollup data source. Soft gap flagged in the plan for a future backfill job.
+
+**Files to create/modify:**
+- NEW: `Agentic Workflows/services/n8n-ops/src/routes/initiative-kpi-sync.ts` (~150 LOC; mirror shape of `routes/kpi-rollup.ts`).
+- MODIFY: `Agentic Workflows/services/n8n-ops/src/services/supabase.ts` — add 3 helpers (list initiatives + workflow links, resolve canonical KPI, upsert initiative_kpis).
+- MODIFY: `Agentic Workflows/services/n8n-ops/src/index.ts` — wire the new route.
+- MODIFY: `Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts` — call `initiativeKpiSync()` at the end of the existing handler so daily cron does both.
+- LOG: new entry in `n8n-builder-cloud-claude/docs/decision-log.md` capturing Option A choice + observable consequences.
+
+**Estimated effort:** 2-3 hours code + 30 min docs/commit. Half a session.
+
+**Adjacent items also worth picking up if time permits:**
+- **Feedback-loop harvest** — Apr 15 last run, weekly cadence — currently overdue ~30 days. Run `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
+- **Kurt DM** sitting in Slack drafts `D0A9V1YRRQT` since 2026-05-13 — review + send when ready.
+- **24 errored workflows from Session 8 bulk-populate** — 21 IS production + 2 Cura + 1 self-conflicting webhook. Documented in decision-log; will revisit when affected dept's KPI lands in Hub.
+
+---
+
+### ✅ SHIPPED 2026-05-12 through 2026-05-14 — Session 8 — Time Saved KPI v2 + v3 + Hub form strip + n8n-ops v0.3 deploy
+
+> **Outcome:** Three coordinated landings. Architecture pivoted twice in 48h (v1 → v2 → v3) as scope expanded from initiative-linked workflows to department-wide.
+>
+> **Plan files:**
+> - v2: [`.claude/plans/2026-05-12-time-saved-kpi-v2.md`](plans/2026-05-12-time-saved-kpi-v2.md)
+> - v3: [`.claude/plans/2026-05-13-time-saved-kpi-v3-dept-centric.md`](plans/2026-05-13-time-saved-kpi-v3-dept-centric.md)
+>
+> **What landed:**
+> - **v2 (2026-05-12)** — moved per-execution time-saved from `strategic_ideas.current_process_minutes_per_run` to each n8n workflow's native `settings.timeSavedPerExecution`. BQ migration v2 added `time_saved_mode` + `time_saved_per_execution_min` to `n8n_ops.workflows` SCD2 dim. `/kpi-rollup` rewrote to read from BQ dim. Initiative `expected_impact` as fallback. `/insights/summary` cross-check baked into response.
+> - **v3 (2026-05-13)** — pivoted from initiative-centric to **department-centric** rollup. BQ migration v3 added `project_id` + `project_env`. Workflow → project → department mapping in `src/services/departments.ts`. 100% coverage of active workflows; 18 personal-experiment workflows + 1 placeholder explicitly excluded; 11 unmapped projects classified (6 → AI Team sub-projects, 2 → Product, 1 → Finance, 1 each → exclusions).
+> - **Bulk-populated 111 workflows** with `settings.timeSavedPerExecution` via node-count tier heuristic (5 / 10 / 15 / 25 / 40 min). Rationale in `src/services/time-saved-heuristic.ts`. 24 errored (21 IS production + 2 Cura — API key write-scope; 1 self-conflicting webhook in CS).
+> - **Hub form strip (PR #51 merged + Cloud Build deployed `00104-nsw`)** — `AddStrategicIdeaModal` Baseline Metrics section gone, `ROIBusinessImpactCard` no-baseline copy updated, Edge Function `n8n-conversation-callback` v10 with empty `numberSpec`.
+> - **chat-ui side cleaned** — planning whitelist, system prompt, hub-callback type, MessageBubble display all updated.
+>
+> **Live Marketing Time Saved KPI:**
+> - April 2026: **38.08 h** (21 of 184 in-scope workflows currently configured)
+> - May 2026: **87.57 h** (partial — full-month re-run lands June 1)
+> - Whole-instance Insights sanity: April 358 h, Marketing ≈ 11% of company-wide.
+>
+> **API gotchas surfaced and worked around:**
+> - n8n's public `PUT /workflows/{id}` rejects extra `settings` keys (`binaryMode`, `availableInMCP`, `timeSavedMode`). Tools whitelist only public-spec keys; `/kpi-rollup` treats `value > 0` as configured regardless of mode.
+> - `gcloud auth print-identity-token` doesn't carry `email` claim; n8n-ops's `requireOidc` middleware requires it. Use `iamcredentials.googleapis.com/.../generateIdToken` with `includeEmail:true` (OIDC helper script in next-session.md).
+> - CloudFront-vs-Cloud Run routing: `thehub.gue5ty.com` returns 403 on OAuth redirects. Use Cloud Run URL directly (`ai-innovation-hub-hoepmeihvq-uc.a.run.app`) — Supabase auth `uri_allow_list` patched to include it.
+>
+> **Decisions logged** ([docs/decision-log.md](../docs/decision-log.md) entries 2026-05-12 through 2026-05-14): n8n-native settings as source of truth, all-or-nothing fallback, department mapping + Alvaro exclusion, heuristic tier rationale + anchors, Option A auto-overwrite reasoning, observable Apr/May regression (37 → 25 → 38 h vs v1 → v2 → v3).
+
+---
+
+### Superseded HEAD (kept for context — content rolled up into Session 8 shipped entry above)
+
+> Originally: "n8n-ops v0.2 deploy — bundle Time Saved KPI rollup + zombie sweeper + alert fixes + sync-hub stub-row". Replaced by the bundled Session 8 ship which did all of that PLUS v3 + form strip.
+
+---
+
+### 1.OLD [archived HEAD content — for reference only] n8n-ops v0.2 deploy — bundle Time Saved KPI rollup + zombie sweeper + alert fixes + sync-hub stub-row
 
 **Goal:** One deploy ships everything coded in Sessions 2 (sync-hub diagnosis) + 7 (Time Saved KPI + zombie sweeper). Single `cd "Agentic Workflows/services/n8n-ops" && ./deploy.sh` rebuilds Cloud Run + idempotently creates/updates 6 schedulers (4 existing + 2 new: `n8n-ops-kpi-rollup` `0 2 1 * *` UTC, `n8n-ops-sweep-zombies` `*/30 * * * *` UTC).
 
