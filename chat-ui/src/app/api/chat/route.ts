@@ -159,22 +159,33 @@ current JSON, call the get_workflow_for_promotion tool with the workflow_id abov
  * Defense-in-depth: the Edge Function re-validates these same bounds.
  */
 function extractAndValidatePlanningFields(text: string): Record<string, string | number | string[]> | null {
-  // Match the LAST ```json … ``` block — Claude may emit a draft mid-conversation
-  // and a final at the end; we want the final.
-  const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+  // Permissive block-finder: accepts ```json, ```JSON, ```json5, ```js, or bare ```
+  // followed (optionally) by whitespace/newline. Claude is inconsistent about
+  // fence variants under pressure — losing the planning payload because of a
+  // case-sensitive `json` was the 2026-05-11 silent-failure root cause.
+  const blockRe = /```(?:json\d?|JSON|js)?\s*\r?\n?([\s\S]*?)\r?\n?```/gi;
+  const matches = [...text.matchAll(blockRe)];
   if (matches.length === 0) return null;
-  const lastMatch = matches[matches.length - 1];
-  const jsonText = lastMatch[1];
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    return null;
+  // Try each block from LAST to FIRST. The last block is typically the
+  // canonical payload (drafts come first); but if it fails to parse, an
+  // earlier block may still be valid (e.g. AI re-printed prose-with-JSON
+  // after a confirmation prompt).
+  let parsed: Record<string, unknown> | null = null;
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const body = matches[i][1].trim();
+    if (!body) continue;
+    try {
+      const candidate: unknown = JSON.parse(body);
+      if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+        parsed = candidate as Record<string, unknown>;
+        break;
+      }
+    } catch { /* try previous block */ }
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  if (!parsed) return null;
 
-  const obj = parsed as Record<string, unknown>;
+  const obj = parsed;
   const out: Record<string, string | number | string[]> = {};
 
   const stringField = (key: string, max: number): void => {
@@ -244,6 +255,22 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   arrayPatternField('jira_ticket_ids', /^[A-Z][A-Z0-9_]+-\d+$/, 5);
 
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Walk the conversation history backwards looking for the most-recent model
+ * message that yields a non-null planning payload. Used as a fallback when
+ * the AI emits <create_initiative /> without re-attaching the JSON in the
+ * same turn (which it does often once the form has been confirmed verbally).
+ */
+function extractFromHistory(history: DisplayMessage[]): Record<string, string | number | string[]> | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg.role !== 'model') continue;
+    const extracted = extractAndValidatePlanningFields(msg.content);
+    if (extracted) return extracted;
+  }
+  return null;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -486,38 +513,42 @@ export async function POST(req: Request): Promise<Response> {
               console.error('Failed to persist messages:', err);
             }
 
-            // Planning-mode auto-pop: when the assistant's reply contains a
-            // fenced ```json block at the end, parse + whitelist it. We do two
-            // things with the result: (a) emit an SSE event so embed-mode
-            // clients can postMessage it to the Hub parent (Direction 3), and
-            // (b) fire-and-forget POST to the Hub's n8n-conversation-callback
-            // Edge Function, which upserts {extracted_fields, extracted_fields_at}
-            // on the initiative_chat_conversations row. Failures log only —
-            // never break the chat response.
-            // Direction-3 Phase 3 handoff sentinel: when the assistant's
-            // planning-mode reply contains <request_workflow_handoff />, fire
-            // an SSE event the embed client relays as postMessage so the Hub
-            // auto-saves the draft initiative.
-            if (
-              initiativeMode === 'planning' &&
-              initiativeId &&
-              /<request_workflow_handoff\s*\/?>/i.test(modelChunks.join(''))
-            ) {
-              enqueue({
-                type: 'request_workflow_handoff',
-                initiative_id: initiativeId,
-                conversation_id: convId,
-              });
-            }
+            // Planning-mode end-of-turn handling. Three concerns, each
+            // independently gated to avoid the 2026-05-11 silent-failure bug
+            // where a missing JSON block in the current turn killed the
+            // sentinel-driven write path:
+            //
+            //   (a) Extract planning fields if the AI emitted JSON this turn.
+            //       Drives the Hub's form-fill (`extracted_fields` SSE) and the
+            //       initiative_chat_conversations summary row.
+            //
+            //   (b) Sentinel-driven server-write: when <create_initiative /> or
+            //       <update_initiative /> appears, call the Hub Edge Function.
+            //       Falls back to history-extracted fields when the current
+            //       turn omitted the JSON (common after the user already
+            //       confirmed verbally in an earlier reply).
+            //
+            //   (c) Legacy <request_workflow_handoff /> postMessage — only
+            //       emitted when the new server-write sentinels did NOT fire,
+            //       to avoid two races writing the same row.
+            //
+            // Always log one structured `planning_turn` line at the end so we
+            // can see what happened from Cloud Run logs without storing PII.
             if (initiativeMode === 'planning' && initiativeId) {
-              const extracted = extractAndValidatePlanningFields(modelChunks.join(''));
-              if (extracted) {
+              const fullReply = modelChunks.join('');
+              const wantsCreate = /<create_initiative\s*\/?>/i.test(fullReply);
+              const wantsUpdate = /<update_initiative\s*\/?>/i.test(fullReply);
+              const wantsLegacyHandoff = /<request_workflow_handoff\s*\/?>/i.test(fullReply);
+
+              // (a) Current-turn extraction
+              const extractedThisTurn = extractAndValidatePlanningFields(fullReply);
+              if (extractedThisTurn) {
                 const extractedAt = new Date().toISOString();
                 enqueue({
                   type: 'extracted_fields',
                   initiative_id: initiativeId,
                   conversation_id: convId,
-                  extracted_fields: extracted,
+                  extracted_fields: extractedThisTurn,
                   extracted_fields_at: extractedAt,
                 });
                 if (process.env.HUB_CALLBACK_URL && process.env.HUB_CALLBACK_SECRET) {
@@ -532,69 +563,98 @@ export async function POST(req: Request): Promise<Response> {
                       conversation_id: convId,
                       mode: 'planning',
                       created_by: user.email,
-                      extracted_fields: extracted,
+                      extracted_fields: extractedThisTurn,
                       source,
                     }),
                     signal: AbortSignal.timeout(5000),
                   }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
                 }
+              }
 
-                // Redesign-v2 server-write path:
-                // <create_initiative /> / <update_initiative /> sentinels.
-                // When present, call the Hub Edge Function directly and emit
-                // initiative_upserted (or initiative_upsert_failed). Decoupled
-                // from the workflow handoff — saving an initiative does NOT
-                // require the user to continue into Phase 3.
-                const fullReply = modelChunks.join('');
-                const wantsCreate = /<create_initiative\s*\/?>/i.test(fullReply);
-                const wantsUpdate = /<update_initiative\s*\/?>/i.test(fullReply);
-                if (wantsCreate || wantsUpdate) {
+              // (b) Sentinel-driven server-write
+              let upsertResult: Awaited<ReturnType<typeof callHubInitiativeUpsert>> | null = null;
+              let extractedFromHistory = false;
+              let fieldsForUpsert: Record<string, string | number | string[]> | null = extractedThisTurn;
+              if (wantsCreate || wantsUpdate) {
+                if (!fieldsForUpsert) {
+                  fieldsForUpsert = extractFromHistory(history);
+                  extractedFromHistory = !!fieldsForUpsert;
+                }
+                if (!fieldsForUpsert) {
+                  enqueue({
+                    type: 'initiative_upsert_failed',
+                    reason: 'AI emitted <create_initiative /> but no valid JSON payload was found in this turn or any prior turn. Ask the AI to re-send the JSON.',
+                    mode: wantsCreate ? 'create' : 'update',
+                  });
+                } else {
                   const isDraft = initiativeId === '__draft__';
                   const upsertMode: 'create' | 'update' = wantsUpdate && !isDraft ? 'update' : 'create';
-                  // Strip the array-typed jira_ticket_ids — the Edge Function
-                  // contract only takes scalar fields. (Jira links are written
-                  // separately via the existing extracted_fields callback.)
                   const scalarFields: InitiativeUpsertFields = {};
-                  for (const [k, v] of Object.entries(extracted)) {
+                  for (const [k, v] of Object.entries(fieldsForUpsert)) {
                     if (Array.isArray(v)) continue;
                     (scalarFields as Record<string, string | number>)[k] = v;
                   }
-                  const result = await callHubInitiativeUpsert({
+                  upsertResult = await callHubInitiativeUpsert({
                     mode: upsertMode,
                     conversation_id: convId,
                     initiative_id: upsertMode === 'update' ? initiativeId : undefined,
                     created_by: user.email,
                     fields: scalarFields,
                   });
-                  if (result.ok) {
-                    // If we just created a real row from a __draft__, swap the
-                    // id on the conversation doc so subsequent turns build the
-                    // workflow against the real initiative_id.
-                    if (upsertMode === 'create' && isDraft && result.data.initiative_id !== initiativeId) {
+                  if (upsertResult.ok) {
+                    if (upsertMode === 'create' && isDraft && upsertResult.data.initiative_id !== initiativeId) {
                       try {
-                        await updateConversationInitiativeId(user.email, convId, result.data.initiative_id);
-                        initiativeId = result.data.initiative_id;
+                        await updateConversationInitiativeId(user.email, convId, upsertResult.data.initiative_id);
+                        initiativeId = upsertResult.data.initiative_id;
                       } catch (err) {
                         console.error('Failed to swap initiativeId after upsert:', err);
                       }
                     }
                     enqueue({
                       type: 'initiative_upserted',
-                      initiative_id: result.data.initiative_id,
-                      url: result.data.url,
-                      action: result.data.action,
-                      updated_fields: result.data.updated_fields,
+                      initiative_id: upsertResult.data.initiative_id,
+                      url: upsertResult.data.url,
+                      action: upsertResult.data.action,
+                      updated_fields: upsertResult.data.updated_fields,
                     });
                   } else {
-                    console.error('Initiative upsert failed:', result.reason);
+                    console.error('Initiative upsert failed:', upsertResult.reason);
                     enqueue({
                       type: 'initiative_upsert_failed',
-                      reason: result.reason,
+                      reason: upsertResult.reason,
                       mode: upsertMode,
                     });
                   }
                 }
               }
+
+              // (c) Legacy handoff — only when the new path didn't run.
+              // Prevents the AddStrategicIdeaModal autosave path from racing
+              // the Edge Function create on the same turn.
+              if (wantsLegacyHandoff && !wantsCreate && !wantsUpdate) {
+                enqueue({
+                  type: 'request_workflow_handoff',
+                  initiative_id: initiativeId,
+                  conversation_id: convId,
+                });
+              }
+
+              // (d) Observability — one structured line per planning turn.
+              // Greppable via `textPayload=~"planning_turn"` in Cloud Run logs.
+              // No PII: no chat content, no user email.
+              console.log(JSON.stringify({
+                event: 'planning_turn',
+                convId,
+                hasSentinelCreate: wantsCreate,
+                hasSentinelUpdate: wantsUpdate,
+                hasLegacyHandoff: wantsLegacyHandoff,
+                extractedCurrentTurn: !!extractedThisTurn,
+                extractedFromHistory,
+                upsertCalled: (wantsCreate || wantsUpdate) && !!fieldsForUpsert,
+                upsertOk: upsertResult?.ok ?? null,
+                upsertAction: upsertResult?.ok ? upsertResult.data.action : null,
+                upsertReason: upsertResult && !upsertResult.ok ? upsertResult.reason : null,
+              }));
             }
 
             // Log analytics event with token usage (fire-and-forget)

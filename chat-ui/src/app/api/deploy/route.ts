@@ -111,9 +111,16 @@ export async function POST(req: Request): Promise<Response> {
               initiative_id: conv.initiativeId,
               n8n_workflow_id: result.workflowId,
               n8n_workflow_name: result.workflowName,
+              n8n_workflow_url: result.workflowUrl,
               deployed_by: user.email,
               deployed_at: new Date().toISOString(),
               source: conv.source,
+              // Phase 2.1: optional PoC linkage. When the chat conversation
+              // was launched from a PoC card (Phase 2.2's poc_context payload,
+              // not yet plumbed end-to-end), pass the innovation_items.id so
+              // n8n-builder-callback auto-populates that row's solution_url.
+              // Stub for now — Phase 2.2 will wire `conv.innovationItemId`.
+              innovation_item_id: (conv as { innovationItemId?: string }).innovationItemId,
             }),
           });
         }

@@ -85,7 +85,7 @@ deploy_mcp() {
     log_info "Deploying n8n-mcp..."
     source .env
 
-    # internal ingress — only callable from Cloud Run services in the same project
+    # Protected by IAM (run.invoker) + app-level AUTH_TOKEN check.
     # N8N_API_URL sourced from existing N8N_URL secret
     gcloud run deploy "$MCP_SERVICE_NAME" \
         --image "$MCP_IMAGE" \
@@ -93,12 +93,12 @@ deploy_mcp() {
         --region "$REGION" \
         --project "$PROJECT_ID" \
         --service-account "n8n-workflow-builder@${PROJECT_ID}.iam.gserviceaccount.com" \
-        --ingress internal \
+        --ingress all \
         --port 8080 \
         --memory 512Mi \
         --cpu 1 \
-        --min-instances 0 \
-        --max-instances 3 \
+        --min-instances 1 \
+        --max-instances 5 \
         --set-secrets="AUTH_TOKEN=AUTH_TOKEN:latest,N8N_API_KEY=N8N_API_KEY:latest,N8N_API_URL=N8N_URL:latest" \
         --set-env-vars="MCP_MODE=http,LOG_LEVEL=info,TRUST_PROXY=1,NODE_ENV=production"
     # IAM: n8n-workflow-builder SA already has run.invoker on this service (SA-to-SA auth)
@@ -155,7 +155,7 @@ deploy_chat_ui() {
         --min-instances 1 \
         --max-instances 15 \
         --set-secrets="N8N_API_KEY=N8N_API_KEY:latest,MCP_AUTH_TOKEN=AUTH_TOKEN:latest,HUB_CALLBACK_SECRET=HUB_CALLBACK_SECRET:latest" \
-        --set-env-vars="MCP_SERVICE_URL=${MCP_URL},N8N_API_URL=${N8N_API_URL},NODE_ENV=production,HUB_CALLBACK_URL=https://ilhlkseqwparwdwhzcek.supabase.co/functions/v1,GOOGLE_OAUTH_CLIENT_ID=535171325336-lohp54d4kp8npumfp8bgm4bttnlg6v48.apps.googleusercontent.com"
+        --set-env-vars="MCP_SERVICE_URL=${MCP_URL},N8N_API_URL=${N8N_API_URL},NODE_ENV=production,HUB_CALLBACK_URL=https://ilhlkseqwparwdwhzcek.supabase.co/functions/v1,HUB_PUBLIC_ORIGIN=https://thehub.gue5ty.com,GOOGLE_OAUTH_CLIENT_ID=535171325336-lohp54d4kp8npumfp8bgm4bttnlg6v48.apps.googleusercontent.com"
 
     CHAT_URL=$(gcloud run services describe "$CHAT_SERVICE_NAME" \
         --region="$REGION" --project="$PROJECT_ID" --format='value(status.url)')

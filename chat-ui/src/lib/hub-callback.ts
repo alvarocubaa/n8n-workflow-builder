@@ -72,10 +72,27 @@ function absolutiseUrl(maybeRelative: string): string {
   return `${origin}${path}`;
 }
 
+async function postOnce(url: string, secret: string, payload: InitiativeUpsertRequest): Promise<Response> {
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Hub-Secret': secret,
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10_000),
+  });
+}
+
 /**
  * POST to the Hub's n8n-initiative-upsert Edge Function. Returns a discriminated
  * union so callers can branch without try/catch. Network/timeout failures are
  * swallowed into `ok: false` with a human-readable reason.
+ *
+ * Transient-failure retry: one retry after 500 ms on 5xx or network error.
+ * The Edge Function uses an idempotency tracker keyed on conversation_id, so
+ * a retry of a request that actually succeeded will return action='no_changes'
+ * with the existing id rather than creating a duplicate row.
  */
 export async function callHubInitiativeUpsert(
   payload: InitiativeUpsertRequest,
@@ -85,20 +102,30 @@ export async function callHubInitiativeUpsert(
   if (!base || !secret) {
     return { ok: false, reason: 'Hub callback not configured (HUB_CALLBACK_URL / HUB_CALLBACK_SECRET missing).' };
   }
+  const url = `${base.replace(/\/+$/, '')}/n8n-initiative-upsert`;
 
-  let res: Response;
+  let res: Response | null = null;
+  let networkErr: unknown = null;
   try {
-    res = await fetch(`${base.replace(/\/+$/, '')}/n8n-initiative-upsert`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Hub-Secret': secret,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10_000),
-    });
+    res = await postOnce(url, secret, payload);
   } catch (err) {
-    return { ok: false, reason: `Network error: ${String(err)}` };
+    networkErr = err;
+  }
+
+  // Retry once on 5xx or network/timeout — but never on 4xx (those are
+  // deterministic client errors and a retry won't change anything).
+  if (networkErr || (res && res.status >= 500 && res.status < 600)) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      res = await postOnce(url, secret, payload);
+      networkErr = null;
+    } catch (err) {
+      networkErr = err;
+    }
+  }
+
+  if (networkErr || !res) {
+    return { ok: false, reason: `Network error: ${String(networkErr)}` };
   }
 
   if (!res.ok) {

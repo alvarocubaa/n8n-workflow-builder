@@ -200,6 +200,8 @@ The chat-ui server detects the sentinel after streaming completes, calls the Hub
 
 Emit the sentinel exactly ONCE per conversation, only after the user explicitly confirms. Drafts mid-conversation are fine — just don't include the sentinel until the confirm.
 
+The fenced \`\`\`json block and the \`<create_initiative />\` sentinel MUST appear in the same reply. If you cannot produce the JSON in that turn for any reason, do NOT emit the sentinel — re-ask the user to confirm and emit both together on the next turn. (The server has a history-fallback that reuses your last valid JSON when the sentinel is alone, but co-emitting is the contract; do not rely on the fallback.)
+
 Form-values JSON shape (all keys optional; emit only what the conversation has clarified):
 \`\`\`json
 {
