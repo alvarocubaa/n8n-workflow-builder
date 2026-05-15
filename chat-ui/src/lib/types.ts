@@ -23,6 +23,33 @@ export interface PromoteContext {
   hub_url?: string;             // deep-link back to the PROJ detail modal
 }
 
+// ─── PoC context (Hub Generate-from-PoC flow, Session 10) ────────────────────
+// Hub deep-links into chat-ui with a base64-encoded PocContext when the user
+// clicks "Generate workflow with AI" on a PoC card. The conversation opens
+// scoped to that PoC; the system prompt rule `poc_mode` skips the Phase 1/2
+// initiative interview and goes straight to Builder mode.
+//
+// Two pipelines feed this context (Hub-side: services/api.ts):
+//   - From Roadmap Initiative → createPocFromInitiative (source_strategic_idea_id set).
+//   - From Team Idea          → markAsPocActive (status flip in place; no parent).
+// So `initiative_id` and `idea_id` are both optional, with an at-least-one
+// invariant enforced by `decodePocContext`.
+//
+// Precedence: `prefill=` / `promote=` / `poc=` URL params are mutually
+// exclusive. When a PoC has a parent initiative, the Hub embeds the parent's
+// id inside `PocContext.initiative_id` rather than emitting a second URL param.
+
+export interface PocContext {
+  poc_id: string;                 // innovation_items.id (the PoC row itself)
+  poc_title: string;              // denormalized snapshot
+  initiative_id?: string;         // set iff PoC was forked from a Roadmap Initiative
+  idea_id?: string;               // set iff PoC came from a Team Idea (= same row as poc_id)
+  department_id: string;          // chat-ui canonical (e.g. 'cs', 'cx')
+  poc_description?: string;
+  poc_guidelines_doc?: string;
+  hub_url?: string;               // ${origin}/#/item/${poc_id}
+}
+
 export interface InitiativePrefill {
   initiative_id: string;
   mode: ChatPrefillMode;

@@ -9,7 +9,7 @@ import {
   logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
-import type { AnalyticsEvent, AssistantMode, InitiativePrefill, PromoteContext } from '@/lib/types';
+import type { AnalyticsEvent, AssistantMode, InitiativePrefill, PocContext, PromoteContext } from '@/lib/types';
 import {
   getDepartment,
   getDepartmentCredentialsMarkdown,
@@ -148,6 +148,38 @@ prompt's <promote_to_production> rule. Do not engage with off-topic requests —
 asks for anything outside promotion (e.g. revising the initiative, redesigning the workflow),
 direct them to "Plan with AI" on the parent initiative in the Hub. To inspect the workflow's
 current JSON, call the get_workflow_for_promotion tool with the workflow_id above.`;
+}
+
+/**
+ * Build a `<poc_context>` block from a Hub-supplied PoC payload. Prepended ABOVE
+ * the department context on the first turn of a poc-mode session. The system
+ * prompt's `<poc_mode>` rule detects this block and skips Phase 1/2 (initiative
+ * interview), going straight to Builder mode against the PoC spec.
+ *
+ * Precedence: when <poc_context> is present, the AI must IGNORE any
+ * <initiative_context> for behaviour purposes — PoC scope wins (leaf scope).
+ * The optional initiative_id is informational parent context only.
+ */
+function buildPocContext(poc: PocContext): string {
+  const lines = [
+    `poc_id: ${poc.poc_id}`,
+    `poc_title: ${poc.poc_title}`,
+    poc.initiative_id ? `initiative_id: ${poc.initiative_id}` : null,
+    poc.idea_id ? `idea_id: ${poc.idea_id}` : null,
+    `department_id: ${poc.department_id}`,
+    poc.poc_description ? `poc_description: ${poc.poc_description}` : null,
+    poc.poc_guidelines_doc ? `poc_guidelines_doc: ${poc.poc_guidelines_doc}` : null,
+    poc.hub_url ? `hub_url: ${poc.hub_url}` : null,
+  ].filter(Boolean).join('\n  ');
+
+  return `<poc_context>
+  ${lines}
+</poc_context>
+
+You are in POC mode. Build a workflow that delivers exactly what this PoC describes. Skip the
+initiative interview (Phases 1 and 2) — the PoC has already been scoped. Go straight to Builder:
+search for nodes, validate them, propose the workflow JSON, then deploy. If poc_guidelines_doc
+is set, ask the user to share its contents only if you need detail beyond the description.`;
 }
 
 /**
@@ -301,6 +333,11 @@ export async function POST(req: Request): Promise<Response> {
     // context so the system prompt's <promote_to_production> rule fires
     // deterministically. Persisted as part of the first user message in history.
     promote_context?: PromoteContext;
+    // PoC flow (Session 10): Hub passes this on the first turn of a poc-mode
+    // conversation. Server injects a <poc_context> block above the department
+    // context so the system prompt's <poc_mode> rule fires deterministically and
+    // skips the Phase 1/2 initiative interview.
+    poc_context?: PocContext;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -308,7 +345,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { message, conversationId: existingConvId, file, prefill, embed, current_initiative_id, promote_context } = body;
+  const { message, conversationId: existingConvId, file, prefill, embed, current_initiative_id, promote_context, poc_context } = body;
   if (!message?.trim()) {
     return new Response('message is required', { status: 400 });
   }
@@ -371,6 +408,15 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // Same lock for poc-mode (Session 10): scope the conversation to the PoC's
+  // department. PoC scope wins over prefill/promote if multiple arrive.
+  if (!existingConvId && poc_context?.department_id) {
+    const mapped = getDepartment(poc_context.department_id);
+    if (mapped) {
+      departmentId = poc_context.department_id;
+    }
+  }
+
   // Direction-3: derive the conversation source. Set once at creation, never
   // mutated. Hub-write paths (n8n-conversation-callback) defensively reject
   // 'standalone' so a misuse can't reach Hub data. On subsequent turns, the
@@ -378,17 +424,24 @@ export async function POST(req: Request): Promise<Response> {
   // the request, so a standalone conv can never be promoted by a stale prefill.
   const source: 'standalone' | 'hub_prefill' | 'hub_embed' =
     conversationSource ??
-    (promote_context ? 'hub_embed' : !prefill ? 'standalone' : embed ? 'hub_embed' : 'hub_prefill');
+    (poc_context || promote_context ? 'hub_embed' : !prefill ? 'standalone' : embed ? 'hub_embed' : 'hub_prefill');
 
   if (!conversationId) {
+    // PoC-mode: persist the parent initiative_id (if present) onto the
+    // conversation so subsequent turns + deploy callback can use it. For
+    // Idea-path PoCs (no parent initiative), initiativeId stays undefined and
+    // the deploy callback fires with innovation_item_id only.
+    const initialInitiativeId = prefill?.initiative_id ?? poc_context?.initiative_id;
+    const initialInitiativeMode = prefill?.mode ?? (poc_context ? 'building' : undefined);
     conversationId = await createConversation(
       user.email,
       message,
       departmentId,
       mode,
-      prefill?.initiative_id,
-      prefill?.mode,
+      initialInitiativeId,
+      initialInitiativeMode,
       source,
+      poc_context?.poc_id,
     );
   }
 
@@ -426,7 +479,11 @@ export async function POST(req: Request): Promise<Response> {
     // entire conversation. Mutually exclusive with prefill in practice (Hub launches one
     // OR the other), but we don't enforce that here.
     const promotePrefix = promote_context ? `${buildPromoteContext(promote_context)}\n\n` : '';
-    enrichedMessage = `${promotePrefix}${initiativePrefix}${contextPrefix}\n\n${message}`;
+    // PoC context (Session 10) goes ABOVE everything — PoC is leaf scope. When
+    // present, the system prompt's <poc_mode> rule instructs the AI to ignore
+    // any <initiative_context> for behaviour purposes.
+    const pocPrefix = poc_context ? `${buildPocContext(poc_context)}\n\n` : '';
+    enrichedMessage = `${pocPrefix}${promotePrefix}${initiativePrefix}${contextPrefix}\n\n${message}`;
   } else if (handoffNote) {
     enrichedMessage = `${handoffNote}${message}`;
   }

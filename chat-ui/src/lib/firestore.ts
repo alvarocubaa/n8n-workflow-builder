@@ -19,6 +19,10 @@ interface LocalConv {
   initiativeId?: string;
   initiativeMode?: 'planning' | 'building';
   source?: ConversationSource;
+  // PoC-scoped conversations (Session 10). innovationItemId is the PoC row
+  // (innovation_items.id). Read by /api/deploy to seed the n8n-builder-callback
+  // payload so the Edge Function can populate innovation_items.solution_url.
+  innovationItemId?: string;
 }
 const localStore = new Map<string, LocalConv>();
 
@@ -56,6 +60,11 @@ export interface Conversation {
   initiativeId?: string;
   initiativeMode?: 'planning' | 'building';
   source?: ConversationSource;
+  /** PoC row id (innovation_items.id). Set when the conversation was launched
+   *  from a PoC card via Hub's GeneratePocButton. /api/deploy reads this to
+   *  populate `innovation_item_id` on the n8n-builder-callback payload so the
+   *  Edge Function can write innovation_items.solution_url. */
+  innovationItemId?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -93,6 +102,7 @@ export async function createConversation(
   initiativeId?: string,
   initiativeMode?: 'planning' | 'building',
   source: ConversationSource = 'standalone',
+  innovationItemId?: string,
 ): Promise<string> {
   const title =
     firstMessage.length > 60
@@ -114,6 +124,9 @@ export async function createConversation(
       docPayload.initiativeId = initiativeId;
       docPayload.initiativeMode = initiativeMode ?? 'building';
     }
+    if (innovationItemId) {
+      docPayload.innovationItemId = innovationItemId;
+    }
     const ref = await userRef(userEmail)
       .collection('conversations')
       .add(docPayload);
@@ -129,6 +142,7 @@ export async function createConversation(
         initiativeId,
         initiativeMode,
         source,
+        innovationItemId,
       });
       return id;
     }
@@ -231,6 +245,7 @@ export async function getConversation(
           initiativeId: conv.initiativeId,
           initiativeMode: conv.initiativeMode,
           source: conv.source,
+          innovationItemId: conv.innovationItemId,
         }
       : null;
   }
@@ -250,6 +265,7 @@ export async function getConversation(
       initiativeMode: (data.initiativeMode as 'planning' | 'building' | undefined) ?? undefined,
       // Pre-v0.30 docs lack `source`; treat as 'standalone' for safety.
       source: ((data.source as ConversationSource | undefined) ?? 'standalone'),
+      innovationItemId: (data.innovationItemId as string) ?? undefined,
     };
   } catch (err) {
     if (isFirestoreUnavailable(err)) return null;
