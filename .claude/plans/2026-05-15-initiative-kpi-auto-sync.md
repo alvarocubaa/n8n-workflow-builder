@@ -6,6 +6,52 @@
 
 ---
 
+## Upstream data flow — already shipped (do NOT rebuild)
+
+The auto-fill we're designing in this session is the **last hop** of a chain that already exists. Knowing the full chain saves a fresh session from re-implementing earlier links.
+
+```
+USER  → opens Plan-with-AI on a Hub initiative
+        chat-ui Phase 2 fires <create_initiative />
+        → Edge Function n8n-initiative-upsert
+        → strategic_ideas row materialised
+             (impact_category='Time Savings', department='Marketing')
+
+USER  → "build the workflow"
+        chat-ui Builder produces JSON → Deploy → workflow #X live in n8n
+
+        Edge Function n8n-builder-callback fires:
+             INSERT initiative_workflow_links (initiative_id=…, n8n_workflow_id=X)    ← THE JOIN KEY
+             UPDATE innovation_items.solution_url (when Phase 2.2 plumbs poc id;
+                                                    informational mirror — NOT what
+                                                    our rollup reads)
+
+USER  → in n8n, edits Workflow Settings → Time Saved Per Execution = 8 min
+        Next /ingest (≤15 min) updates BQ n8n_ops.workflows
+             time_saved_per_execution_min = 8
+
+CRON  → 06:15 UTC, the new /initiative-kpi-sync runs from /sync-hub:    ← THIS SESSION'S WORK
+        For each strategic_ideas row:
+          SKIP if impact_category ≠ 'Time Savings'
+          SKIP if no rows in initiative_workflow_links
+          RESOLVE dept → canonical KPI (kpis.name LIKE '%time saved%' AND is_active)
+          COMPUTE expected_impact = Σ(runs_30d × time_saved_per_execution_min / 60)
+          UPSERT initiative_kpis (initiative_id, kpi_id, expected_impact,
+                                  impact_period='monthly',
+                                  created_by='<auto-sync-uuid>')
+
+HUB UI → IdeaDetailModal "Contributes to KPI" card auto-populated.
+         /business-kpis/<kpi_id> dept-level chart rolls this up with others.
+```
+
+**Two non-obvious pieces (already-shipped facts the fresh session should know but not re-build):**
+
+1. **`initiative_workflow_links` is the join key.** The `n8n-builder-callback` Edge Function has been auto-writing this row since Direction-2 (2026-05-04) for every chat-ui deploy whose conversation has an `initiative_id`. This row already exists when our auto-sync runs. If it doesn't (e.g. workflow built outside the Builder, or initiative not yet linked), the initiative falls into the `skipped_no_workflows` bucket — correct behaviour.
+
+2. **`innovation_items.solution_url` is a PoC-level mirror, NOT the rollup data source.** PR #52 (shipped 2026-05-15) added auto-write for PoC cards keyed on `innovation_item_id`. It's a human-readable column for the PoC card's "Open workflow →" affordance. Our rollup reads `initiative_workflow_links`, not `solution_url`. **Soft gap to watch (not in this session's scope):** if a PoC owner manually types a `solution_url` for a workflow built outside the Builder, no `initiative_workflow_links` row gets created → workflow doesn't roll up into any KPI. A future "fill-the-gaps" job could backfill link rows from `solution_url` strings when they match a known n8n workflow id, but that's a separate session.
+
+---
+
 ## Context for a fresh session
 
 ### What's already live in prod (do NOT redo this)
@@ -97,26 +143,35 @@ LOG OUTPUT per run:
 
 ---
 
-## DECISION TO LOCK IN BEFORE CODING
+## DECISION (locked in 2026-05-15) — Option A: auto-overwrite
 
-**Conflict policy when an `initiative_kpis` row exists with a manual value:**
+Confirmed by Ron's flow-diagram review on 2026-05-15. Measured data is the authority; Ron's previous manual values (PFR Celebration 20h, ORM analysis 5h) get refreshed to current measured rates on the next cron run.
 
-| Option | What it does | Implication |
-|---|---|---|
-| **A (auto-overwrite)** | Measured data overwrites Ron's manual values | Cleanest single-source-of-truth. Ron's 20h on PFR Celebration becomes 1h (measured); his 5h on ORM becomes 47h. UI labels need to make clear this is auto-calculated. |
-| **B (respect manual)** | Skip rows where current `expected_impact` was set manually | Safer but means manual values persist forever and slowly diverge from reality. Requires a "set_by" or `created_by` discriminator we don't have yet. |
-| **C (dual-track)** | Add a `measured_impact_hours` column on `initiative_kpis`; render both in UI | Cleanest UX. Needs Hub schema change + Kurt UI work (~1 week). |
+### Schema reality (verified live 2026-05-15)
 
-**My recommendation: A short-term, C long-term.** Defaulting to A right now gets us "Hub matches reality" tomorrow; the dual-track view in Kurt's roadmap.
+`initiative_kpis` columns are: `id, initiative_id, kpi_id, signal_kpi_id, impact_period, expected_impact, created_at, updated_at`. **There is no `created_by` column.** So we can't tag auto-synced rows with a principal UUID — and with Option A's "always overwrite" semantics, we don't need to. The cron rewrites every eligible row every morning. The implicit signals are:
+- `updated_at` close to the most recent cron fire (within minutes) = auto-synced
+- `updated_at` between cron runs (gap of hours) = manual edit; will be overwritten on the next sync
 
-**If you pick A,** the deploy is straightforward — execute the plan below.
+### Implications worth restating in code comments
 
-**If you pick B,** add a `created_by` field tracking (uuid of an auto-sync principal) + condition the UPDATE on it. Slightly more code; same architecture.
+- **Single source of truth** = the live `daily_workflow_stats × workflows_dim` join.
+- **Manual values get overwritten** on the next sync. If Ron or any initiative owner types a value in the Hub UI, it's a soft override that lasts until 06:15 UTC the next morning. This is the explicit, accepted Option A behaviour.
+- **UI labeling** (Kurt's repo, separate follow-up): the "Expected Impact (Hours)" field should be labelled "Auto-calculated from execution data — last updated {updated_at}". Without this label, users will type values and be surprised when they revert.
+- **Long-term, Option C** (dual-track `measured_impact_hours` column rendered side-by-side with owner-typed `expected_impact`) is the cleanest UX but needs Hub schema + Kurt UI work. Defer to a separate session when Hub UI bandwidth opens up. Today's Option A is forward-compatible: when Option C lands, the auto-sync just writes a different column, no logic change.
 
-**If you pick C,** this becomes a 3-PR sequence:
-  1. Hub-side schema migration adding `measured_impact_hours` column.
-  2. Hub UI PR to render both values side-by-side.
-  3. Then this auto-sync writes the new column instead of `expected_impact`.
+### UPSERT semantics
+
+PostgREST upsert on `(initiative_id, kpi_id)` with `Prefer: resolution=merge-duplicates`:
+
+```
+POST /rest/v1/initiative_kpis?on_conflict=initiative_id,kpi_id
+Prefer: resolution=merge-duplicates,return=minimal
+Body: { "initiative_id": "...", "kpi_id": "...",
+        "impact_period": "monthly", "expected_impact": 12.34 }
+```
+
+Idempotent. Overwrites existing rows by design (Option A). The Phase 2 partial-unique index on `(initiative_id, kpi_id) WHERE kpi_id IS NOT NULL` already exists, so PostgREST has the constraint to merge on.
 
 ---
 
