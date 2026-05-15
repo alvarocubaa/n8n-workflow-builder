@@ -1,6 +1,6 @@
 # Next session brief — Session 11: PoC modal trim + Smart-Add Skip Analysis
 
-**Last touched:** 2026-05-15 — Sessions 9 + 10 both shipped same day (Track A initiative-KPI auto-sync; Track B PoC Builder CTA + poc_mode). Session 11 promoted to HEAD.
+**Last touched:** 2026-05-15 — Sessions 9 + 10 both shipped same day (Track A initiative-KPI auto-sync; Track B PoC Builder CTA + poc_mode). Hub PRs #52, #53, #54 all merged into `main`; stale #44 closed. Session 11 promoted to HEAD.
 
 ## What you're picking up
 
@@ -43,17 +43,16 @@ This is the final session in the Track B "Hub × n8n-builder UX polish" arc that
 
 ## Adjacent items (lower priority)
 
-- **Hub PR #53 review + merge** (Session 10 — PoC Builder CTA). Currently open; pending Kurt review. If you ship Session 11 before #53 merges, coordinate so they don't conflict in `IdeaDetailModal.tsx`.
-- **Browser-driven E2E smoke for Session 10** (both PoC pipelines: Initiative-path + Idea-path). IAP-protected; user-driven. Once green, document outcome in decision-log.
-- **Kurt DM** about Time Saved KPI UI label (Session 9 follow-up). Slack draft in `D0A9V1YRRQT` since 2026-05-13. Send when ready.
+- **Browser-driven E2E smoke for Session 10** (both PoC pipelines: Initiative-path + Idea-path). IAP-protected; user-driven. Wait for Hub Cloud Build to redeploy from `cdf9baa…88a6aadc` first — once live, click "Generate workflow with AI" on a PoC card and verify the flow end-to-end. Document outcome in decision-log.
+- **Kurt DM** about Time Saved KPI UI label (Session 9 follow-up). Slack draft in `D0A9V1YRRQT` since 2026-05-13. Send when ready — now also a good moment to mention the Session 10 + 9 merges.
 - **Feedback-loop harvest** — Apr 15 last run, overdue ~30 days. `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
 
 ## What's already shipped (do NOT redo)
 
 - Marketing Time Saved KPI live in Hub (April 38h, May 88h).
 - Initiative-KPI auto-sync daily 06:15 UTC (`n8n-ops-00008-vqf`). Verified live: #214 PFR=1h, #213 PMM=0h, #193 ORM untouched.
-- PoC Builder CTA on PoC cards (chat-ui rev `n8n-chat-ui-00047-wgk`; Hub PR #53). `poc_mode` rule live; `<poc_context>` plumbed end-to-end; both PoC pipelines (Initiative-path + Idea-path) handled.
-- Hub PR #51 (Baseline Metrics form strip) merged. Hub PR #52 (`innovation_items.solution_url` + Edge Function write path) merged.
+- PoC Builder CTA on PoC cards (chat-ui rev `n8n-chat-ui-00047-wgk`; **Hub PRs #52, #53, #54 all merged 2026-05-15** into `main` at `cdf9baa…88a6aadc`). `poc_mode` rule live; `<poc_context>` plumbed end-to-end; both PoC pipelines (Initiative-path + Idea-path) handled. Hub Cloud Build will auto-deploy.
+- Hub PR #51 (Baseline Metrics form strip) merged. Stale PR #44 (server-write Edge Function) closed — its 2 unique files brought into git via the narrow PR #54.
 
 ## User preferences (carried forward)
 

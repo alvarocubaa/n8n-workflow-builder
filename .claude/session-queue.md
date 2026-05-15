@@ -4,7 +4,7 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Sessions 9 + 10 BOTH shipped 2026-05-15. Session 9: initiative-KPI auto-sync (`n8n-ops-00008-vqf`) — live data confirms #214 PFR=1h, #213 PMM=0h, #193 ORM untouched. Session 10: PoC Builder CTA + `poc_mode` plumbing — chat-ui rev `n8n-chat-ui-00047-wgk` deployed; Hub PR #53 open pending Kurt review. Next focus = Session 11, **PoC modal trim + Smart-Add Skip Analysis** (Hub-only, smallest UX cut).
+**Current focus track:** Sessions 9 + 10 BOTH shipped 2026-05-15. Session 9: initiative-KPI auto-sync (`n8n-ops-00008-vqf`) — live data confirms #214 PFR=1h, #213 PMM=0h, #193 ORM untouched. Session 10: PoC Builder CTA + `poc_mode` plumbing — chat-ui rev `n8n-chat-ui-00047-wgk` deployed; Hub PRs **#52, #53, #54 all merged into main** (`cdf9baa…88a6aadc`); Hub Cloud Build will auto-deploy. Stale PR #44 closed. Next focus = Session 11, **PoC modal trim + Smart-Add Skip Analysis** (Hub-only, smallest UX cut).
 
 ---
 
@@ -70,7 +70,7 @@ Verification:
 > - MODIFY `src/lib/firestore.ts` — `Conversation.innovationItemId?` field persisted at create-time.
 > - MODIFY `src/app/api/deploy/route.ts` — relaxed Hub-callback gate from `conv.initiativeId` only to `(conv.initiativeId || conv.innovationItemId)`. `innovation_item_id` sourced from `conv.innovationItemId` (replaces stub from `9d46348`).
 >
-> *Hub* (PR #53 on `kurtpabilona-code/AI-Innovation-Hub-Vertex`, branch `session-10-poc-builder-cta` — pending Kurt review):
+> *Hub* (PR #53 on `kurtpabilona-code/AI-Innovation-Hub-Vertex` — **MERGED 2026-05-15 14:30 UTC** as squash commit `cdf9baa`; companion PR #52 also merged at 14:30 UTC):
 > - NEW `services/n8nBuilderUrl.ts` — `PocContext` + `buildPocModeUrl()`.
 > - NEW `components/GeneratePocButton.tsx` — mirrors `GenerateWorkflowButton`. Resolves `parentInitiative` from `item.source_strategic_idea_id`.
 > - MODIFY `components/IdeaDetailModal.tsx` — wires `<GeneratePocButton>` into PoC details block.
@@ -84,9 +84,23 @@ Verification:
 > **Decision-log:** [`docs/decision-log.md` 2026-05-15 Session 10 entry](../docs/decision-log.md).
 >
 > **Pending follow-ups:**
-> - Browser-driven E2E smoke for both PoC pipelines (IAP-protected; user-driven).
-> - Hub PR #53 merge — pending Kurt review.
+> - Browser-driven E2E smoke for both PoC pipelines (IAP-protected; user-driven). Wait for Hub Cloud Build to redeploy after the merge first.
 > - Re-deploy preservation check (`solution_url_updated: 'preserved'`).
+> - Document Cloud Build deploy revision in decision-log once it lands.
+
+---
+
+### ✅ SHIPPED 2026-05-15 — Hub source-control sync (PR #54) — Edge Function + migration into git
+
+> **Outcome:** Closes a documentation/source-control gap. The `n8n-initiative-upsert` Edge Function and the `initiative_chat_creations` migration have been live in prod since 2026-05-11 but never landed in git via PR. Now they're in `main`.
+>
+> **What landed (squash commit `88a6aadc` on `main`):**
+> - `supabase/functions/n8n-initiative-upsert/index.ts` (293 lines) — Edge Function called by chat-ui's server-write path.
+> - `supabase/migrations/20260511120000_add_initiative_chat_creations.sql` (21 lines) — idempotency sidecar table (`conversation_id` PK → `initiative_id` FK).
+>
+> **Context:** The original PR #44 carried these 2 files plus 11 others that had already merged via PR #43 (Jira). Closed PR #44 as stale; created PR #54 via GitHub API (no local checkout) that cherry-picks just the 2 unique files off current `main`. Zero functional change — the Edge Function + migration are already running.
+>
+> **PR #44 closed** with explanation comment; branch `session/2026-05-11-redesign-v2-server-write` retained for history.
 
 ---
 
