@@ -9,7 +9,7 @@ import type { AnalyticsEvent, AssistantMode, DeployEvent, FeedbackEntry } from '
 // Direction-3: explicit source of the conversation. Set once on creation,
 // immutable thereafter. Hub-write callbacks (n8n-conversation-callback /
 // n8n-builder-callback) reject 'standalone' rows defensively. See
-// docs/direction-3-design.md.
+// docs/innovation-hub/protocol-contract.md.
 export type ConversationSource = 'standalone' | 'hub_prefill' | 'hub_embed';
 
 interface LocalConv {
@@ -179,6 +179,35 @@ export async function appendMessages(
     return { messageLimitReached };
   } catch (err) {
     if (isFirestoreUnavailable(err)) return { messageLimitReached: false };
+    throw err;
+  }
+}
+
+/**
+ * Direction-3 Phase 3 handoff: when the Hub auto-saves a draft initiative
+ * and posts back the new id, the next /api/chat turn uses this to swap the
+ * conversation's initiative_id from `__draft__` to the real UUID. Idempotent.
+ */
+export async function updateConversationInitiativeId(
+  userEmail: string,
+  conversationId: string,
+  newInitiativeId: string,
+): Promise<void> {
+  if (conversationId.startsWith('local-')) {
+    const conv = localStore.get(conversationId);
+    if (conv) conv.initiativeId = newInitiativeId;
+    return;
+  }
+  try {
+    await convRef(userEmail, conversationId).set(
+      {
+        initiativeId: newInitiativeId,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (err) {
+    if (isFirestoreUnavailable(err)) return;
     throw err;
   }
 }

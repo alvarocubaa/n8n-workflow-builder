@@ -8,6 +8,21 @@ export type AssistantMode = 'builder' | 'data';
 
 export type ChatPrefillMode = 'building' | 'planning';
 
+// ─── Promote context (Hub Take-to-Production flow) ───────────────────────────
+// Hub deep-links into chat-ui with a base64-encoded PromoteContext when the user
+// clicks the "Take to Production" button on a PROJ modal. The conversation opens
+// scoped to that single workflow + linked initiative; the system prompt detects
+// the context block and runs the production checklist deterministically.
+
+export interface PromoteContext {
+  workflow_id: string;          // n8n_workflow_id from initiative_workflow_links
+  workflow_name?: string;       // denormalized snapshot from the same row
+  innovation_item_id: string;   // PROJ uuid (innovation_items.id)
+  initiative_id: string;        // INIT uuid (strategic_ideas.id, parent of PROJ)
+  department_id: string;        // chat-ui canonical id (e.g. 'cs', 'cx')
+  hub_url?: string;             // deep-link back to the PROJ detail modal
+}
+
 export interface InitiativePrefill {
   initiative_id: string;
   mode: ChatPrefillMode;
@@ -46,8 +61,36 @@ export type ChatEvent =
       type: 'extracted_fields';
       initiative_id: string;
       conversation_id: string;
-      extracted_fields: Record<string, string | number>;
+      extracted_fields: Record<string, string | number | string[]>;
       extracted_fields_at: string;
+    }
+  // Embed-mode (Direction 3, Phase 3 handoff): server emits this when the
+  // assistant's planning-mode reply contains the <request_workflow_handoff />
+  // sentinel. Client relays via postMessage so the Hub auto-saves the open
+  // form as a draft initiative; the new id is sent back via `initiative_saved`
+  // postMessage and used on the next /api/chat turn.
+  | {
+      type: 'request_workflow_handoff';
+      initiative_id: string;
+      conversation_id: string;
+    }
+  // Redesign-v2 server-write path: when the assistant emits the literal
+  // sentinel `<create_initiative />` or `<update_initiative />` alongside the
+  // 13-key JSON, the chat-ui server calls the Hub's n8n-initiative-upsert
+  // Edge Function directly. On success it emits this event; the client renders
+  // an inline "Open in Hub →" link and caches the id for downstream workflow
+  // builds in the same conversation.
+  | {
+      type: 'initiative_upserted';
+      initiative_id: string;
+      url: string;                     // absolute URL into the Hub
+      action: 'created' | 'updated' | 'no_changes';
+      updated_fields?: string[];
+    }
+  | {
+      type: 'initiative_upsert_failed';
+      reason: string;
+      mode: 'create' | 'update';
     };
 
 // ─── Analytics types ────────────────────────────────────────────────────────

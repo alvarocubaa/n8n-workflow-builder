@@ -5,17 +5,20 @@ import {
   createConversation,
   appendMessages,
   getConversation,
+  updateConversationInitiativeId,
   logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
-import type { AnalyticsEvent, AssistantMode, InitiativePrefill } from '@/lib/types';
+import type { AnalyticsEvent, AssistantMode, InitiativePrefill, PromoteContext } from '@/lib/types';
 import {
   getDepartment,
   getDepartmentCredentialsMarkdown,
+  getDepartmentServiceKeyBlock,
   DEFAULT_DEPARTMENT,
   type DepartmentConfig,
 } from '@/lib/departments';
 import type { ChatEvent } from '@/lib/types';
+import { callHubInitiativeUpsert, type InitiativeUpsertFields } from '@/lib/hub-callback';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,11 +37,17 @@ ${dept.promptRules ?? ''}
 
   // Builder mode: full credentials + rules
   const credTable = getDepartmentCredentialsMarkdown(dept);
+  const serviceKeyBlock = getDepartmentServiceKeyBlock(dept);
+  const prodProjectLine = dept.n8nProductionProjectId
+    ? `\nProduction n8n project for promote-to-production flow: ${dept.n8nProductionProjectId}`
+    : '\nNo production n8n project configured for this department — workflows cannot promote to production via the AI Builder.';
   return `<department_context department="${dept.displayName}">
-You are assisting a ${dept.displayName} team member. Scope your responses to these systems: ${systems}.
+You are assisting a ${dept.displayName} team member. Scope your responses to these systems: ${systems}.${prodProjectLine}
 
 Available credentials for this department:
 ${credTable}
+
+${serviceKeyBlock}
 
 Use ONLY the credentials listed above when building workflow JSON.
 ${dept.promptRules ?? ''}
@@ -85,9 +94,7 @@ You are in PLANNING mode. The user is drafting this initiative in the Hub and cl
      prioritising the highest-impact gaps.
   3. After 3-5 turns of refinement, propose a JSON block with the form-fill values:
        \`\`\`json
-       { "improvement_kpi": "...", "business_justification": "...", "current_state": "...",
-         "current_process_minutes_per_run": <number>, "current_process_runs_per_month": <number>,
-         "current_process_people_count": <number> }
+       { "improvement_kpi": "...", "business_justification": "...", "current_state": "..." }
        \`\`\`
   4. Tell the user they can copy these into the Hub form (Session 2 will auto-populate).
 
@@ -117,6 +124,33 @@ lines after the purpose (per the system prompt's <sticky_notes> rule):
 }
 
 /**
+ * Build a `<promote_context>` block from a Hub-supplied promote payload. Prepended ABOVE
+ * the department context on the first turn of a Take-to-Production session. The system
+ * prompt's `<promote_to_production>` rule detects this block and runs the production
+ * checklist deterministically (no need for the user to type the trigger phrase).
+ */
+function buildPromoteContext(promote: PromoteContext): string {
+  const lines = [
+    `workflow_id: ${promote.workflow_id}`,
+    promote.workflow_name ? `workflow_name: ${promote.workflow_name}` : null,
+    `innovation_item_id: ${promote.innovation_item_id}`,
+    `initiative_id: ${promote.initiative_id}`,
+    `department_id: ${promote.department_id}`,
+    promote.hub_url ? `hub_url: ${promote.hub_url}` : null,
+  ].filter(Boolean).join('\n  ');
+
+  return `<promote_context>
+  ${lines}
+</promote_context>
+
+You are in PROMOTE mode for the workflow above. Run the production checklist per the system
+prompt's <promote_to_production> rule. Do not engage with off-topic requests — if the user
+asks for anything outside promotion (e.g. revising the initiative, redesigning the workflow),
+direct them to "Plan with AI" on the parent initiative in the Hub. To inspect the workflow's
+current JSON, call the get_workflow_for_promotion tool with the workflow_id above.`;
+}
+
+/**
  * Extract a fenced ```json block from the assistant's final reply and
  * whitelist it down to fields the Hub's StrategicIdea form recognises.
  * Returns null when no parseable JSON block is found, when no whitelisted
@@ -124,36 +158,55 @@ lines after the purpose (per the system prompt's <sticky_notes> rule):
  *
  * Defense-in-depth: the Edge Function re-validates these same bounds.
  */
-function extractAndValidatePlanningFields(text: string): Record<string, string | number> | null {
-  // Match the LAST ```json … ``` block — Claude may emit a draft mid-conversation
-  // and a final at the end; we want the final.
-  const matches = [...text.matchAll(/```json\s*([\s\S]*?)```/g)];
+function extractAndValidatePlanningFields(text: string): Record<string, string | number | string[]> | null {
+  // Permissive block-finder: accepts ```json, ```JSON, ```json5, ```js, or bare ```
+  // followed (optionally) by whitespace/newline. Claude is inconsistent about
+  // fence variants under pressure — losing the planning payload because of a
+  // case-sensitive `json` was the 2026-05-11 silent-failure root cause.
+  const blockRe = /```(?:json\d?|JSON|js)?\s*\r?\n?([\s\S]*?)\r?\n?```/gi;
+  const matches = [...text.matchAll(blockRe)];
   if (matches.length === 0) return null;
-  const lastMatch = matches[matches.length - 1];
-  const jsonText = lastMatch[1];
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(jsonText);
-  } catch {
-    return null;
+  // Try each block from LAST to FIRST. The last block is typically the
+  // canonical payload (drafts come first); but if it fails to parse, an
+  // earlier block may still be valid (e.g. AI re-printed prose-with-JSON
+  // after a confirmation prompt).
+  let parsed: Record<string, unknown> | null = null;
+  for (let i = matches.length - 1; i >= 0; i--) {
+    const body = matches[i][1].trim();
+    if (!body) continue;
+    try {
+      const candidate: unknown = JSON.parse(body);
+      if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+        parsed = candidate as Record<string, unknown>;
+        break;
+      }
+    } catch { /* try previous block */ }
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  if (!parsed) return null;
 
-  const obj = parsed as Record<string, unknown>;
-  const out: Record<string, string | number> = {};
+  const obj = parsed;
+  const out: Record<string, string | number | string[]> = {};
 
   const stringField = (key: string, max: number): void => {
     const v = obj[key];
     if (typeof v === 'string' && v.length > 0 && v.length <= max) out[key] = v;
   };
-  const numberField = (key: string, min: number, max: number): void => {
-    const v = obj[key];
-    if (typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max) out[key] = v;
-  };
   const enumField = (key: string, allowed: readonly string[]): void => {
     const v = obj[key];
     if (typeof v === 'string' && allowed.includes(v)) out[key] = v;
+  };
+  const arrayPatternField = (key: string, pattern: RegExp, maxLen: number): void => {
+    const v = obj[key];
+    if (!Array.isArray(v)) return;
+    const cleaned: string[] = [];
+    for (const item of v) {
+      if (typeof item !== 'string') continue;
+      const trimmed = item.trim().toUpperCase();
+      if (pattern.test(trimmed) && !cleaned.includes(trimmed)) cleaned.push(trimmed);
+      if (cleaned.length >= maxLen) break;
+    }
+    if (cleaned.length > 0) out[key] = cleaned;
   };
 
   // Mirrors the Hub StrategicIdea form. Source of truth for these enums:
@@ -193,11 +246,31 @@ function extractAndValidatePlanningFields(text: string): Record<string, string |
   enumField('level_of_improvement', LEVEL_OF_IMPROVEMENT);
   enumField('impact_category', IMPACT_CATEGORY);
   enumField('effort', EFFORT);
-  numberField('current_process_minutes_per_run', 1, 1440);
-  numberField('current_process_runs_per_month', 0, 100000);
-  numberField('current_process_people_count', 0, 10000);
+  // 2026-05-13: current_process_minutes_per_run / _runs_per_month /
+  // _people_count removed — n8n-ops Time Saved KPI v3 reads
+  // settings.timeSavedPerExecution directly from n8n workflow settings;
+  // these baseline fields no longer feed anything. Hub UI form inputs
+  // removed in the same release. DB columns left intact for historical
+  // records.
+  arrayPatternField('jira_ticket_ids', /^[A-Z][A-Z0-9_]+-\d+$/, 5);
 
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Walk the conversation history backwards looking for the most-recent model
+ * message that yields a non-null planning payload. Used as a fallback when
+ * the AI emits <create_initiative /> without re-attaching the JSON in the
+ * same turn (which it does often once the form has been confirmed verbally).
+ */
+function extractFromHistory(history: DisplayMessage[]): Record<string, string | number | string[]> | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg.role !== 'model') continue;
+    const extracted = extractAndValidatePlanningFields(msg.content);
+    if (extracted) return extracted;
+  }
+  return null;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -217,6 +290,17 @@ export async function POST(req: Request): Promise<Response> {
     // request headers (x-embed) only fire on the /chat/* page route and don't
     // propagate to /api/chat XHRs.
     embed?: boolean;
+    // Direction-3 Phase 3 handoff: when the Hub auto-saves a draft initiative
+    // mid-conversation, the client passes the new real UUID here. Server swaps
+    // the conversation's stored initiativeId from `__draft__` to this value
+    // and prepends a fresh <initiative_context> block so the AI continues
+    // with the right id for the workflow build phase.
+    current_initiative_id?: string;
+    // Take-to-Production flow: Hub passes this on the first turn of a promote-mode
+    // conversation. Server injects a <promote_context> block above the department
+    // context so the system prompt's <promote_to_production> rule fires
+    // deterministically. Persisted as part of the first user message in history.
+    promote_context?: PromoteContext;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -224,7 +308,7 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const { message, conversationId: existingConvId, file, prefill, embed } = body;
+  const { message, conversationId: existingConvId, file, prefill, embed, current_initiative_id, promote_context } = body;
   if (!message?.trim()) {
     return new Response('message is required', { status: 400 });
   }
@@ -279,6 +363,14 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
+  // Same lock for promote-mode: scope the conversation to the dept on the PROJ.
+  if (!existingConvId && promote_context?.department_id) {
+    const mapped = getDepartment(promote_context.department_id);
+    if (mapped) {
+      departmentId = promote_context.department_id;
+    }
+  }
+
   // Direction-3: derive the conversation source. Set once at creation, never
   // mutated. Hub-write paths (n8n-conversation-callback) defensively reject
   // 'standalone' so a misuse can't reach Hub data. On subsequent turns, the
@@ -286,7 +378,7 @@ export async function POST(req: Request): Promise<Response> {
   // the request, so a standalone conv can never be promoted by a stale prefill.
   const source: 'standalone' | 'hub_prefill' | 'hub_embed' =
     conversationSource ??
-    (!prefill ? 'standalone' : embed ? 'hub_embed' : 'hub_prefill');
+    (promote_context ? 'hub_embed' : !prefill ? 'standalone' : embed ? 'hub_embed' : 'hub_prefill');
 
   if (!conversationId) {
     conversationId = await createConversation(
@@ -302,6 +394,27 @@ export async function POST(req: Request): Promise<Response> {
 
   const convId = conversationId; // narrowed — always defined from here on
 
+  // Direction-3 Phase 3 handoff: client supplies the real initiative_id once
+  // the Hub has auto-saved the draft. Swap it on the conversation doc and
+  // prepend a fresh <initiative_context> note so the AI continues with the
+  // right id when it transitions to workflow building. Idempotent — only
+  // updates when the value actually changed.
+  let handoffNote = '';
+  if (
+    existingConvId &&
+    current_initiative_id &&
+    current_initiative_id !== '__draft__' &&
+    current_initiative_id !== initiativeId
+  ) {
+    await updateConversationInitiativeId(user.email, existingConvId, current_initiative_id);
+    initiativeId = current_initiative_id;
+    handoffNote =
+      `<initiative_context_update>\n` +
+      `The Hub auto-saved this initiative as a draft. The real initiative_id is now ${current_initiative_id}.\n` +
+      `Use this id for any workflow build / deploy in this conversation; the deploy callback will link the workflow to this initiative.\n` +
+      `</initiative_context_update>\n\n`;
+  }
+
   // Build department context prefix for the first message of new conversations
   const dept = getDepartment(departmentId);
   let enrichedMessage = message;
@@ -309,7 +422,13 @@ export async function POST(req: Request): Promise<Response> {
     const contextPrefix = buildDepartmentContext(dept, mode);
     // Initiative context goes ABOVE department context — initiative is the higher-level frame.
     const initiativePrefix = prefill ? `${buildInitiativeContext(prefill)}\n\n` : '';
-    enrichedMessage = `${initiativePrefix}${contextPrefix}\n\n${message}`;
+    // Promote context (Take-to-Production flow) goes ABOVE both — promotion scopes the
+    // entire conversation. Mutually exclusive with prefill in practice (Hub launches one
+    // OR the other), but we don't enforce that here.
+    const promotePrefix = promote_context ? `${buildPromoteContext(promote_context)}\n\n` : '';
+    enrichedMessage = `${promotePrefix}${initiativePrefix}${contextPrefix}\n\n${message}`;
+  } else if (handoffNote) {
+    enrichedMessage = `${handoffNote}${message}`;
   }
 
   // Fire-and-forget: tell the Hub a conversation has started against this
@@ -394,23 +513,42 @@ export async function POST(req: Request): Promise<Response> {
               console.error('Failed to persist messages:', err);
             }
 
-            // Planning-mode auto-pop: when the assistant's reply contains a
-            // fenced ```json block at the end, parse + whitelist it. We do two
-            // things with the result: (a) emit an SSE event so embed-mode
-            // clients can postMessage it to the Hub parent (Direction 3), and
-            // (b) fire-and-forget POST to the Hub's n8n-conversation-callback
-            // Edge Function, which upserts {extracted_fields, extracted_fields_at}
-            // on the initiative_chat_conversations row. Failures log only —
-            // never break the chat response.
+            // Planning-mode end-of-turn handling. Three concerns, each
+            // independently gated to avoid the 2026-05-11 silent-failure bug
+            // where a missing JSON block in the current turn killed the
+            // sentinel-driven write path:
+            //
+            //   (a) Extract planning fields if the AI emitted JSON this turn.
+            //       Drives the Hub's form-fill (`extracted_fields` SSE) and the
+            //       initiative_chat_conversations summary row.
+            //
+            //   (b) Sentinel-driven server-write: when <create_initiative /> or
+            //       <update_initiative /> appears, call the Hub Edge Function.
+            //       Falls back to history-extracted fields when the current
+            //       turn omitted the JSON (common after the user already
+            //       confirmed verbally in an earlier reply).
+            //
+            //   (c) Legacy <request_workflow_handoff /> postMessage — only
+            //       emitted when the new server-write sentinels did NOT fire,
+            //       to avoid two races writing the same row.
+            //
+            // Always log one structured `planning_turn` line at the end so we
+            // can see what happened from Cloud Run logs without storing PII.
             if (initiativeMode === 'planning' && initiativeId) {
-              const extracted = extractAndValidatePlanningFields(modelChunks.join(''));
-              if (extracted) {
+              const fullReply = modelChunks.join('');
+              const wantsCreate = /<create_initiative\s*\/?>/i.test(fullReply);
+              const wantsUpdate = /<update_initiative\s*\/?>/i.test(fullReply);
+              const wantsLegacyHandoff = /<request_workflow_handoff\s*\/?>/i.test(fullReply);
+
+              // (a) Current-turn extraction
+              const extractedThisTurn = extractAndValidatePlanningFields(fullReply);
+              if (extractedThisTurn) {
                 const extractedAt = new Date().toISOString();
                 enqueue({
                   type: 'extracted_fields',
                   initiative_id: initiativeId,
                   conversation_id: convId,
-                  extracted_fields: extracted,
+                  extracted_fields: extractedThisTurn,
                   extracted_fields_at: extractedAt,
                 });
                 if (process.env.HUB_CALLBACK_URL && process.env.HUB_CALLBACK_SECRET) {
@@ -425,13 +563,98 @@ export async function POST(req: Request): Promise<Response> {
                       conversation_id: convId,
                       mode: 'planning',
                       created_by: user.email,
-                      extracted_fields: extracted,
+                      extracted_fields: extractedThisTurn,
                       source,
                     }),
                     signal: AbortSignal.timeout(5000),
                   }).catch((err) => console.error('Hub extracted-fields callback failed:', err));
                 }
               }
+
+              // (b) Sentinel-driven server-write
+              let upsertResult: Awaited<ReturnType<typeof callHubInitiativeUpsert>> | null = null;
+              let extractedFromHistory = false;
+              let fieldsForUpsert: Record<string, string | number | string[]> | null = extractedThisTurn;
+              if (wantsCreate || wantsUpdate) {
+                if (!fieldsForUpsert) {
+                  fieldsForUpsert = extractFromHistory(history);
+                  extractedFromHistory = !!fieldsForUpsert;
+                }
+                if (!fieldsForUpsert) {
+                  enqueue({
+                    type: 'initiative_upsert_failed',
+                    reason: 'AI emitted <create_initiative /> but no valid JSON payload was found in this turn or any prior turn. Ask the AI to re-send the JSON.',
+                    mode: wantsCreate ? 'create' : 'update',
+                  });
+                } else {
+                  const isDraft = initiativeId === '__draft__';
+                  const upsertMode: 'create' | 'update' = wantsUpdate && !isDraft ? 'update' : 'create';
+                  const scalarFields: InitiativeUpsertFields = {};
+                  for (const [k, v] of Object.entries(fieldsForUpsert)) {
+                    if (Array.isArray(v)) continue;
+                    (scalarFields as Record<string, string | number>)[k] = v;
+                  }
+                  upsertResult = await callHubInitiativeUpsert({
+                    mode: upsertMode,
+                    conversation_id: convId,
+                    initiative_id: upsertMode === 'update' ? initiativeId : undefined,
+                    created_by: user.email,
+                    fields: scalarFields,
+                  });
+                  if (upsertResult.ok) {
+                    if (upsertMode === 'create' && isDraft && upsertResult.data.initiative_id !== initiativeId) {
+                      try {
+                        await updateConversationInitiativeId(user.email, convId, upsertResult.data.initiative_id);
+                        initiativeId = upsertResult.data.initiative_id;
+                      } catch (err) {
+                        console.error('Failed to swap initiativeId after upsert:', err);
+                      }
+                    }
+                    enqueue({
+                      type: 'initiative_upserted',
+                      initiative_id: upsertResult.data.initiative_id,
+                      url: upsertResult.data.url,
+                      action: upsertResult.data.action,
+                      updated_fields: upsertResult.data.updated_fields,
+                    });
+                  } else {
+                    console.error('Initiative upsert failed:', upsertResult.reason);
+                    enqueue({
+                      type: 'initiative_upsert_failed',
+                      reason: upsertResult.reason,
+                      mode: upsertMode,
+                    });
+                  }
+                }
+              }
+
+              // (c) Legacy handoff — only when the new path didn't run.
+              // Prevents the AddStrategicIdeaModal autosave path from racing
+              // the Edge Function create on the same turn.
+              if (wantsLegacyHandoff && !wantsCreate && !wantsUpdate) {
+                enqueue({
+                  type: 'request_workflow_handoff',
+                  initiative_id: initiativeId,
+                  conversation_id: convId,
+                });
+              }
+
+              // (d) Observability — one structured line per planning turn.
+              // Greppable via `textPayload=~"planning_turn"` in Cloud Run logs.
+              // No PII: no chat content, no user email.
+              console.log(JSON.stringify({
+                event: 'planning_turn',
+                convId,
+                hasSentinelCreate: wantsCreate,
+                hasSentinelUpdate: wantsUpdate,
+                hasLegacyHandoff: wantsLegacyHandoff,
+                extractedCurrentTurn: !!extractedThisTurn,
+                extractedFromHistory,
+                upsertCalled: (wantsCreate || wantsUpdate) && !!fieldsForUpsert,
+                upsertOk: upsertResult?.ok ?? null,
+                upsertAction: upsertResult?.ok ? upsertResult.data.action : null,
+                upsertReason: upsertResult && !upsertResult.ok ? upsertResult.reason : null,
+              }));
             }
 
             // Log analytics event with token usage (fire-and-forget)
