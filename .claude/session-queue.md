@@ -4,7 +4,7 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Session 9 (initiative-KPI auto-sync) shipped 2026-05-15 (`n8n-ops-00008-vqf`). Verified live: #214 PFR=1h, #213 PMM=0h, #193 ORM correctly untouched. Marketing Time Saved KPI fully end-to-end. Next focus = Session 10, **Hub × n8n-builder PoC plumbing** so deploying from a PoC card auto-populates `innovation_items.solution_url` + `initiative_workflow_links`.
+**Current focus track:** Sessions 9 + 10 BOTH shipped 2026-05-15. Session 9: initiative-KPI auto-sync (`n8n-ops-00008-vqf`) — live data confirms #214 PFR=1h, #213 PMM=0h, #193 ORM untouched. Session 10: PoC Builder CTA + `poc_mode` plumbing — chat-ui rev `n8n-chat-ui-00047-wgk` deployed; Hub PR #53 open pending Kurt review. Next focus = Session 11, **PoC modal trim + Smart-Add Skip Analysis** (Hub-only, smallest UX cut).
 
 ---
 
@@ -25,7 +25,8 @@ All plans live in [`.claude/plans/`](plans/). Two parallel tracks running:
 
 | Date | Plan file | Status |
 |---|---|---|
-| 2026-05-15 | [`2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md) | ✅ Phase 1 + Phase 2.1 shipped today. Phase 2.2 + 2.3 queued below as Sessions 10 + 11. |
+| 2026-05-15 | [`let-s-plan-and-execute-enumerated-cherny.md`](plans/let-s-plan-and-execute-enumerated-cherny.md) | ✅ Phase 2.2 (PoC Builder CTA + poc_mode) shipped Session 10 — chat-ui `n8n-chat-ui-00047-wgk`, Hub PR #53. |
+| 2026-05-15 | [`2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md) | ✅ Phase 1 + Phase 2.1 shipped earlier same day. Phase 2.3 queued below as Session 11. |
 
 End-to-end flow tying both tracks together (team-shareable): [`docs/innovation-hub/end-to-end-flow.md`](../docs/innovation-hub/end-to-end-flow.md).
 
@@ -35,52 +36,7 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD] Session 10 — Phase 2.2: Builder CTA on PoC card + `<rule name="poc_mode">` + `poc_context` plumbing
-
-**Goal:** Add the "Generate workflow with AI" button to PoC cards so a user with an approved PoC can invoke the Builder against the **specific PoC** (not the parent initiative). Plumbs `innovation_item_id` end-to-end so the `solution_url` auto-fill column from PR #52 actually fires on deploy.
-
-**Full plan + design + verification (this session's plan):** [`.claude/plans/let-s-plan-and-execute-enumerated-cherny.md`](plans/let-s-plan-and-execute-enumerated-cherny.md).
-
-**Why now:** Today's PR #52 added `innovation_items.solution_url` + the Edge Function write path, but the column stays empty in real usage because chat-ui has no concept of "this conversation belongs to a PoC card." Session 10 fixes that.
-
-**Two pipelines** (verified live, see `services/api.ts:1058` + `:1099`):
-- **From Roadmap Initiative** → `createPocFromInitiative` inserts new row with `source_strategic_idea_id` set. Has parent initiative.
-- **From Team Idea** → `markAsPocActive` flips status in place. `source_strategic_idea_id` IS NULL. No parent initiative.
-
-So `PocContext` carries optional `initiative_id?` OR `idea_id?` (at-least-one invariant), not required `initiative_id`.
-
-**Precedence:** `prefill=` / `promote=` / `poc=` are mutually exclusive. `GeneratePocButton` embeds parent inside `PocContext.initiative_id` rather than emitting both `poc=` + `prefill=` (single source of truth per URL).
-
-**Hub URL pattern:** `HashRouter` — PoC deep-links are `${origin}/#/item/<poc_uuid>` (NOT `/innovation/<item_number>`). Verified at `App.tsx:416` + `IdeaDetailModal.tsx:582`.
-
-**Files to create/modify:**
-
-Hub (`/Users/alvaro.cuba/code/AI-Innovation-Hub-Vertex/`):
-- MODIFY `services/n8nBuilderUrl.ts` — add `PocContext` + `buildPocModeUrl()` mirroring `buildPromoteModeUrl` (lines 117–123). Reuse `encode` helper (lines 69–74).
-- NEW `components/GeneratePocButton.tsx` — mirror `components/GenerateWorkflowButton.tsx`. Props: `poc: InnovationItem`, `parentInitiative: StrategicIdea | null`.
-- MODIFY `components/IdeaDetailModal.tsx` — inside existing PoC block (lines 859–887, gated by `isPOC(item.status)`), add `<GeneratePocButton poc={item} parentInitiative={…} />` just before line 886's closing `</div>`. Caller fetches parent via `item.source_strategic_idea_id`.
-
-chat-ui (`n8n-builder-cloud-claude/chat-ui/`):
-- MODIFY `src/lib/types.ts` — add `PocContext` interface (lines 17–24 vicinity).
-- MODIFY `src/components/ChatWindow.tsx` — add `decodePocContext` (mirror `decodePromoteContext` at lines 76–91); extract via `searchParams?.get('poc')` (~line 110); discard `prefill=` / `promote=` if also present.
-- MODIFY `src/lib/firestore.ts` — extend `Conversation` (lines 50–59) with `pocId?` + `pocContext?`.
-- MODIFY `src/lib/system-prompt.ts` — add `<rule name="poc_mode" priority="critical">` mirroring `planning_mode` (lines 176–188). Include precedence clause "if `<poc_context>` present, ignore any `<initiative_context>` block — PoC scope wins."
-- MODIFY `src/app/api/chat/route.ts` — add `buildPocContext(poc)` mirroring `buildPromoteContext` (lines 127–151). Wire into first-turn user message.
-- MODIFY `src/app/api/deploy/route.ts` — replace stub at lines 110–125 with `conv.pocContext?.poc_id` as `innovation_item_id` source.
-
-**Verification (must test BOTH PoC pipelines):**
-- Initiative-path PoC (`source_strategic_idea_id` non-null) → `initiative_workflow_links` row written with parent initiative_id.
-- Idea-path PoC (`source_strategic_idea_id` IS NULL) → verify Edge Function `n8n-builder-callback` handles no-parent case; document the consequence in decision-log.
-- E2E: click "Generate workflow with AI" on PoC card → chat-ui in poc_mode skips Phase 1/2 → builds → deploys → check `innovation_items.solution_url` populated + (where applicable) `initiative_workflow_links` row.
-- Re-deploy → expect `solution_url_updated: 'preserved'`.
-
-**Sequencing:** Hub helper + button (no wire-up yet) → chat-ui full path → local smoke with hand-crafted `?poc=…` URL → wire Hub button → deploy chat-ui → E2E smoke → decision-log + end-to-end-flow.md updates.
-
-**Estimated effort:** 3-4 hours.
-
----
-
-### 2. Session 11 — Phase 2.3: PoC modal trim + Smart-Add bypass
+### 1. [HEAD] Session 11 — Phase 2.3: PoC modal trim + Smart-Add bypass
 
 **Goal:** The smallest UX win on Track B — reduce modal stacking and surface a power-user shortcut.
 
@@ -95,6 +51,42 @@ Verification:
 **Risk + rollback:** Retiring `StartPocModal` is the only meaningful UX change. Gate behind a Hub feature flag if one exists; otherwise demo to Kurt before merging the deletion.
 
 **Estimated effort:** 2-3 hours.
+
+---
+
+### ✅ SHIPPED 2026-05-15 — Session 10 (Track B) — Phase 2.2: PoC Builder CTA + `poc_mode` plumbing end-to-end
+
+> **Outcome:** PoC owners can now click "Generate workflow with AI" on a PoC card. Chat-ui receives `?poc=<base64>` → decodes `PocContext` → runs in `poc_mode` (skips Phase 1/2 interview) → builds → deploys → `innovation_items.solution_url` populated automatically.
+>
+> **Plan file:** [`.claude/plans/let-s-plan-and-execute-enumerated-cherny.md`](plans/let-s-plan-and-execute-enumerated-cherny.md).
+>
+> **What landed:**
+>
+> *chat-ui* (commit `6877f21` on `session/2026-05-08-jira-integration`, Cloud Run rev **`n8n-chat-ui-00047-wgk`**):
+> - NEW `PocContext` interface in `src/lib/types.ts` mirroring `PromoteContext`. Optional `initiative_id?` / `idea_id?` (at-least-one invariant).
+> - NEW `decodePocContext` in `src/components/ChatWindow.tsx`. Reads `?poc=`. Discards co-present `prefill=`/`promote=` (precedence: PoC = leaf scope, wins).
+> - NEW `<rule name="poc_mode" priority="critical">` in `src/lib/system-prompt.ts`. Skips initiative interview when `<poc_context>` block present.
+> - NEW `buildPocContext()` in `src/app/api/chat/route.ts`. Injected ABOVE all other context blocks.
+> - MODIFY `src/lib/firestore.ts` — `Conversation.innovationItemId?` field persisted at create-time.
+> - MODIFY `src/app/api/deploy/route.ts` — relaxed Hub-callback gate from `conv.initiativeId` only to `(conv.initiativeId || conv.innovationItemId)`. `innovation_item_id` sourced from `conv.innovationItemId` (replaces stub from `9d46348`).
+>
+> *Hub* (PR #53 on `kurtpabilona-code/AI-Innovation-Hub-Vertex`, branch `session-10-poc-builder-cta` — pending Kurt review):
+> - NEW `services/n8nBuilderUrl.ts` — `PocContext` + `buildPocModeUrl()`.
+> - NEW `components/GeneratePocButton.tsx` — mirrors `GenerateWorkflowButton`. Resolves `parentInitiative` from `item.source_strategic_idea_id`.
+> - MODIFY `components/IdeaDetailModal.tsx` — wires `<GeneratePocButton>` into PoC details block.
+>
+> **Two PoC pipelines handled** (verified `services/api.ts:1058` + `:1099`):
+> - Initiative-path (`source_strategic_idea_id` non-null) → writes both `solution_url` AND `initiative_workflow_links`.
+> - Idea-path (`source_strategic_idea_id` IS NULL) → writes only `solution_url`. Link row skipped (no FK target). Idea-path PoCs won't roll up into dept KPI until promoted to Initiative.
+>
+> **User-caught design bug** (caught in plan review before code shipped): initial `PocContext` made `initiative_id` REQUIRED. That would have broken Idea-path PoCs (no parent initiative). Fix: both `initiative_id?` and `idea_id?` optional with at-least-one invariant in `decodePocContext`.
+>
+> **Decision-log:** [`docs/decision-log.md` 2026-05-15 Session 10 entry](../docs/decision-log.md).
+>
+> **Pending follow-ups:**
+> - Browser-driven E2E smoke for both PoC pipelines (IAP-protected; user-driven).
+> - Hub PR #53 merge — pending Kurt review.
+> - Re-deploy preservation check (`solution_url_updated: 'preserved'`).
 
 ---
 

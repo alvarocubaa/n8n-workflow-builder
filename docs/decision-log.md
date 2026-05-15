@@ -4,6 +4,59 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-15 — Session 10 shipped: PoC Builder CTA + `poc_mode` plumbing end-to-end
+
+PoC owners can now click "Generate workflow with AI" on a PoC card. Hub PR #52's `innovation_items.solution_url` auto-fill (shipped 2026-05-15 morning) finally has the upstream plumbing to actually fire in real usage.
+
+### What shipped
+
+**chat-ui** (commit `6877f21` on `session/2026-05-08-jira-integration`, Cloud Run rev `n8n-chat-ui-00047-wgk`):
+- NEW `PocContext` interface in `src/lib/types.ts` mirroring `PromoteContext`. Optional `initiative_id` / `idea_id` (at-least-one invariant) — PoCs come from two pipelines.
+- NEW `decodePocContext` in `src/components/ChatWindow.tsx`. Reads `?poc=<base64>`. Discards co-present `prefill=`/`promote=` URL params (precedence: PoC = leaf scope, wins).
+- NEW `<rule name="poc_mode" priority="critical">` in `src/lib/system-prompt.ts`. Triggered by `<poc_context>` block presence. Skips Phase 1/2 (initiative interview); goes straight to Builder. Precedence clause: "if `<poc_context>` present, ignore `<initiative_context>` for behaviour purposes."
+- NEW `buildPocContext()` in `src/app/api/chat/route.ts`. Injected ABOVE prefill/promote/department context blocks.
+- MODIFY `src/lib/firestore.ts` — `Conversation.innovationItemId?` field. Persisted at create-time; read by `/api/deploy` to seed the n8n-builder-callback payload.
+- MODIFY `src/app/api/deploy/route.ts` — relaxed the Hub-callback gate from `conv.initiativeId` to `(conv.initiativeId || conv.innovationItemId)`. `innovation_item_id` now sourced from `conv.innovationItemId` (replaces the stub `(conv as { innovationItemId?: string }).innovationItemId` from commit `9d46348`).
+
+**Hub** (PR #53 on `kurtpabilona-code/AI-Innovation-Hub-Vertex`, branch `session-10-poc-builder-cta`):
+- NEW `services/n8nBuilderUrl.ts` — `PocContext` interface + `buildPocModeUrl()` mirroring `buildPromoteModeUrl`.
+- NEW `components/GeneratePocButton.tsx` — mirrors `GenerateWorkflowButton`. Resolves `parentInitiative` from `item.source_strategic_idea_id` (null for Idea-path PoCs).
+- MODIFY `components/IdeaDetailModal.tsx` — wires `<GeneratePocButton>` into the existing PoC details block (`isPOC(item.status)`, lines 859–887).
+
+### Two-pipeline design (verified live)
+
+PoCs reach the Builder via two pipelines, both legitimate:
+- **Initiative-path**: `createPocFromInitiative` (Hub `services/api.ts:1099`) — inserts new `innovation_items` row with `source_strategic_idea_id` pointing at the parent `strategic_ideas` row. Has parent initiative.
+- **Idea-path**: `markAsPocActive` (Hub `services/api.ts:1058`) — flips status on the existing Team Idea row in place. `source_strategic_idea_id` IS NULL. **No parent initiative.**
+
+Initial plan (recorded in `.claude/plans/let-s-plan-and-execute-enumerated-cherny.md`) made `initiative_id` REQUIRED on `PocContext`. User flagged this as a semantic bug before code went out — Idea-path PoCs would have failed to construct a valid PocContext. Fix landed before any user traffic: both `initiative_id` and `idea_id` are optional with an at-least-one invariant enforced by `decodePocContext`.
+
+**Deploy-side consequence**: For Initiative-path PoCs, `innovation_workflow_links.initiative_id` gets a row pointing at the parent (KPI roll-up works). For Idea-path PoCs, the Edge Function `n8n-builder-callback` writes only `solution_url`; the `initiative_workflow_links` row is skipped because there's no `strategic_ideas` FK target. This is intentional and documented in the `poc_mode` rule. Idea-path PoCs won't roll up into a department KPI until they're promoted to Initiative or the schema gains an `(idea_id, n8n_workflow_id)` link table.
+
+### Precedence: `prefill=` / `promote=` / `poc=` are mutually exclusive
+
+Three Hub→chat-ui handoff modes today, all use base64 URL params: `prefill=` (Hub initiative), `promote=` (Take-to-Production), and now `poc=` (PoC builder). Design choice: **embed parent inside `PocContext`, never emit two URL params.** When a PoC has a parent initiative, `GeneratePocButton` puts the parent id into `PocContext.initiative_id` instead of also adding `prefill=`. Single source of truth per URL. `decodePocContext` defensively warns + discards co-present `prefill=`/`promote=` if any client constructs an invalid URL.
+
+System-prompt rule reinforces this: `poc_mode` instructs the AI to ignore any `<initiative_context>` block for behaviour purposes when `<poc_context>` is also present. PoC scope wins (leaf scope).
+
+### Pre-flight checks that paid off
+
+- **Verified Hub URL pattern before writing smoke commands**: `HashRouter` at `App.tsx:416` → item deep-links are `${origin}/#/item/<uuid>`, NOT numeric `/innovation/<item_number>`. Cached plan had wrong URLs; grep caught it before they shipped into user-facing docs.
+- **Verified two-pipeline reality before finalizing PocContext shape**: grepped `services/api.ts:1058` + `:1099` instead of trusting my mental model. Found `markAsPocActive` doesn't set `source_strategic_idea_id` — that's what forced the `initiative_id?` optional design.
+
+### Verification queue
+
+- Browser-driven E2E smoke for both PoC pipelines (Initiative-path + Idea-path) — IAP-protected, user-driven, deferred.
+- Hub PR #53 merge — pending Kurt review.
+- Re-deploy preservation check (`solution_url_updated: 'preserved'` on second deploy) — same E2E.
+- Decision-log of any AI behaviour drift in `poc_mode` (does it occasionally lapse back into Phase 1/2 interview?) — monitor `planning_turn` log lines for false positives.
+
+### Source-of-truth plan file
+
+[`n8n-builder-cloud-claude/.claude/plans/let-s-plan-and-execute-enumerated-cherny.md`](../.claude/plans/let-s-plan-and-execute-enumerated-cherny.md).
+
+---
+
 ## 2026-05-15 — Initiative-KPI auto-sync shipped (Option A: auto-overwrite)
 
 Ron + Kurt's direction "users shouldn't have to type Expected Impact (Hours) into the per-initiative KPI card — we have the data, populate it" landed end-to-end. Marketing-scoped today; auto-extends to any department whose canonical Time Saved KPI gets created in the Hub.
