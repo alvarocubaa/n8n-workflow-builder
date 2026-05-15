@@ -4,52 +4,161 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Time Saved KPI infrastructure shipped end-to-end across Sessions 7-8 (2026-05-08 → 2026-05-14). Marketing Time Saved KPI live at [`/business-kpis/e6f47f5b-…`](https://thehub.gue5ty.com/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53) showing April 38 h / May 88 h. Next focus = Session 9, **auto-fill the per-initiative "Contributes to KPI" card** so initiative owners never type Expected Impact (Hours) themselves.
+**Current focus track:** Session 9 (initiative-KPI auto-sync) shipped 2026-05-15 (`n8n-ops-00008-vqf`). Verified live: #214 PFR=1h, #213 PMM=0h, #193 ORM correctly untouched. Marketing Time Saved KPI fully end-to-end. Next focus = Session 10, **Hub × n8n-builder PoC plumbing** so deploying from a PoC card auto-populates `innovation_items.solution_url` + `initiative_workflow_links`.
 
 ---
 
-## Plan files index (this multi-session arc)
+## Plan files index
 
-All plans live in [`.claude/plans/`](plans/). Read the most recent first if you're new to this track:
+All plans live in [`.claude/plans/`](plans/). Two parallel tracks running:
+
+**Track A — Time Saved KPI rollup** (v1 → v2 → v3 → auto-sync)
 
 | Date | Plan file | Status |
 |---|---|---|
-| 2026-05-15 | [`2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md) | **Active HEAD** — designed; execution in fresh session |
+| 2026-05-15 | [`2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md) | ✅ Shipped Session 9 (deployed `n8n-ops-00008-vqf`; verified live) |
 | 2026-05-13 | [`2026-05-13-time-saved-kpi-v3-dept-centric.md`](plans/2026-05-13-time-saved-kpi-v3-dept-centric.md) | ✅ Shipped Session 8 |
 | 2026-05-12 | [`2026-05-12-time-saved-kpi-v2.md`](plans/2026-05-12-time-saved-kpi-v2.md) | ✅ Shipped Session 8 (superseded by v3 same week) |
 | 2026-05-08 | [`2026-05-08-time-saved-kpi-rollup.md`](plans/2026-05-08-time-saved-kpi-rollup.md) | ✅ Shipped Session 7 (initial v1) |
 
-Architecture history + every design decision is captured in [`docs/decision-log.md`](../docs/decision-log.md) — entries 2026-05-08 through 2026-05-15 cover the whole journey from v1 → v2 → v3 → auto-sync planning.
+**Track B — Hub × n8n-builder UX** (redesign-v2 → write-path fix → PoC integration)
+
+| Date | Plan file | Status |
+|---|---|---|
+| 2026-05-15 | [`2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md) | ✅ Phase 1 + Phase 2.1 shipped today. Phase 2.2 + 2.3 queued below as Sessions 10 + 11. |
+
+End-to-end flow tying both tracks together (team-shareable): [`docs/innovation-hub/end-to-end-flow.md`](../docs/innovation-hub/end-to-end-flow.md).
+
+Architecture history + every design decision is captured in [`docs/decision-log.md`](../docs/decision-log.md) — entries 2026-05-08 through 2026-05-15 cover the whole journey.
 
 ---
 
 ## Queue
 
-### 1. [HEAD] Session 9 — Auto-fill per-initiative `initiative_kpis` rows from our data
+### 1. [HEAD] Session 10 — Phase 2.2: Builder CTA on PoC card + `<rule name="poc_mode">` + `poc_context` plumbing
 
-**Goal:** When an initiative has linked workflow(s), auto-populate its "Contributes to KPI" card so the user never has to type Expected Impact (Hours). Daily cron folded into `/sync-hub`.
+**Goal:** Add the "Generate workflow with AI" button to PoC cards so a user with an approved PoC can invoke the Builder against the **specific PoC** (not the parent initiative). Plumbs `innovation_item_id` end-to-end so the `solution_url` auto-fill column from PR #52 actually fires on deploy.
 
-**Full plan + decisions + verification:** [`.claude/plans/2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md).
+**Full plan + design + verification (this session's plan):** [`.claude/plans/let-s-plan-and-execute-enumerated-cherny.md`](plans/let-s-plan-and-execute-enumerated-cherny.md).
 
-**Decision locked** (2026-05-15): Option A — auto-overwrite. Measured data is the authority. `initiative_kpis` has no `created_by` column (verified live) so no discriminator needed; cron rewrites every eligible row every morning. Manual UI edits last until the next sync.
+**Why now:** Today's PR #52 added `innovation_items.solution_url` + the Edge Function write path, but the column stays empty in real usage because chat-ui has no concept of "this conversation belongs to a PoC card." Session 10 fixes that.
 
-**Upstream data flow (already shipped — DO NOT rebuild):**
-- `initiative_workflow_links` rows are auto-written by `n8n-builder-callback` Edge Function on every chat-ui Builder deploy that has an `initiative_id` (Direction-2, 2026-05-04).
-- `innovation_items.solution_url` (PoC mirror, PR #52, 2026-05-15) is informational — NOT the rollup data source. Soft gap flagged in the plan for a future backfill job.
+**Two pipelines** (verified live, see `services/api.ts:1058` + `:1099`):
+- **From Roadmap Initiative** → `createPocFromInitiative` inserts new row with `source_strategic_idea_id` set. Has parent initiative.
+- **From Team Idea** → `markAsPocActive` flips status in place. `source_strategic_idea_id` IS NULL. No parent initiative.
+
+So `PocContext` carries optional `initiative_id?` OR `idea_id?` (at-least-one invariant), not required `initiative_id`.
+
+**Precedence:** `prefill=` / `promote=` / `poc=` are mutually exclusive. `GeneratePocButton` embeds parent inside `PocContext.initiative_id` rather than emitting both `poc=` + `prefill=` (single source of truth per URL).
+
+**Hub URL pattern:** `HashRouter` — PoC deep-links are `${origin}/#/item/<poc_uuid>` (NOT `/innovation/<item_number>`). Verified at `App.tsx:416` + `IdeaDetailModal.tsx:582`.
 
 **Files to create/modify:**
-- NEW: `Agentic Workflows/services/n8n-ops/src/routes/initiative-kpi-sync.ts` (~150 LOC; mirror shape of `routes/kpi-rollup.ts`).
-- MODIFY: `Agentic Workflows/services/n8n-ops/src/services/supabase.ts` — add 3 helpers (list initiatives + workflow links, resolve canonical KPI, upsert initiative_kpis).
-- MODIFY: `Agentic Workflows/services/n8n-ops/src/index.ts` — wire the new route.
-- MODIFY: `Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts` — call `initiativeKpiSync()` at the end of the existing handler so daily cron does both.
-- LOG: new entry in `n8n-builder-cloud-claude/docs/decision-log.md` capturing Option A choice + observable consequences.
 
-**Estimated effort:** 2-3 hours code + 30 min docs/commit. Half a session.
+Hub (`/Users/alvaro.cuba/code/AI-Innovation-Hub-Vertex/`):
+- MODIFY `services/n8nBuilderUrl.ts` — add `PocContext` + `buildPocModeUrl()` mirroring `buildPromoteModeUrl` (lines 117–123). Reuse `encode` helper (lines 69–74).
+- NEW `components/GeneratePocButton.tsx` — mirror `components/GenerateWorkflowButton.tsx`. Props: `poc: InnovationItem`, `parentInitiative: StrategicIdea | null`.
+- MODIFY `components/IdeaDetailModal.tsx` — inside existing PoC block (lines 859–887, gated by `isPOC(item.status)`), add `<GeneratePocButton poc={item} parentInitiative={…} />` just before line 886's closing `</div>`. Caller fetches parent via `item.source_strategic_idea_id`.
 
-**Adjacent items also worth picking up if time permits:**
-- **Feedback-loop harvest** — Apr 15 last run, weekly cadence — currently overdue ~30 days. Run `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
-- **Kurt DM** sitting in Slack drafts `D0A9V1YRRQT` since 2026-05-13 — review + send when ready.
-- **24 errored workflows from Session 8 bulk-populate** — 21 IS production + 2 Cura + 1 self-conflicting webhook. Documented in decision-log; will revisit when affected dept's KPI lands in Hub.
+chat-ui (`n8n-builder-cloud-claude/chat-ui/`):
+- MODIFY `src/lib/types.ts` — add `PocContext` interface (lines 17–24 vicinity).
+- MODIFY `src/components/ChatWindow.tsx` — add `decodePocContext` (mirror `decodePromoteContext` at lines 76–91); extract via `searchParams?.get('poc')` (~line 110); discard `prefill=` / `promote=` if also present.
+- MODIFY `src/lib/firestore.ts` — extend `Conversation` (lines 50–59) with `pocId?` + `pocContext?`.
+- MODIFY `src/lib/system-prompt.ts` — add `<rule name="poc_mode" priority="critical">` mirroring `planning_mode` (lines 176–188). Include precedence clause "if `<poc_context>` present, ignore any `<initiative_context>` block — PoC scope wins."
+- MODIFY `src/app/api/chat/route.ts` — add `buildPocContext(poc)` mirroring `buildPromoteContext` (lines 127–151). Wire into first-turn user message.
+- MODIFY `src/app/api/deploy/route.ts` — replace stub at lines 110–125 with `conv.pocContext?.poc_id` as `innovation_item_id` source.
+
+**Verification (must test BOTH PoC pipelines):**
+- Initiative-path PoC (`source_strategic_idea_id` non-null) → `initiative_workflow_links` row written with parent initiative_id.
+- Idea-path PoC (`source_strategic_idea_id` IS NULL) → verify Edge Function `n8n-builder-callback` handles no-parent case; document the consequence in decision-log.
+- E2E: click "Generate workflow with AI" on PoC card → chat-ui in poc_mode skips Phase 1/2 → builds → deploys → check `innovation_items.solution_url` populated + (where applicable) `initiative_workflow_links` row.
+- Re-deploy → expect `solution_url_updated: 'preserved'`.
+
+**Sequencing:** Hub helper + button (no wire-up yet) → chat-ui full path → local smoke with hand-crafted `?poc=…` URL → wire Hub button → deploy chat-ui → E2E smoke → decision-log + end-to-end-flow.md updates.
+
+**Estimated effort:** 3-4 hours.
+
+---
+
+### 2. Session 11 — Phase 2.3: PoC modal trim + Smart-Add bypass
+
+**Goal:** The smallest UX win on Track B — reduce modal stacking and surface a power-user shortcut.
+
+**Scope (Hub only):**
+- **Retire `StartPocModal` as a standalone modal.** Fold its 6 fields (title, description, poc_guidelines_doc, solution_url, validation_notes, test_data_source, owner) into `EditInnovationItemModal`'s PoC section as a top-of-modal expanded group. Update both call sites in `components/views/InnovationPipeline.tsx` (`handlePocSubmitFromIdea` + `handlePocSubmitFromInitiative`) to open `EditInnovationItemModal` with a `startPocFlow=true` prop instead.
+- **Add a "Skip Analysis" toggle to `SmartAddIdeaModal`** for power users who already know the idea is real and don't need the AI feasibility/dedupe pass. Defaults off; one checkbox; bypasses the 3-step flow to a single submit.
+
+Verification:
+- Start a PoC from an approved idea → no two-modal-deep nav; lands directly on the consolidated edit form with PoC fields populated.
+- Smart Add Idea with "Skip Analysis" on → idea row created without AI analysis fields; idea still appears in "New Ideas" column.
+
+**Risk + rollback:** Retiring `StartPocModal` is the only meaningful UX change. Gate behind a Hub feature flag if one exists; otherwise demo to Kurt before merging the deletion.
+
+**Estimated effort:** 2-3 hours.
+
+---
+
+### ✅ SHIPPED 2026-05-15 — Session 9 (Track A) — Initiative-KPI auto-sync (Option A: auto-overwrite)
+
+> **Outcome:** Per-initiative "Contributes to KPI" cards now auto-fill from measured n8n execution data. Cron folded into existing `/sync-hub` daily 06:15 UTC handler — no new scheduler.
+>
+> **Plan file:** [`.claude/plans/2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md).
+>
+> **What landed:**
+> - NEW `services/n8n-ops/src/routes/initiative-kpi-sync.ts` (261 LOC) — single BQ round-trip via `JSON_QUERY_ARRAY` over flattened `{initiative_id, workflow_id}` array; dry-run mode.
+> - MODIFY `services/n8n-ops/src/services/supabase.ts` — added `listAllInitiativesWithCategory`, `listAllWorkflowLinks`, `findCanonicalKpiForDept`, `upsertInitiativeKpi`.
+> - MODIFY `services/n8n-ops/src/index.ts` — wired `POST /initiative-kpi-sync` (requireOidc).
+> - MODIFY `services/n8n-ops/src/routes/sync-hub.ts` — folded `runInitiativeKpiSync({ dryRun:false })` into the daily handler; errors isolated (failure can't break workflow-stats sync).
+> - Cloud Run revision: `n8n-ops-00008-vqf` (deployed 2026-05-15 11:57 UTC).
+>
+> **Live verification (via Supabase REST, 2026-05-15 11:59 UTC):**
+> - #214 PFR Celebration: 20h → **1h** (auto-overwrote Ron's manual seed; matches measured rate).
+> - #213 PMM HubSpot Reporting: **0h** (newly inserted; workflow has 239 runs but `time_saved_per_execution_min` unset).
+> - #193 ORM analysis: 5h untouched (`impact_category='Improved Quality'`, correctly excluded by Time-Savings-only filter).
+>
+> **Decision:** Option A (auto-overwrite) over B (respect manual) and C (dual-track schema). Measured data is the authority. Manual UI edits last until next 06:15 UTC sync. Forward-compatible with future Option C.
+>
+> **Schema discovery:** `initiative_kpis` has a *partial* unique index on `(initiative_id, kpi_id) WHERE kpi_id IS NOT NULL`, not a full unique constraint. PostgREST `on_conflict` upsert against partial uniques is fragile, so `upsertInitiativeKpi` uses `SELECT → UPDATE | INSERT` instead. Two HTTP hops per row; negligible at <100 initiatives.
+>
+> **Decision-log:** [`docs/decision-log.md` 2026-05-15 entry](../docs/decision-log.md).
+>
+> **Pending follow-ups:**
+> - Visual confirm in Hub UI for #213 + #214 (manual; URLs are `${origin}/#/item/<uuid>`).
+> - Kurt DM about UI label "Auto-calculated from execution data — last updated {updated_at}" so users don't get confused when their manual edits revert at 06:15 UTC. Slack draft in `D0A9V1YRRQT` since 2026-05-13.
+> - 24 errored workflows from Session 8 bulk-populate — revisit when affected dept's KPI lands in Hub.
+
+---
+
+### ✅ SHIPPED 2026-05-15 — Track B Session 9 — Plan-with-AI write-path bug fix + PoC `solution_url` field
+
+> **Outcome:** Two parallel sub-tracks shipped in one session.
+>
+> **Plan file:** [`.claude/plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md).
+>
+> **Track B.1 — Plan-with-AI write-path bulletproofed (chat-ui rev `n8n-chat-ui-00046-k9b`, commit `9d46348`):**
+> - **Root cause** (silent failure since redesign-v2 deploy on 2026-05-11): the `<create_initiative />` sentinel detection sat inside the `if (extracted)` clause. Replies emitting the sentinel without same-turn JSON skipped the upsert with no log + no SSE event. Verified live: 0 rows in `initiative_chat_creations`, 0 AI-drafted `strategic_ideas` rows, 0 `create_initiative` log entries since deploy.
+> - Fix: decoupled sentinel from JSON-extraction gate; added `extractFromHistory()` fallback that walks prior model messages for the most-recent valid JSON; sentinel without any extractable JSON surfaces `⚠ Couldn't save the initiative: …` to the user instead of silence.
+> - Observability: every planning-mode turn logs one structured `planning_turn` line — greppable via `gcloud logging read 'textPayload=~"planning_turn"'`. Captures sentinel-detected, extracted-current-turn, extracted-from-history, upsert-called, upsert-ok, upsert-action, upsert-reason.
+> - Hardened JSON-block regex: accepts ```` ```JSON ````, ```` ```json5 ````, ```` ```js ````, bare ```` ``` ```` variants; iterates candidates last-to-first.
+> - Phase-2 prompt tightened (co-emit contract). Edge Function call retries once on 5xx/network error.
+> - Suppressed legacy `<request_workflow_handoff />` SSE when the new path fires on the same turn — closes a race where the AddStrategicIdeaModal autosaves while the Edge Function inserts a row.
+> - `HUB_PUBLIC_ORIGIN=https://thehub.gue5ty.com` pinned explicitly in `deploy-cloudrun.sh` (was implicit default).
+>
+> **Track B.2 — PoC `solution_url` field (Hub PR #52, migration `20260514120000_…` applied):**
+> - New nullable column `innovation_items.solution_url`. Distinct from `production_workflow_url` (post-promotion URL).
+> - New `Solution URL` input in `StartPocModal` (between Specs Doc and Notes) and `EditInnovationItemModal` (PoC section). Helper text explains auto-fill.
+> - `n8n-builder-callback` Edge Function extended: accepts optional `innovation_item_id` + `n8n_workflow_url`. When both present + column currently null/empty, writes `solution_url`; preserves owner-typed values. Response carries `solution_url_updated: 'set'|'preserved'|'skipped'|'failed'`.
+> - chat-ui deploy callback caller extended with stub `innovation_item_id` field — full plumbing follows in Session 10.
+>
+> **Smoke (server-side, what I could verify without driving the UI):**
+> - Cloud Run rev `n8n-chat-ui-00046-k9b` serving 100% traffic; `HUB_PUBLIC_ORIGIN` env confirmed.
+> - Edge Function `n8n-initiative-upsert` still ACTIVE; auth-gate 401 without `X-Hub-Secret`.
+> - Edge Function `n8n-builder-callback` redeployed with `--no-verify-jwt` (matching prior config); auth-gate verified.
+> - `npx tsc --noEmit` clean on both repos.
+>
+> **Pending:** Phase 1.9 live UI smoke (browser-driven; trivial). Track in HEAD's adjacent items.
+>
+> **Decision-log entries:** sentinel decoupling, history fallback, `planning_turn` observability schema, `solution_url` vs `production_workflow_url` semantics, `--no-verify-jwt` invariant for server-to-server Edge Functions.
 
 ---
 
