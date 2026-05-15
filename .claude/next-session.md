@@ -1,76 +1,57 @@
-# Next session brief — Cleanup + follow-ups after Time Saved KPI v3 ship
+# Next session brief — Auto-fill the per-initiative "Contributes to" KPI card
 
-**Last touched:** 2026-05-13 (post-v3 ship). v3 shipped end-to-end today; this brief is the cleanup tail.
+**Last touched:** 2026-05-15 (planning only; context was running thin so we deferred execution to a fresh session).
 
-## What's live as of 2026-05-13
+## What you're picking up
 
-Marketing Time Saved KPI in Hub is **fully running**:
-- April 2026 = 38.08 h (pushed to `kpi_measurements`)
-- May 2026 = 87.57 h (partial; monthly cron re-pushes June 1)
-- Cloud Run `n8n-ops` on revision `n8n-ops-00007-tmm`
-- 159 workflows in BQ dim with a `time_saved_per_execution_min` value (46 owner-set + 111 we bulk-populated + 2 drift)
-- BQ migrations v2 + v3 applied; project_id / project_env / time_saved fields all populated on the workflows dim
+Ron + Kurt's direction is "users shouldn't have to type Expected Impact (Hours) into the Hub's KPI Tracking card on each initiative — we have the data, populate it automatically." This session designs + builds that auto-fill flow.
 
-## Pickup queue (small + parallel, no big new work)
+**Full design + decisions + verification steps live in:** [`.claude/plans/2026-05-15-initiative-kpi-auto-sync.md`](plans/2026-05-15-initiative-kpi-auto-sync.md).
 
-### 1. chat-ui whitelist cleanup
-Stop extracting the 3 deprecated baseline fields in planning-mode auto-extract:
-- `current_process_minutes_per_run`
-- `current_process_runs_per_month`
-- `current_process_people_count`
+**Read that first.** It contains:
+- The flow diagram + procedure (skip checks → resolve KPI → compute → upsert)
+- The three conflict-policy options (A: auto-overwrite, B: respect manual, C: dual-track schema)
+- File-level implementation map
+- Verification commands
+- Quick-reference URLs/IDs + OIDC token helper
 
-These wire through `chat-ui/src/app/api/chat/route.ts` (`extractAndValidatePlanningFields`) and the SSE `extracted_fields` event. They no longer drive anything in our rollup (n8n workflow settings are the source of truth). Harmless drift; cleaner to remove. **Coordinate with Kurt** — he's stripping the form inputs on his side; remove our extraction at the same time so we don't keep writing to columns no UI uses.
+## Single decision to lock in before coding
 
-Files to touch (chat-ui):
-- `chat-ui/src/app/api/chat/route.ts` — whitelist drops 3 keys (14 → 11 keys, but check current count)
-- Edge Function `n8n-conversation-callback` — drop the same 3 keys from re-validation
-- Whatever planning system prompt referenced them
+**Conflict policy when an `initiative_kpis` row exists with a manual `expected_impact`** (today: Ron set 20h on PFR Celebration, 5h on ORM analysis; live data measures ~1h and ~47h respectively).
 
-Estimated effort: 30 min. Single small PR.
+The plan recommends **Option A (auto-overwrite)** as the default. If you concur, the implementation is straightforward (~2-3 hours). If you want Option B or C, the plan documents the additional code/schema work needed.
 
-### 2. Kurt DM follow-through
-DM draft sits in `kurt.pabilona`'s Slack drafts (channel `D0A9V1YRRQT`, draft `Dr0B3G9SK0Q5`) since 2026-05-13. Review and send.
+## What's already shipped (do NOT redo)
 
-### 3. The 24 errored workflows (only when an affected KPI lands)
-Documented in [docs/decision-log.md](../docs/decision-log.md) §"24-error breakdown":
-- 21 IS production project: needs `n8n-workflow-builder` API key granted editor role on project `UCEMQoFhrGZ3FChz`. Path: ask Louie (IS team) OR have IT add project-editor for the SA. Not blocking until an IS Time Saved KPI is created in Hub.
-- 2 Cura (Product) workflows: same scope issue on project `Wh25Z3w6AZxTFnWf`. Not blocking until a Product Time Saved KPI lands.
-- 1 Upsell Detection 2.1 (CS): workflow has TWO webhook nodes both at `path='upsell-approval'`. n8n PUT rejects. Ronishif must either rename one webhook or set value via the n8n UI (the UI uses a different save code path that accepts the existing state). Not blocking until a CS Time Saved KPI lands.
+- Marketing Time Saved KPI live in Hub at `/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53` (April 38 h, May 88 h).
+- n8n-ops Cloud Run service at `n8n-ops-00007-tmm`. Routes: `/ingest`, `/loop-alerts`, `/weekly-digest`, `/sync-hub`, `/sweep-zombies`, `/kpi-rollup`, plus `/workflows` + `/suggest-links`.
+- 111 n8n workflows bulk-populated with `settings.timeSavedPerExecution` via node-count heuristic. 24 errored (documented in decision-log).
+- Hub PR #51 merged — "Baseline Metrics" form section stripped. Cloud Build `00104-nsw` live.
+- chat-ui PR #2 commit `1564204` + follow-ups — planning whitelist clean.
+- Edge Function `n8n-conversation-callback` v10 — empty `numberSpec`.
 
-### 4. bulk-estimate eligibility check tweak (cosmetic)
-`tools/bulk-estimate-time-saved.ts::classifyOrPropose` skips on `mode === 'fixed' && value > 0`. Workflows we populated via API have `mode=null + value=N` so they re-appear as eligible on dry-runs. Re-applies are idempotent no-ops but verbose. Tighten the check to `value > 0 && mode !== 'dynamic'` to match the rollup's semantic. ~3 LOC.
+## What's pending in the cleanup queue (lower priority than the main task)
 
-### 5. Feedback-loop harvest (carried forward, ~5 weeks overdue)
-Run `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`. Last run 2026-04-15.
+1. **Feedback-loop harvest** — Apr 15 last run, weekly cadence — currently overdue ~30 days. Run `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
+2. **24 errored workflows from the bulk populate** — 21 IS production + 2 Cura (API key scope) + 1 self-conflicting webhook in CS. Revisit when affected dept's KPI lands in Hub.
+3. **Kurt DM** — drafted in Slack channel `D0A9V1YRRQT` since 2026-05-13. Send when ready.
 
-## Quick-reference URLs (unchanged)
+## Files most relevant to this task
 
-```
-Hub (VPN):         https://thehub.gue5ty.com/
-chat-ui:           https://n8n-chat-ui-535171325336.europe-west1.run.app
-n8n-ops:           https://n8n-ops-fhehssni7q-ew.a.run.app  (rev n8n-ops-00007-tmm)
-Hub Supabase:      ilhlkseqwparwdwhzcek
-
-Marketing Time Saved KPI
-  kpi_id:           e6f47f5b-5de7-4630-84b5-441741270e53
-  Hub link:         https://thehub.gue5ty.com/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53
-  Secret Manager:   kpi-webhook-token-e6f47f5b-5de7-4630-84b5-441741270e53
-
-How to mint an audience-correct OIDC token to call n8n-ops endpoints from shell
-(gcloud's default print-identity-token doesn't carry email claim → use IAM Credentials REST):
-
-  SVC_URL="https://n8n-ops-fhehssni7q-ew.a.run.app"
-  SA="n8n-workflow-builder@agentic-workflows-485210.iam.gserviceaccount.com"
-  ACCESS=$(gcloud auth print-access-token 2>/dev/null)
-  TOKEN=$(curl -s -X POST \
-    "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SA}:generateIdToken" \
-    -H "Authorization: Bearer ${ACCESS}" -H "Content-Type: application/json" \
-    -d "{\"audience\":\"${SVC_URL}\",\"includeEmail\":true}" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
-```
+**Read these first** (they show the existing patterns to mirror):
+- [`Agentic Workflows/services/n8n-ops/src/routes/kpi-rollup.ts`](../../Agentic%20Workflows/services/n8n-ops/src/routes/kpi-rollup.ts) — the most similar existing route. Mirror its shape: dry-run flag, BQ-driven computation, Supabase write, structured logging.
+- [`Agentic Workflows/services/n8n-ops/src/routes/sync-hub.ts`](../../Agentic%20Workflows/services/n8n-ops/src/routes/sync-hub.ts) — where to fold the new auto-sync call so it runs daily 06:15 UTC.
+- [`Agentic Workflows/services/n8n-ops/src/services/supabase.ts`](../../Agentic%20Workflows/services/n8n-ops/src/services/supabase.ts) — Hub Supabase REST client. Add helpers here (don't introduce a different client).
+- [`Agentic Workflows/services/n8n-ops/src/services/bigquery.ts`](../../Agentic%20Workflows/services/n8n-ops/src/services/bigquery.ts) — `runQuery` + `fq` helpers; reuse the workflows dim + daily_workflow_stats join pattern from `kpi-rollup.ts`.
+- [`docs/decision-log.md`](../docs/decision-log.md) — full architectural history (entries 2026-05-08 through 2026-05-14). Reference, don't re-read end-to-end.
 
 ## User preferences (carried forward)
+
 - **Direct + terse.** No fluff.
-- **Verify-before-destructive** especially when writing to live data / n8n / Hub. Today's session executed step 4a (single PUT test) before step 4b (bulk-apply 135) for exactly this reason.
-- **Skip team-wide Slack comms unless explicit.** Kurt DM is OK (specific stakeholder ping); broad workflow-owner blast was skipped per direction.
-- **`gcloud auth print-identity-token` ≠ `iamcredentials.generateIdToken`** — only the latter carries the `email` claim required by `n8n-ops`'s requireOidc middleware. Documented above.
+- **Verify-before-destructive** especially when writing to live Hub data. Dry-run first; eyeball the planned upserts; then apply.
+- **`gcloud auth` expires periodically.** When it does, user runs `gcloud auth login` interactively. The OIDC token helper in the plan file uses IAM Credentials REST (carries `email` claim, which n8n-ops's `requireOidc` middleware requires).
+- **Will commit + push autonomously** when given approval.
+
+## Estimated effort
+
+Half-a-session (~2-3 hours code + 30 min docs/commit) if Option A is approved on the conflict policy. Longer if Option C dual-track is chosen (becomes a 3-PR sequence including a Hub schema migration + Kurt UI work).
