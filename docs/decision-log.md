@@ -4,6 +4,49 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-15 — Initiative-KPI auto-sync shipped (Option A: auto-overwrite)
+
+Ron + Kurt's direction "users shouldn't have to type Expected Impact (Hours) into the per-initiative KPI card — we have the data, populate it" landed end-to-end. Marketing-scoped today; auto-extends to any department whose canonical Time Saved KPI gets created in the Hub.
+
+### What shipped
+- **NEW** `services/n8n-ops/src/routes/initiative-kpi-sync.ts` — `runInitiativeKpiSync({ dryRun })` helper + thin HTTP wrapper. One BQ round-trip via `JSON_QUERY_ARRAY` over a flattened `{initiative_id, workflow_id}` array (matches `mergeExecutions` pattern; sidesteps BQ's awkward ARRAY<STRUCT> parameter binding).
+- **MODIFY** `services/n8n-ops/src/services/supabase.ts` — added `listAllInitiativesWithCategory`, `listAllWorkflowLinks`, `findCanonicalKpiForDept`, `upsertInitiativeKpi`.
+- **MODIFY** `services/n8n-ops/src/index.ts` — wired `POST /initiative-kpi-sync` (requireOidc).
+- **MODIFY** `services/n8n-ops/src/routes/sync-hub.ts` — folded `runInitiativeKpiSync()` into the existing daily 06:15 UTC handler; errors isolated (failure can't break workflow-stats sync). No new scheduler.
+- Cloud Run revision: `n8n-ops-00008` (built + deployed from `Agentic Workflows/services/n8n-ops/` via `./deploy.sh`).
+
+### Decision: Option A (auto-overwrite) chosen over B (respect manual) and C (dual-track schema)
+- **Why**: measured data is the authority. Manual values were Ron's best-guess seed; once measurement runs, the seed is stale. Forward-compatible with future Option C — when the Hub adds a `measured_impact_hours` column for side-by-side rendering, the auto-sync just writes the new column with no logic change.
+- **Observable consequence on first run (verified live 2026-05-15 ~12:00 UTC)**:
+  - #214 **PFR Celebration**: 20h → 1h (overwrote Ron's manual seed; matches the 3-workflow × measured-run-rate × per-execution-time math).
+  - #213 **PMM HubSpot Reporting Automation**: 0h (newly inserted — workflow has 239 historical runs but `time_saved_per_execution_min` is unset in n8n, so contribution = 0 until the owner sets the value).
+  - #193 **ORM analysis**: untouched (`impact_category='Improved Quality'`, correctly excluded by the Time-Savings-only filter).
+- **Out of scope this session** — locked but worth restating: non-Time-Savings impact categories (each needs its own canonical KPI mapping); Hub UI label "Auto-calculated from execution data — last updated {updated_at}" (Kurt's repo); Option C dual-track column; lockout for owner overrides.
+
+### Schema discovery: partial unique index, not full
+The Hub's `initiative_kpis` table has `idx_initiative_kpis_unique_kpi ON (initiative_id, kpi_id) WHERE (kpi_id IS NOT NULL)` — a **partial** unique index, not the full unique constraint the source plan assumed. PostgREST `on_conflict` upsert against partial uniques is fragile (silently no-ops on some Supabase versions). **Fix**: `upsertInitiativeKpi` is implemented as `SELECT → UPDATE | INSERT` instead of relying on `on_conflict=initiative_id,kpi_id`. Two HTTP hops per row; negligible at our scale (<100 initiatives) and explicit about Option A's "always overwrite" semantics.
+
+### Pre-flight checks that paid off
+- **Cloud Run timeout** verified at 540s before deploy — well above the 300s floor; the BQ-grouped query + N PostgREST upserts add seconds, not minutes.
+- **Constraint type** verified live via `pg_indexes` before writing the upsert helper. Took ~30s, saved an hour of mystery debugging.
+
+### How the cron flows now
+Daily 06:15 UTC `n8n-ops-sync-hub` job hits `/sync-hub` →
+1. Pulls `initiative_workflow_links` from Hub → joins to last 14d of `daily_workflow_stats` + `alert_state` from BQ → upserts `initiative_workflow_stats` (unchanged).
+2. NEW: calls `runInitiativeKpiSync({ dryRun: false })` → for every `Time Savings` initiative with workflow links + a canonical dept KPI, recomputes `expected_impact = Σ(success_runs(30d) × time_saved_per_execution_min / 60)` and upserts `initiative_kpis`.
+
+Both summaries returned in the same response.
+
+### Source-of-truth plan file
+[`n8n-builder-cloud-claude/.claude/plans/2026-05-15-initiative-kpi-auto-sync.md`](../.claude/plans/2026-05-15-initiative-kpi-auto-sync.md) — full design + procedure + verification commands + OIDC token helper.
+
+### Verification queue
+- Visual confirm in Hub UI for #213 + #214 (`/innovation/{id}` cards show auto-filled "Contributes to" with new values) — **manual, deferred to follow-up.**
+- Note to send Kurt: ask him to add the "Auto-calculated from execution data" UI label on the Expected Impact (Hours) input so users don't get confused when their manual edits revert at 06:15 UTC.
+- 24 workflows still errored from the bulk-populate (21 IS production + 2 Cura + 1 self-conflicting webhook) — revisit per-dept when that dept's KPI lands in the Hub.
+
+---
+
 ## 2026-05-14 — Baseline-metric form-input strip shipped (both repos + Edge Function)
 
 Cleanup landed for the deprecated `current_process_minutes_per_run / _runs_per_month / _people_count` triplet — surplus surface area after the v3 dept-centric rollup ship made these fields no longer drive any downstream metric.
