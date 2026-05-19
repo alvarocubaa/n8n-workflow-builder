@@ -350,6 +350,36 @@ export async function POST(req: Request): Promise<Response> {
     return new Response('message is required', { status: 400 });
   }
 
+  // 2026-05-19: structured warning when a Hub deep-link param is in the URL
+  // (referer) but the corresponding context made it to the request body as
+  // null/undefined. Catches the class of bug where the client decoder silently
+  // dropped the payload — the root cause of the 2026-05-18 silent failure
+  // (empty-string title rejected by the over-strict client validator).
+  // No-op on subsequent turns of an existing conversation (referer no longer
+  // carries the param after the URL is stripped on first mount).
+  if (!existingConvId) {
+    const refererStr = req.headers.get('referer') ?? '';
+    const refererHadPrefill = refererStr.includes('prefill=');
+    const refererHadPromote = refererStr.includes('promote=');
+    const refererHadPoc = refererStr.includes('poc=');
+    if (
+      (refererHadPrefill && !prefill) ||
+      (refererHadPromote && !promote_context) ||
+      (refererHadPoc && !poc_context)
+    ) {
+      console.warn(JSON.stringify({
+        event: 'context_decode_drop',
+        refererHadPrefill,
+        refererHadPromote,
+        refererHadPoc,
+        bodyHasPrefill: !!prefill,
+        bodyHasPromote: !!promote_context,
+        bodyHasPoc: !!poc_context,
+        note: 'Hub deep-link URL carried a context param but the client decoder rejected it; conversation will be created in standalone mode and the server-write path will be dead-gated.',
+      }));
+    }
+  }
+
   // Resolve department and mode
   let departmentId = body.departmentId ?? DEFAULT_DEPARTMENT;
   let mode: AssistantMode = body.mode ?? 'builder';
