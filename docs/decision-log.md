@@ -4,6 +4,102 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-21 — Session 13 shipped: Ron feedback alignment (MTD aggregation + measurement history + user-typed fallback)
+
+Three coordinated landings closing Ron Madar-Hallevi's 2026-05-20 spec feedback on the Time Saved KPI rollup we shipped Session 9. n8n-ops + Hub Supabase + Hub UI all changed in one session because we own all three repos (no Kurt coordination needed). Plus the Hub Cloud Build approval gate disabled going forward.
+
+**What shipped:**
+
+- n8n-ops `n8n-ops-00008-vqf` → `n8n-ops-00009-j6p` (Drive-only deploy via `./deploy.sh` 2026-05-21):
+  - `/initiative-kpi-sync` BQ window: `INTERVAL 30 DAY` → `DATE_TRUNC(CURRENT_DATE(), MONTH)`.
+  - Alias `hours_30d` renamed to `hours_mtd` end-to-end.
+  - New `upsertInitiativeKpiMeasurement` helper writes daily MTD rows to `public.initiative_kpi_measurements` using PostgREST `on_conflict` (works because the new table has a FULL unique constraint — unlike `initiative_kpis`' partial index).
+  - Old `upsertInitiativeKpi` deleted (cron no longer touches `initiative_kpis.expected_impact`).
+- Hub Supabase migration `20260522120000_add_initiative_kpi_measurements.sql` (Hub repo, also reference copy at `Agentic Workflows/services/n8n-ops/migrations/`). Table keyed on `(initiative_id, kpi_id, period_date, period_type)` — KPI-agnostic, future non-Time-Savings KPIs reuse the same surface. Verified post-create via `pg_indexes`; verified live via 2 rows (PMM HubSpot 543.33h, PFR Celebration 1.5h, both `source='n8n_auto'`).
+- Hub `ai-innovation-hub-00106-zj8` → `ai-innovation-hub-00107-9ks` (PR #57, squash `927f6fd`):
+  - `services/api.ts` — new `fetchLatestMeasurementsForMonth` helper; `getInitiativeKpis` / `getAllInitiativeKpis` / `getInitiativesForKpi` extended to merge current-month MTD measurements client-side (Option I from the plan: two queries beat embedded resource with array-side filtering).
+  - `KpiPanel.tsx` — per-contribution display uses `COALESCE(latest_measurement.value, expected_impact, none)` with source badge ("Auto-calculated from n8n · YYYY-MM-DD" / "User estimate · …" / "No data yet").
+  - `KpiLinkedInitiativesTable.tsx` — same COALESCE in sort + sum + render + per-row badge.
+  - `types.ts` — new `InitiativeKpiMeasurement` interface; `latest_measurement?` field on `InitiativeKpi` and `LinkedInitiativeRow`.
+  - 3 new `KpiPanel.spec.tsx` cases (measured / fallback / no-data). `tsc --noEmit` clean. Hub suite regression count identical to baseline (29 failed files / 106 passed — pre-existing).
+
+**Reversal of Session 9 Option A:** `initiative_kpis.expected_impact` is now USER-OWNED. The Session 9 decision was "auto-overwrite from n8n; manual UI edits last until next sync". Ron asked us to invert: type values should persist as the fallback when no measurement exists. Cron stops writing to `expected_impact` entirely.
+
+**Alternatives considered:**
+
+| Option | Approach | Why not chosen |
+|---|---|---|
+| **Chosen** | New `initiative_kpi_measurements` table with daily MTD rows; `expected_impact` user-owned; UI does COALESCE. | — |
+| New column | Add `measured_impact_hours` to `initiative_kpis`. Single row per (initiative, kpi). | Loses Ron's history requirement ("keep the data for each month"). |
+| Wipe + repopulate | Keep old behaviour; just stop overwriting non-zero values. | Doesn't solve "keep history" or "MTD vs rolling". Half-measure. |
+| PostgREST embedded resource | One supabase query with `latest_measurement:initiative_kpi_measurements(...)` in select. | Can't dynamically filter embedded resource by current-month at the select-string level; would return all measurements per kpi. Two-query approach is cleaner. |
+
+**Step 0 — Hub Cloud Build approval gate disabled (operational reversal):** The trigger had `approvalRequired:true` set 2026-02-20 as part of the initial guarded rollout. By 2026-05-19 it had bottlenecked Hub deploys for 13 days (39 builds queued unapproved). We approved one manually, then today disabled the gate ourselves via the `gcloud alpha builds triggers export → edit YAML → import` path (the `update github` subcommand rejected the flag with INVALID_ARGUMENT). 48 zombie PENDING builds cancelled. Auto-deploy on merge to `main` going forward. Re-enable command preserved in the next-session brief for rollback.
+
+**Step 5 finding (NOT a code change — documented for follow-up):**
+
+- **Data hygiene:** PMM HubSpot initiative (`0588fd9f-4dbf-43e0-956b-d18151a6eac4`) has `'Positive CSAT Analysis - @Kareen Ben Ari'` (`6o7gZ5h6yXzqixae`) linked as a workflow (added 2026-05-20). That workflow contributes the entire 543.33h shown; Ron's actual workflow `'PMM HubSpot Reporting Automation - @ron.madar.hallevi'` (`2Mwjxcssfoo0Vt3C`) has `time_saved_per_execution_min=NULL` and contributes 0h. Whoever owns this initiative's wiring should validate whether the CSAT link is intentional. Not deleted — user data.
+- **UX label collision:** `initiative_workflow_links.role` enum has `'primary'` as a value (default when adding new workflow links via `WorkflowLinkPicker`), which collides visually with the `is_primary` boolean. Two workflows linked to PMM HubSpot both render `role='primary'` badges even though only one has `is_primary=true`. Constraint is intact; this is a UI semantics issue. Fix options for a follow-up session: rename role enum 'primary' → 'core', default new link role to 'other', or hide role badge when `role='primary'` and `is_primary=false`.
+
+**Outcome:** Live, end-to-end. n8n-ops cron will fire tomorrow 06:15 UTC and insert another set of MTD rows for `2026-05-22`. UI smoke pending user/VPN. Session 12 walkthrough re-promotes to HEAD with two new verification points: (1) confirm "User estimate" badge renders for an initiative with `expected_impact` set but no measurement row; (2) confirm `expected_impact` persists across a `/initiative-kpi-sync` manual trigger.
+
+---
+
+## 2026-05-15 — Session 11 shipped: extract `<PocFieldsSection>` + Smart-Add Skip Analysis (Hub PR #55)
+
+Two Hub-only UX changes merged together as squash commit `ccdfbfd` on `kurtpabilona-code/AI-Innovation-Hub-Vertex` `main`. Cloud Build auto-deploys.
+
+### What shipped
+
+- **NEW `components/PocFieldsSection.tsx`** (~161 lines) — pure controlled section component covering the 5 non-universal PoC fields (`poc_guidelines_doc`, `solution_url`, `validation_notes`, `test_data_source`, `owner`). `accentColor: 'coral' | 'ocean'` prop selects focus-ring theme; `sectionHeaders` prop togglable (parents that already wrap in their own header pass `null`).
+- **`StartPocModal.tsx`** trimmed from 315 → 224 lines. Embeds `<PocFieldsSection accentColor="coral" ownerRequired />`. Submit dispatcher (`createPocFromInitiative` for roadmap_initiative source; `markAsPocActive` for approved_idea source) preserved as-is.
+- **`EditInnovationItemModal.tsx`** ~60 lines of inline PoC field JSX (lines 264–309 pre-refactor) replaced with `<PocFieldsSection accentColor="ocean" sectionHeaders={null} />`. Submit handler unchanged.
+- **`SmartAddIdeaModal.tsx`** — new `skipAnalysis` state + checkbox in `step='form'` view. When toggled on, `handleSkipAdd` calls `createInnovationItem` with `ai_effort_estimate` / `impact_assessment` / `implementation_path` / `ai_analysis_data` all omitted, then jumps to `step='success'`. Toggle off = existing 3-step flow unchanged.
+
+### Decision — Option A (shared form section) over Option B / Option C
+
+Three architectural alternatives considered for the modal-trim goal:
+
+| Option | Approach | Why not chosen |
+|---|---|---|
+| **A (chosen)** | Extract `<PocFieldsSection>` as a shared form section embedded by both `StartPocModal` and `EditInnovationItemModal`. Both modals keep their identities and submit paths. | — |
+| B | Pre-create the `innovation_items` row on "Start PoC" click; open `EditInnovationItemModal` on the new row. Single modal surface. | Orphan-row problem if user cancels mid-edit. Mitigation (`is_archived` flag or new `is_draft` column) too heavy for the UX win. |
+| C | Add a `creationContext?` prop to `EditInnovationItemModal` so it mode-switches between `updateInnovationItem` (edit) and `createPocFromInitiative` / `markAsPocActive` (create). Single modal, no orphans. | Modal now does two semantically different things; create+edit responsibilities collapsed onto one component. Smell. |
+
+Option A pros:
+- One copy of PoC field code (DRY win).
+- Test surface against `<PocFieldsSection>` alone covers both consumers.
+- Future "delete StartPocModal" stays trivial — swap for an inline trigger when modal-stacking pain becomes a real signal; the form section doesn't change.
+
+Option A con (accepted):
+- Modal stacking is NOT reduced. `StartPocModal` still exists. That's the deliberate cost of avoiding B / C.
+
+**Modal-count reduction explicitly deferred** — re-queue as a contingent future session, gated on real user-feedback signal (Kurt or Lena complaining about "two modals deep"). No evidence the stacking is painful enough to justify either B's orphan handling or C's responsibility expansion today.
+
+### Plan-as-written had two mismatches with reality (worth flagging)
+
+1. **Plan said "6 PoC fields"; actual code has 7** (the original brief omitted `solution_url`, which was added in PR #52 earlier this same day). Shared component scoped to 5 non-universal fields after recognizing that `title` + `description` live in different sections of each modal (StartPocModal "POC Identity"; EditInnovationItemModal "Core Details") — including them in the shared component would have forced one modal to restructure or duplicate them.
+2. **Plan said files at `components/modals/`**; actual repo has the modals flat at `components/<Name>Modal.tsx`. The Explore agent saw Kurt's in-progress `AppPlatform` WIP which moves files into `components/modals/`. New component shipped at `components/PocFieldsSection.tsx` to match existing flat structure.
+
+### Test-collision learning
+
+Initial checkbox copy "Skip AI analysis" broke 3 SmartAddIdeaModal specs that use `getByText(/AI Analysis/i)` to detect the analysis step transition. Regex matched the form-step checkbox label, so `waitFor` resolved immediately and `click('Add Idea to Pipeline')` failed against an unchanged form. Fix: relabel to "Skip analysis" (no "AI" prefix). General lesson — for case-insensitive `getByText` regexes that detect step transitions, any new persistent UI text containing the same words can collide.
+
+### Verification
+
+- `npx tsc --noEmit` — 0 errors.
+- `npx vitest run` (touched specs) — 14/14 pass (StartPocModal 2, SmartAddIdeaModal 12).
+- Full Hub test suite — 29 failed / 106 passed / 120 failing tests. **Identical to `origin/main` baseline** (verified by stashing PR changes and re-running). All pre-existing breakage; no regressions introduced.
+- Local browser verification BLOCKED — Hub `.env.local` not in this clone (only `.env.example`). Supabase URL required at boot. Browser-driven E2E left for post-deploy verification on Cloud Run / VPN URL.
+
+### Production deploy
+
+PR #55 squash-merged to `kurtpabilona-code/AI-Innovation-Hub-Vertex` `main` as `ccdfbfd` at 2026-05-15 15:47:57 UTC. Hub Cloud Build trigger fires on push-to-main → auto-deploys to Cloud Run (`https://ai-innovation-hub-hoepmeihvq-uc.a.run.app/`) → reachable via VPN at `https://thehub.gue5ty.com/`.
+
+Vercel preview check failed with "Git author alvarocubaa must have access to the project on Vercel" — `alvarocubaa` doesn't have a seat on Kurt's Vercel team. Unrelated to production deploy (Cloud Build is the prod path). Either grant Vercel access or accept that PRs from this account always show that one red check.
+
+---
+
 ## 2026-05-15 — Session 10 shipped: PoC Builder CTA + `poc_mode` plumbing end-to-end
 
 PoC owners can now click "Generate workflow with AI" on a PoC card. Hub PR #52's `innovation_items.solution_url` auto-fill (shipped 2026-05-15 morning) finally has the upstream plumbing to actually fire in real usage.

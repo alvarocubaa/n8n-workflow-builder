@@ -4,7 +4,7 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Sessions 9 + 10 BOTH shipped 2026-05-15. Session 9: initiative-KPI auto-sync (`n8n-ops-00008-vqf`) — live data confirms #214 PFR=1h, #213 PMM=0h, #193 ORM untouched. Session 10: PoC Builder CTA + `poc_mode` plumbing — chat-ui rev `n8n-chat-ui-00047-wgk` deployed; Hub PRs **#52, #53, #54 all merged into main** (`cdf9baa…88a6aadc`); Hub Cloud Build will auto-deploy. Stale PR #44 closed. Next focus = Session 11, **PoC modal trim + Smart-Add Skip Analysis** (Hub-only, smallest UX cut).
+**Current focus track:** Session 13 (Ron feedback alignment, MTD aggregation + measurement table + UI fallback) **SHIPPED 2026-05-21** as Hub PR #57 (squash `927f6fd` → rev `ai-innovation-hub-00107-9ks`) + n8n-ops rev `n8n-ops-00009-j6p`. **HEAD = Session 12 (integration walkthrough)** — re-promoted; now validates Session 13's measurement table behaviour in addition to Sessions 9-11.
 
 ---
 
@@ -21,12 +21,21 @@ All plans live in [`.claude/plans/`](plans/). Two parallel tracks running:
 | 2026-05-12 | [`2026-05-12-time-saved-kpi-v2.md`](plans/2026-05-12-time-saved-kpi-v2.md) | ✅ Shipped Session 8 (superseded by v3 same week) |
 | 2026-05-08 | [`2026-05-08-time-saved-kpi-rollup.md`](plans/2026-05-08-time-saved-kpi-rollup.md) | ✅ Shipped Session 7 (initial v1) |
 
-**Track B — Hub × n8n-builder UX** (redesign-v2 → write-path fix → PoC integration)
+**Track A — Time Saved KPI rollup** (cont'd) — Ron feedback alignment
 
 | Date | Plan file | Status |
 |---|---|---|
+| 2026-05-22 | [`2026-05-22-ron-feedback-mtd-aggregation.md`](plans/2026-05-22-ron-feedback-mtd-aggregation.md) | ✅ SHIPPED Session 13 (2026-05-21) — Hub PR #57 squash `927f6fd` → rev `ai-innovation-hub-00107-9ks`; n8n-ops rev `n8n-ops-00009-j6p`. Approval gate disabled same session. |
+
+**Track B — Hub × n8n-builder UX** (redesign-v2 → write-path fix → PoC integration → integration walkthrough)
+
+| Date | Plan file | Status |
+|---|---|---|
+| 2026-05-20 | [`2026-05-20-integration-walkthrough.md`](plans/2026-05-20-integration-walkthrough.md) | **Queued #2** — promotes to HEAD after Session 13 closes. Now also validates the Session 13 measurement-table behaviour. |
+| 2026-05-19 | (no plan file — three hotfixes in one day) | ✅ Shipped — prefill empty-title decoder fix + embed auth 5s race + `solution_url` read-only display + Hub Cloud Build queue unblocked (Sessions 9-11 hotfix bundle). chat-ui `n8n-chat-ui-00049-85m`, Hub PR #56 + build approval `bd4d6d39` → `ai-innovation-hub-00106-zj8`. |
+| 2026-05-15 | `~/.claude/plans/let-s-plan-and-execute-sunny-honey.md` | ✅ Session 11 shipped — Hub PR #55 (squash `ccdfbfd`). Plan file lives in `~/.claude/plans/`; promote to repo if/when needed. |
 | 2026-05-15 | [`let-s-plan-and-execute-enumerated-cherny.md`](plans/let-s-plan-and-execute-enumerated-cherny.md) | ✅ Phase 2.2 (PoC Builder CTA + poc_mode) shipped Session 10 — chat-ui `n8n-chat-ui-00047-wgk`, Hub PR #53. |
-| 2026-05-15 | [`2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md) | ✅ Phase 1 + Phase 2.1 shipped earlier same day. Phase 2.3 queued below as Session 11. |
+| 2026-05-15 | [`2026-05-15-plan-with-ai-fix-and-poc-solution-url.md`](plans/2026-05-15-plan-with-ai-fix-and-poc-solution-url.md) | ✅ Phase 1 + Phase 2.1 shipped earlier same day. Phase 2.3 shipped as Session 11 (revised scope — Option A shared form section rather than full modal retire). |
 
 End-to-end flow tying both tracks together (team-shareable): [`docs/innovation-hub/end-to-end-flow.md`](../docs/innovation-hub/end-to-end-flow.md).
 
@@ -36,21 +45,159 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD] Session 11 — Phase 2.3: PoC modal trim + Smart-Add bypass
+### 1. [HEAD] Session 12 — End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
 
-**Goal:** The smallest UX win on Track B — reduce modal stacking and surface a power-user shortcut.
+**Goal:** First human-driven validation of the complete journey from "I have an idea" → "the KPI rolled up my workflow's time saved", now extended to validate Session 13's new measurement-table behaviour. Surface any gap between the architecture doc and the live system. Not a build session — verification + state-snapshot.
 
-**Scope (Hub only):**
-- **Retire `StartPocModal` as a standalone modal.** Fold its 6 fields (title, description, poc_guidelines_doc, solution_url, validation_notes, test_data_source, owner) into `EditInnovationItemModal`'s PoC section as a top-of-modal expanded group. Update both call sites in `components/views/InnovationPipeline.tsx` (`handlePocSubmitFromIdea` + `handlePocSubmitFromInitiative`) to open `EditInnovationItemModal` with a `startPocFlow=true` prop instead.
-- **Add a "Skip Analysis" toggle to `SmartAddIdeaModal`** for power users who already know the idea is real and don't need the AI feasibility/dedupe pass. Defaults off; one checkbox; bypasses the 3-step flow to a single submit.
+**Full plan + walkthrough script + queries:** [`.claude/plans/2026-05-20-integration-walkthrough.md`](plans/2026-05-20-integration-walkthrough.md).
 
-Verification:
-- Start a PoC from an approved idea → no two-modal-deep nav; lands directly on the consolidated edit form with PoC fields populated.
-- Smart Add Idea with "Skip Analysis" on → idea row created without AI analysis fields; idea still appears in "New Ideas" column.
+**Why now:** Three big arcs landed in two weeks (Sessions 7-8 KPI, Session 9 Track A auto-sync, Sessions 9 Track B / 10 / 11 redesign-v2 + PoC plumbing), plus three production hotfixes on 2026-05-19 (decoder, auth timeout, display gap, build queue), plus Session 13's Ron-feedback alignment (MTD aggregation + measurement table + user-typed fallback + approval-gate disable) on 2026-05-21. All pieces verified in isolation; **never validated end-to-end as a single user journey**.
 
-**Risk + rollback:** Retiring `StartPocModal` is the only meaningful UX change. Gate behind a Hub feature flag if one exists; otherwise demo to Kurt before merging the deletion.
+**Two NEW verification points added for Session 13 behaviour:**
+1. On a PMM HubSpot KPI Tracking card (or any initiative with an MTD measurement row): confirm the "Auto-calculated from n8n · YYYY-MM-DD" source badge renders alongside the auto-calculated value.
+2. On an initiative with `expected_impact` set but NO measurement row for this month: confirm the "User estimate" badge renders, and confirm that triggering `/initiative-kpi-sync` manually does NOT overwrite the typed value.
 
-**Estimated effort:** 2-3 hours.
+**Three phases:**
+1. **Pre-flight** (~10 min, Claude) — static DB / log / rev verification before walkthrough starts. Surface anomalies up-front so live walk doesn't stall on diagnostics.
+2. **Walkthrough** (~60-75 min, user-driven) — three paths:
+   - **Path A** — Idea → PoC → Builder deploy → KPI rollup (Team Ideas pipeline) + Session 13 verification points above.
+   - **Path B** — Initiative → PoC → Builder deploy → KPI rollup (Roadmap Initiatives pipeline)
+   - **Path C** — negative tests (decoder rejects empty-title is FIXED; embed auth slow path; PoC without solution_url; cron preserving user-typed expected_impact)
+3. **Findings report** (~20 min, Claude writes) — decision-log entry, refreshed status table in `docs/innovation-hub/end-to-end-flow.md`, verification queue for observed-but-not-fixed gaps.
+
+**Pre-requisites:**
+- `gcloud auth login` fresh.
+- VPN or `thehub.gue5ty.com` access.
+
+**Estimated effort:** ~90-105 min. Single focused session.
+
+**Adjacent items NOT done in this session** (still in the queue):
+- **PMM HubSpot data hygiene** — confirm with the user/Ron whether the `'Positive CSAT Analysis - @Kareen Ben Ari'` workflow (`6o7gZ5h6yXzqixae`) was intentionally linked to PMM HubSpot. That link is currently driving the entire 543h MTD value.
+- **`initiative_workflow_links.role` enum 'primary' UX collision** — rename to 'core' or hide badge when `is_primary=false`. Schema-touching, separate PR.
+- **Modal-count reduction (Hub Option B or C)** — gated on user-feedback signal.
+- **Feedback-loop harvest** — Apr 15 last run, overdue ~36 days. `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
+- **Information Systems prod project ID** (`UCEMQoFhrGZ3FChz`) — awaiting IS manager confirmation.
+
+---
+
+### ✅ SHIPPED 2026-05-21 — Session 13: Ron feedback alignment (MTD aggregation + historical retention + Hub UI fallback)
+
+> **Outcome:** Three semantic mismatches in the Session 9 Time Saved KPI rollup closed end-to-end. n8n-ops rev `n8n-ops-00008-vqf` → `n8n-ops-00009-j6p`. Hub PR #57 (squash `927f6fd` 2026-05-21 ~15:31 UTC) → rev `ai-innovation-hub-00107-9ks` (Cloud Build SUCCESS auto-deployed because Step 0 disabled the approval gate). 2 measurement rows landed for 2026-05-21 (PMM HubSpot 543.33h / 2 workflows, PFR Celebration 1.5h / 3 workflows); hand-verified PMM HubSpot value matches direct BQ query exactly.
+>
+> **What landed:**
+> - n8n-ops `src/routes/initiative-kpi-sync.ts`: BQ `INTERVAL 30 DAY` → `DATE_TRUNC(CURRENT_DATE(), MONTH)`. Alias `hours_30d` → `hours_mtd` everywhere. New `upsertInitiativeKpiMeasurement` (PostgREST `on_conflict` against full unique constraint). Old `upsertInitiativeKpi` deleted. Summary shape replaced (`measured` count, `period_date` field; dropped `updated`/`inserted`).
+> - Hub Supabase: new `public.initiative_kpi_measurements` table (`id`, `initiative_id`, `kpi_id`, `period_date`, `period_type`, `value`, `workflow_count`, `source`, `created_at`) + 2 secondary indexes + 4-column unique constraint. KPI-agnostic schema; future non-Time-Savings KPIs reuse it. Migration files in BOTH Hub repo (`supabase/migrations/20260522120000_*.sql`) and n8n-ops side reference (`migrations/2026-05-22_*.sql`).
+> - Hub UI: `types.ts` new `InitiativeKpiMeasurement` interface + `latest_measurement?` on `InitiativeKpi` + `LinkedInitiativeRow`. `services/api.ts` new `fetchLatestMeasurementsForMonth` helper; `getInitiativeKpis` / `getAllInitiativeKpis` / `getInitiativesForKpi` extended to merge current-month MTD measurements (Option I — two queries, client merge). `KpiPanel.tsx` per-contribution display chain `COALESCE(measured, expected, none)` + source badge. `KpiLinkedInitiativesTable.tsx` same COALESCE in sort/sum/render + per-row badge. 3 new spec cases pass; full suite regression count identical to baseline.
+> - Operational: Hub Cloud Build trigger `approvalRequired:true` → `false` (via `gcloud alpha builds triggers export → edit YAML → import`). 48 zombie PENDING builds cancelled. Auto-deploy on merge to `main` going forward.
+> - Reversal: Session 9 Option A (auto-overwrite) → `expected_impact` is now USER-OWNED; cron stops writing to it. Hub UI does COALESCE so typed values remain the fallback.
+>
+> **Step 5 finding (deferred, documented):** PMM HubSpot's `'Positive CSAT Analysis - @Kareen Ben Ari'` workflow link contributes the entire 543.33h; Ron's actual workflow has `time_saved_per_execution_min=NULL` and contributes 0h. UI label collision: `initiative_workflow_links.role` enum has value `'primary'` colliding with `is_primary` boolean (constraint intact; only one row has `is_primary=true`).
+>
+> **Decisions reversed by this session:**
+> - Session 9 "Option A — auto-overwrite": replaced with separate-tables + user-owned column.
+> - Approval-gate stance from 2026-02-20: now disabled going forward.
+>
+> **Pending follow-ups (carried into Session 12 or later):**
+> - Post-deploy UI smoke (user, VPN-gated).
+> - PMM HubSpot workflow-link hygiene with Ron.
+> - role-enum rename schema migration.
+
+---
+
+### ✅ ARCHIVED HEAD CANDIDATES — Session 12 brief originally said:
+
+**Goal:** First human-driven validation of the complete journey from "I have an idea" → "the KPI rolled up my workflow's time saved". Surface any gap between the architecture doc and the live system. Not a build session — a verification + state-snapshot session.
+
+**Full plan + walkthrough script + queries:** [`.claude/plans/2026-05-20-integration-walkthrough.md`](plans/2026-05-20-integration-walkthrough.md).
+
+**Why now:** Three big arcs landed in two weeks (Sessions 7-8 KPI, Session 9 Track A auto-sync, Sessions 9 Track B / 10 / 11 redesign-v2 + PoC plumbing), plus three production hotfixes on 2026-05-19 (decoder, auth timeout, display gap, build queue). All pieces verified in isolation; **never validated end-to-end as a single user journey**.
+
+**Three phases:**
+1. **Pre-flight** (~10 min, Claude) — static DB / log / rev verification before walkthrough starts. Surface anomalies up-front so live walk doesn't stall on diagnostics.
+2. **Walkthrough** (~60-75 min, user-driven) — three paths:
+   - **Path A** — Idea → PoC → Builder deploy → KPI rollup (Team Ideas pipeline)
+   - **Path B** — Initiative → PoC → Builder deploy → KPI rollup (Roadmap Initiatives pipeline)
+   - **Path C** — negative tests (decoder rejects empty-title is now FIXED; embed auth slow path; PoC without solution_url)
+3. **Findings report** (~20 min, Claude writes) — decision-log entry 2026-05-20, refreshed status table in `docs/innovation-hub/end-to-end-flow.md`, verification queue for observed-but-not-fixed gaps.
+
+**Pre-requisites:**
+- `gcloud auth login` fresh.
+- VPN or `thehub.gue5ty.com` access.
+- Approval-gate clarity from Kurt (not blocking — affects same-session fix flow if walkthrough finds a Hub bug).
+
+**Estimated effort:** ~90-105 min. Single focused session.
+
+**Adjacent items NOT done in this session** (still in the queue):
+- **Modal-count reduction (Hub Option B or C)** — gated on user-feedback signal.
+- **Feedback-loop harvest** — Apr 15 last run, overdue ~34 days. `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
+- **Information Systems prod project ID** (`UCEMQoFhrGZ3FChz`) — awaiting IS manager confirmation.
+- **Kurt DM about Hub Cloud Build approval gate** — drafted 2026-05-19, awaiting send + reply.
+- **Kurt DM about Time Saved KPI UI label** — Slack draft in `D0A9V1YRRQT` since 2026-05-13.
+- **~37 superseded PENDING Hub builds** — cancel after Kurt OKs.
+
+---
+
+### ✅ SHIPPED 2026-05-19 — Hotfix bundle: prefill decoder, embed auth race, `solution_url` display, Cloud Build queue unblocked
+
+> **Outcome:** Four prod fixes shipped in one session after the user reported the PoC modal had no Builder button and the chat panel kept saying "Sign-in didn't reach the chat panel". Diagnosis turned into a cascade — first the prefill empty-title decoder bug (silent failure root cause of the 2026-05-18 incident), then the auth timeout race, then a long-deferred display gap, plus discovering the Hub Cloud Build queue had been stuck on `approvalRequired: true` for 13 days while every Track-B PR sat undeployed.
+>
+> **What landed (most recent first):**
+>
+> 1. **Hub Cloud Run rev `ai-innovation-hub-00106-zj8`** (build `bd4d6d39`, PR #56 squash `245d3e3`) — `solution_url` read-only display in `IdeaDetailModal.tsx` PoC Details section. 12 lines. Mirrors the existing Guidelines InfoRow pattern. Closes the long-standing gap where typed/auto-filled solution URLs lived in the DB only.
+>
+> 2. **chat-ui rev `n8n-chat-ui-00049-85m`** — embed auth race fix in `src/components/AuthGate.tsx`:
+>    - `EMBED_AUTH_TIMEOUT_MS: 5000 → 30000` (was racing the Hub GIS overlay; user clicked AFTER the 5s timeout, token was silently dropped).
+>    - Listener stays alive past timeout — late-arriving `auth_token` still completes sign-in.
+>    - New in-iframe GIS button rendered on `embed_timeout` state as user-driven fallback. "Open in a new tab" stays as secondary fallback.
+>
+> 3. **chat-ui rev `n8n-chat-ui-00048-b6x`** (commit `935f9df`) — prefill decoder fix in `src/components/ChatWindow.tsx`:
+>    - `decodePrefill` title check: `!title` → `typeof title !== 'string'`. The "Plan with AI on a new initiative" entry point sends `title: ""` legitimately (user hasn't typed one yet — that's the use case). Prior check rejected → conversation created without planning context → entire `<create_initiative />` path dead-gated upstream of every Session 9 observability hook → invisible failure.
+>    - Same fix on `decodePocContext.poc_title` for consistency. Promote decoder left strict (all-ID fields).
+>    - New `contextDecodeFailed` state + yellow warning banner above chat input when decoder rejects a Hub URL param.
+>    - New server-side `context_decode_drop` structured log line in `/api/chat` route when request body lacks a context but the Referer URL had one — greppable via `gcloud logging read 'textPayload=~"context_decode_drop"'`.
+>
+> 4. **Hub Cloud Run rev `ai-innovation-hub-00105-22d`** (build `b94d520b` approved manually after 13 days PENDING) — first deploy of PRs #52, #53, #54, #55 to production. Cloud Build trigger `ai-innovation-hub-deploy` has `approvalRequired: true`; no one had been approving since 2026-05-03; 39 builds queued. Approved HEAD-of-main build → deployed all four PRs in one rev.
+>
+> **Diagnostic evidence (smoking guns):**
+> - DB: 0 rows in `initiative_chat_creations` and 0 AI-drafted `strategic_ideas` since redesign-v2 deploy 2026-05-11 (4 days, supposedly working).
+> - Logs: 0 `planning_turn` entries in last 48h despite 4 successful `/api/chat` POSTs from real chat sessions.
+> - Reason: the entire planning-mode block (sentinel detection, history fallback, `planning_turn` log) lives inside the `initiativeMode === 'planning' && initiativeId` gate at `chat-ui/src/app/api/chat/route.ts:512`. Gate never opened because `prefill` was null because the decoder rejected `title: ""`. Every Session 9 observability hook was dead-gated upstream and invisible to Cloud Run.
+>
+> **Open follow-ups (not blocking the walkthrough):**
+> - Kurt DM about the approval gate — drafted (`D0A9V1YRRQT` candidate), awaiting send.
+> - 37 remaining superseded PENDING Hub builds — cancel after Kurt OKs.
+>
+> **Decision-log entry needed:** Session 12 (walkthrough) will write up the cascade + the four fixes formally.
+
+---
+
+### ✅ SHIPPED 2026-05-15 — Session 11 (Track B) — Phase 2.3 (revised scope): extract `<PocFieldsSection>` + Smart-Add Skip Analysis
+
+> **Outcome:** Hub PR #55 squash-merged to `main` as `ccdfbfd` at 2026-05-15 15:47:57 UTC. Cloud Build auto-deploys to Cloud Run.
+>
+> **Plan file:** `~/.claude/plans/let-s-plan-and-execute-sunny-honey.md` (local — promote to repo if needed).
+>
+> **What landed:**
+> - NEW `components/PocFieldsSection.tsx` (~161 lines) — pure controlled section component for the 5 non-universal PoC fields. `accentColor` + `sectionHeaders` props parameterize the two parent modals' visual contexts.
+> - `components/StartPocModal.tsx` 315 → 224 lines. Embeds `<PocFieldsSection accentColor="coral" ownerRequired />`. Submit dispatcher unchanged.
+> - `components/EditInnovationItemModal.tsx` ~60 lines of inline PoC field JSX replaced with `<PocFieldsSection accentColor="ocean" sectionHeaders={null} />`. Submit handler unchanged.
+> - `components/SmartAddIdeaModal.tsx` adds `skipAnalysis` checkbox in `step='form'` view + `handleSkipAdd` that calls `createInnovationItem` with AI fields omitted. Toggle off = existing 3-step flow unchanged.
+>
+> **Design decisions:**
+> - Option A (shared form section) chosen over Option B (pre-create + orphan handling) and Option C (mode-switch inside Edit modal). Rationale in `docs/decision-log.md` 2026-05-15 Session 11 entry.
+> - Modal-count reduction (full `StartPocModal` retirement) explicitly deferred until a real user-feedback signal arrives. Both modals still exist.
+> - Shared component scoped to 5 fields (not the brief's 6 or actual 7) — `title` + `description` left in each modal's own scaffold since they live in different sections of each modal.
+>
+> **Verification:**
+> - `npx tsc --noEmit` — 0 errors.
+> - 14/14 touched-component specs pass (StartPocModal 2, SmartAddIdeaModal 12).
+> - Full Hub suite regression count identical to `origin/main` baseline (29 failed / 106 passed — pre-existing).
+> - Local browser verification BLOCKED — Hub `.env.local` not in this clone. Post-deploy verification recommended on `https://thehub.gue5ty.com/`.
+>
+> **Pending follow-ups:**
+> - Browser-driven E2E smoke for Sessions 10 + 11 combined.
+> - Confirm Hub Cloud Build deploy revision in decision-log once it lands.
+> - Vercel preview check fails because `alvarocubaa` lacks team access — either grant access or accept the cosmetic red check on future PRs.
 
 ---
 

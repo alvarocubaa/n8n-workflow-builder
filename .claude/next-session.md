@@ -1,77 +1,104 @@
-# Next session brief — Session 11: PoC modal trim + Smart-Add Skip Analysis
+# Next session brief — Session 12: End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
 
-**Last touched:** 2026-05-15 — Sessions 9 + 10 both shipped same day (Track A initiative-KPI auto-sync; Track B PoC Builder CTA + poc_mode). Hub PRs #52, #53, #54 all merged into `main`; stale #44 closed. Session 11 promoted to HEAD.
+**Date:** 2026-05-22 or later
+**Style:** Pre-flight by Claude; walkthrough is user-driven; findings report by Claude.
+**Estimated effort:** ~90-105 minutes single focused session.
 
 ## What you're picking up
 
-Track B Session 11 is the **smallest UX cut** on the Hub side. Hub-only — no chat-ui or n8n-ops work. Reduces modal stacking when starting a PoC, and adds a power-user shortcut to skip AI analysis on Smart Add.
+Session 13 shipped 2026-05-21 — Ron Madar-Hallevi's feedback alignment is live in production. Session 12 (originally HEAD before being preempted by Ron's spec feedback) is now re-promoted with two NEW verification points covering Session 13 behaviour. This is a verification + state-snapshot session, NOT a build session.
 
-This is the final session in the Track B "Hub × n8n-builder UX polish" arc that ran across Sessions 5 → 10. After this lands, the whole loop is shipped.
+**Read these in order before starting:**
+1. **[`.claude/plans/2026-05-20-integration-walkthrough.md`](plans/2026-05-20-integration-walkthrough.md)** — the canonical walkthrough plan. Three phases (pre-flight / walkthrough / findings report). Two new Session-13-specific points threaded in below.
+2. `docs/decision-log.md` — the 2026-05-21 Session 13 entry covers exactly what changed (cron behaviour, table schema, UI fallback chain). Skim before the walkthrough so you can explain the new badges to the user.
+3. `docs/innovation-hub/end-to-end-flow.md` — current architecture summary. Will be refreshed by you at the end of this session.
 
-## Scope (Hub only)
+## NEW Session-13 verification points (thread into Path A or run standalone)
 
-**1. Retire `StartPocModal` as a standalone modal.**
-- Fold its 6 fields into `EditInnovationItemModal`'s PoC section as a top-of-modal expanded group: `title`, `description`, `poc_guidelines_doc`, `solution_url`, `validation_notes`, `test_data_source`, `owner`.
-- Update both call sites in `components/views/InnovationPipeline.tsx`:
-  - `handlePocSubmitFromIdea` → open `EditInnovationItemModal` with `startPocFlow=true`
-  - `handlePocSubmitFromInitiative` → same pattern
-- Today's UX: clicking "Start PoC" opens StartPocModal, user fills in, submits, then the system opens EditInnovationItemModal so they can finish editing other fields. Two modals deep.
-- After: one modal. The PoC fields are pre-expanded; everything else stays collapsed.
+1. **Auto-calculated badge** — On the Marketing canonical KPI page (`https://thehub.gue5ty.com/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53`), find PMM HubSpot in the Linked AI Initiatives table. The Expected Impact column should show `543.33` (or the latest tomorrow morning's MTD value) with a "Auto-calculated from n8n · YYYY-MM-DD" badge. Open the initiative's KPI Tracking card and confirm the same badge there.
+2. **User-estimate fallback** — Pick an initiative (or create one) that has Time Saved as a linked KPI but NO row yet in `initiative_kpi_measurements` for the current month. Type a value in the "Expected (hours)" input and Save. Refresh — value persists. Then trigger `/initiative-kpi-sync` manually (see helper below). Refresh again — the typed value is STILL there (cron no longer overwrites it), and the badge says "User estimate".
+3. **No-data badge** — Open an initiative with neither a measurement row nor a typed `expected_impact`. Expect "No data yet".
 
-**2. Add "Skip Analysis" toggle to `SmartAddIdeaModal`.**
-- One checkbox at the bottom; defaults off.
-- When on: bypass the 3-step AI feasibility/dedupe flow and submit directly to `innovation_items` insert.
-- Use case: power user who already knows the idea is real + unique.
+## Pre-flight checks (Claude, ~10 min)
 
-## Files likely touched
+Before the user starts the walkthrough:
+- Verify n8n-ops rev = `n8n-ops-00009-j6p` (or newer).
+- Verify Hub rev = `ai-innovation-hub-00107-9ks` (or newer).
+- `supabase db query --linked "select count(*) from public.initiative_kpi_measurements where period_date >= date_trunc('month', current_date);"` — confirm rows exist.
+- Confirm 06:15 UTC cron last ran without errors (check Cloud Run logs for `[initiative-kpi-sync] done` line).
+- Confirm chat-ui rev = `n8n-chat-ui-00049-85m` (or newer).
 
-- `components/modals/EditInnovationItemModal.tsx` — add `startPocFlow` prop; expand PoC section by default when set; include the 6 PoC-creation fields.
-- `components/modals/StartPocModal.tsx` — delete (after confirming no other callers).
-- `components/views/InnovationPipeline.tsx` — update both call sites.
-- `components/modals/SmartAddIdeaModal.tsx` — add "Skip Analysis" checkbox + bypass branch.
+## What's live going into this session
 
-## Verification
+| Layer | Revision | Notes |
+|---|---|---|
+| chat-ui | `n8n-chat-ui-00049-85m` (2026-05-19) | Untouched in Session 13. |
+| Hub | `ai-innovation-hub-00107-9ks` (2026-05-21, PR #57) | New COALESCE + source badge UI. |
+| n8n-ops | `n8n-ops-00009-j6p` (2026-05-21) | Writes daily MTD rows to `initiative_kpi_measurements`. |
+| Hub Supabase | `ilhlkseqwparwdwhzcek` | New `initiative_kpi_measurements` table (2026-05-21). |
 
-- Start a PoC from an approved idea → no two-modal-deep nav; lands directly on the consolidated edit form with PoC fields populated.
-- Start a PoC from a Roadmap Initiative → same flow.
-- Smart Add Idea with "Skip Analysis" on → idea row created without AI analysis fields; idea still appears in "New Ideas" column.
-- Regression: existing Smart Add flow (Skip Analysis off) still works end-to-end.
+## Pre-requisites
 
-## Risk + rollback
+- `gcloud auth login` fresh.
+- VPN or `thehub.gue5ty.com` access for the walkthrough.
+- Read the walkthrough plan end-to-end.
 
-- **Retiring `StartPocModal` is the only meaningful UX change.** Gate behind a Hub feature flag if one exists; otherwise demo to Kurt before merging the deletion. The Skip Analysis toggle is purely additive.
+## OIDC helper (manually triggering `/initiative-kpi-sync` for verification point #2)
 
-## Adjacent items (lower priority)
+```bash
+SVC_URL=$(gcloud run services describe n8n-ops --region=europe-west1 --project=agentic-workflows-485210 --format='value(status.url)')
+TOKEN=$(gcloud auth print-identity-token --audiences="${SVC_URL}" \
+  --impersonate-service-account=n8n-workflow-builder@agentic-workflows-485210.iam.gserviceaccount.com \
+  --include-email)
+curl -X POST "${SVC_URL}/initiative-kpi-sync" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq '{measured, eligible, period_date, errors}'
+```
 
-- **Browser-driven E2E smoke for Session 10** (both PoC pipelines: Initiative-path + Idea-path). IAP-protected; user-driven. Wait for Hub Cloud Build to redeploy from `cdf9baa…88a6aadc` first — once live, click "Generate workflow with AI" on a PoC card and verify the flow end-to-end. Document outcome in decision-log.
-- **Kurt DM** about Time Saved KPI UI label (Session 9 follow-up). Slack draft in `D0A9V1YRRQT` since 2026-05-13. Send when ready — now also a good moment to mention the Session 10 + 9 merges.
-- **Feedback-loop harvest** — Apr 15 last run, overdue ~30 days. `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
+## Open follow-ups surfaced by Session 13 (NOT walkthrough scope unless they block)
 
-## What's already shipped (do NOT redo)
+- **PMM HubSpot data hygiene**: `'Positive CSAT Analysis - @Kareen Ben Ari'` workflow (`6o7gZ5h6yXzqixae`) is linked to PMM HubSpot and drives the entire 543.33h MTD. Validate with Ron whether the link is intentional. If not, delete the row from `initiative_workflow_links`.
+- **`initiative_workflow_links.role` UX collision**: `'primary'` value collides with `is_primary` boolean. Rename to `'core'`, or hide role badge when `is_primary=false`, or default new link role to `'other'`. Schema-touching → separate PR.
+- **Feedback-loop harvest** overdue ~36 days.
+- **IS prod project ID** (`UCEMQoFhrGZ3FChz`) awaiting confirmation.
+- **Hub Cloud Build approval gate** remains DISABLED going forward. If re-enabling needed: `gcloud --project=ai-innovation-484111 alpha builds triggers export ai-innovation-hub-deploy --destination=/tmp/t.yaml` → edit `approvalConfig.approvalRequired: true` → `gcloud alpha builds triggers import --source=/tmp/t.yaml` (the `update github --require-approval` flag rejects with INVALID_ARGUMENT; use the export/import path).
 
-- Marketing Time Saved KPI live in Hub (April 38h, May 88h).
-- Initiative-KPI auto-sync daily 06:15 UTC (`n8n-ops-00008-vqf`). Verified live: #214 PFR=1h, #213 PMM=0h, #193 ORM untouched.
-- PoC Builder CTA on PoC cards (chat-ui rev `n8n-chat-ui-00047-wgk`; **Hub PRs #52, #53, #54 all merged 2026-05-15** into `main` at `cdf9baa…88a6aadc`). `poc_mode` rule live; `<poc_context>` plumbed end-to-end; both PoC pipelines (Initiative-path + Idea-path) handled. Hub Cloud Build will auto-deploy.
-- Hub PR #51 (Baseline Metrics form strip) merged. Stale PR #44 (server-write Edge Function) closed — its 2 unique files brought into git via the narrow PR #54.
+## Gotchas carried forward
+
+- **zsh `status` is read-only** — use `s=$(...)` in polling loops.
+- **`Agentic Workflows/services/n8n-ops` not git-tracked** — Drive is source of truth.
+- **Hub local main can lag origin/main**. Branch from `origin/main`. Kurt's AppPlatform WIP is NOT in the working tree as of 2026-05-21 — the stash-dance prescribed in prior sessions isn't currently needed.
+- **OIDC tokens for n8n-ops** need `--impersonate-service-account=...workflow-builder@... --include-email`. Plain `print-identity-token` lacks email claim → `requireOidc` middleware 401.
+- **PostgREST `on_conflict`** requires FULL unique constraint, not partial index. `initiative_kpi_measurements` has full; `initiative_kpis` has partial.
+- **Supabase `db push` rejects** because remote has migrations the local dir doesn't. Apply via `supabase db query --linked -f <file>` then `supabase migration repair --status applied <timestamp>`.
+- **PR squash-merge SHA ≠ branch HEAD SHA** — `gh pr view <num> --json mergeCommit` for the polling SHA.
+- **Hub Cloud Build SUCCESS ≠ rev serving traffic** — verify with `gcloud run services describe ai-innovation-hub --region=us-central1 --format='value(status.traffic[0].revisionName)'`.
 
 ## User preferences (carried forward)
 
-- **Direct + terse.** No fluff.
-- **Verify-before-destructive** especially when touching multiple call sites or deleting components. Grep first.
-- **`gcloud auth` expires periodically.** Run `gcloud auth login` interactively when needed.
-- **Will commit + push autonomously** when given approval.
+- Direct + terse. No fluff.
+- Verify-before-claim. DB query or log line, not visual confirmation.
+- Will commit + push + merge autonomously when given approval.
+- Stage explicitly when collaborator WIP is in working tree. Never `git add -A`.
+- All "Kurt coordination" items: we do them ourselves end-to-end. No DMs to draft.
 
-## Estimated effort
-
-2-3 hours. Hub-only, scope-bounded.
-
-## Quick reference
+## Quick reference (current as of 2026-05-21)
 
 ```
-Hub repo path:           /Users/alvaro.cuba/code/AI-Innovation-Hub-Vertex/
-Hub Cloud Run direct:    https://ai-innovation-hub-hoepmeihvq-uc.a.run.app/
-Hub VPN URL:             https://thehub.gue5ty.com/
-chat-ui Cloud Run rev:   n8n-chat-ui-00047-wgk (Session 10, live)
-n8n-ops Cloud Run rev:   n8n-ops-00008-vqf (Session 9, live)
-Hub Supabase:            ilhlkseqwparwdwhzcek
+Marketing Time Saved KPI:    https://thehub.gue5ty.com/business-kpis/e6f47f5b-5de7-4630-84b5-441741270e53
+PoC deep-link example:        https://thehub.gue5ty.com/#/item/cd0945c8-e400-4e50-9fe7-76e51603e66d (PFR Celebration)
+Hub repo path:                /Users/alvaro.cuba/Code/AI-Innovation-Hub-Vertex/
+Hub remote:                   github.com/kurtpabilona-code/AI-Innovation-Hub-Vertex
+Hub VPN URL:                  https://thehub.gue5ty.com/
+Hub Cloud Run direct:         https://ai-innovation-hub-721337864706.us-central1.run.app/
+Hub Cloud Build trigger:      ai-innovation-hub-deploy (approvalRequired:false going forward)
+Hub GCP project:              ai-innovation-484111 (number 721337864706)
+Hub Supabase project:         ilhlkseqwparwdwhzcek
+
+n8n-ops Cloud Run rev:        n8n-ops-00009-j6p
+n8n-ops region/project:       europe-west1 / agentic-workflows-485210
+n8n-ops URL:                  https://n8n-ops-fhehssni7q-ew.a.run.app/
+
+chat-ui rev:                  n8n-chat-ui-00049-85m
 ```
