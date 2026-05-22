@@ -33,7 +33,7 @@ Before the user starts the walkthrough:
 | Layer | Revision | Notes |
 |---|---|---|
 | chat-ui | `n8n-chat-ui-00049-85m` (2026-05-19) | Untouched in Session 13. |
-| Hub | `ai-innovation-hub-00107-9ks` (2026-05-21, PR #57) | New COALESCE + source badge UI. |
+| Hub | `ai-innovation-hub-00112-p78` (2026-05-22 afternoon, audit follow-ups) | COALESCE + source badge UI + freshness badge + chunked `.in()` + index-page chip consistency. |
 | n8n-ops | `n8n-ops-00009-j6p` (2026-05-21) | Writes daily MTD rows to `initiative_kpi_measurements`. |
 | Hub Supabase | `ilhlkseqwparwdwhzcek` | New `initiative_kpi_measurements` table (2026-05-21). |
 
@@ -58,11 +58,28 @@ curl -X POST "${SVC_URL}/initiative-kpi-sync" \
 
 ## Open follow-ups surfaced by Session 13 (NOT walkthrough scope unless they block)
 
-- **PMM HubSpot data hygiene**: `'Positive CSAT Analysis - @Kareen Ben Ari'` workflow (`6o7gZ5h6yXzqixae`) is linked to PMM HubSpot and drives the entire 543.33h MTD. Validate with Ron whether the link is intentional. If not, delete the row from `initiative_workflow_links`.
+### 🔴 Urgent — needs Kurt
+- **Hub `main` branch protection** (audit C1, 2026-05-22). `gh api repos/.../branches/main/protection` returns 404 — `main` accepts direct pushes from any contributor with push access. Combined with the disabled Cloud Build approval gate (Session 13 Step 0), there is no gate on production deploys. **Ask Kurt to enable branch protection on `main`**: require PR + 1 review + status checks; disallow direct pushes & force-push. My GitHub role is `push` only, not `admin` — I cannot enable this myself.
+
+### 🟡 Open data-hygiene + UX follow-ups
+- **PMM HubSpot data hygiene**: `'Positive CSAT Analysis - @Kareen Ben Ari'` workflow (`6o7gZ5h6yXzqixae`) is linked to PMM HubSpot's `initiative_workflow_links`. Verified via BQ: that workflow lives in CX production project (`W62G9hxuK9c7cKwo`), not Marketing — `/kpi-rollup` (dept-scoped, 87.57h) correctly excludes it, but `/initiative-kpi-sync` (initiative-linked, ~575h) includes it because the link table says so. Validate with Ron whether the link is intentional. If not: `delete from public.initiative_workflow_links where initiative_id='0588fd9f-4dbf-43e0-956b-d18151a6eac4' and n8n_workflow_id='6o7gZ5h6yXzqixae';`
 - **`initiative_workflow_links.role` UX collision**: `'primary'` value collides with `is_primary` boolean. Rename to `'core'`, or hide role badge when `is_primary=false`, or default new link role to `'other'`. Schema-touching → separate PR.
+- **`#/item/:shortCode` deep-link broken** for both UUID and item_number — Hub returns "Item Not Found". MEMORY.md's old deep-link is stale. Investigate routing.
 - **Feedback-loop harvest** overdue ~36 days.
 - **IS prod project ID** (`UCEMQoFhrGZ3FChz`) awaiting confirmation.
-- **Hub Cloud Build approval gate** remains DISABLED going forward. If re-enabling needed: `gcloud --project=ai-innovation-484111 alpha builds triggers export ai-innovation-hub-deploy --destination=/tmp/t.yaml` → edit `approvalConfig.approvalRequired: true` → `gcloud alpha builds triggers import --source=/tmp/t.yaml` (the `update github --require-approval` flag rejects with INVALID_ARGUMENT; use the export/import path).
+
+### 🟢 Audit follow-ups SHIPPED 2026-05-22 afternoon (after Session 13)
+- **C2**: explicit deny INSERT/UPDATE/DELETE policies on `initiative_kpi_measurements` (Hub `2312fd1`, migration `20260522160000_*`). Service-role still bypasses; intent is now explicit.
+- **H2**: `updated_at` column + BEFORE UPDATE trigger (Hub `dc0ca29`, migration `20260522170000_*`) + `formatMeasurementAge` helper in `kpiFormatters.ts` (8 spec cases) + KpiPanel + KpiLinkedInitiativesTable now render "Auto-calculated from n8n · refreshed Xh ago". Verified live at 2026-05-22 15:47 UTC: badge showed "refreshed 34m ago" matching the 15:13 UTC cron run.
+- **H3 + M1**: chunked `.in()` filter at `IN_FILTER_BATCH_SIZE=50` (Hub `eaddfbc`) protecting against PostgREST URL-length overflow on lists >100, and `getInitiativesForKpis` (batched, index page) now merges measurements identically to the singular variant. Plus a consumer fix in `LinkedInitiativesChips.tsx` (`7fa9e14`) to actually USE `latest_measurement` instead of raw `expected_impact`. Verified live: Marketing index now shows `+575.3 hours` for PMM HubSpot (matching the detail page).
+
+### ⚪ Open audit items still standing
+- **H1** — `initiative_kpi_measurements` SELECT policy is org-wide (any authenticated Guesty user reads every initiative). Mirrors `initiative_kpis` pattern, so not strictly a regression — but worth a Kurt convo: is org-wide-read the intended threat model? Time-Saved data joined with `strategic_ideas.owner` is HR/competitive-adjacent.
+- **H4** — Service-role key blast radius. Same key writes to all tables. Three mitigations in increasing effort: (a) rotate; (b) wrap writes in a `security definer` Postgres function with custom-role JWT; (c) Supabase audit logging + alert on service-role writes outside the cron window.
+- **L-tier** — `on delete cascade` from `kpis` wipes measurement history; `LegacyKpiMeasurement` stub functions still in `services/api.ts` though semantically dead.
+
+### Hub Cloud Build approval gate
+**DISABLED going forward** (Session 13 Step 0). If re-enabling needed: `gcloud --project=ai-innovation-484111 alpha builds triggers export ai-innovation-hub-deploy --destination=/tmp/t.yaml` → edit `approvalConfig.approvalRequired: true` → `gcloud alpha builds triggers import --source=/tmp/t.yaml`. The `update github --require-approval` flag rejects with INVALID_ARGUMENT; use the export/import path.
 
 ## Gotchas carried forward
 
