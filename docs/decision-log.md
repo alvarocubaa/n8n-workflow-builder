@@ -4,6 +4,30 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-24 — Bug-Ron-001: broaden /initiative-kpi-sync to drive from explicit `initiative_kpis` links
+
+**Context:** Ron Madar-Hallevi flagged a "Guesty Marketing Cowork Slack MAS" initiative he'd linked to the Marketing Time Saved KPI + linked an active workflow ("Training Coverage Validation from Friction Alert", 18 runs × 25 min in May). The UI showed "+100 hours · User estimate" instead of an auto-calculated value. Two other initiatives ("ORM analysis and insights" + the one Ron flagged) were silently missed for the same reason.
+
+**Root cause:** the cron's outer filter was `listAllInitiativesWithCategory('Time Savings')` — it drove from `strategic_ideas.impact_category`. Both missed initiatives had `impact_category='Improved Quality'` but were explicitly linked to a Time Saved KPI via `initiative_kpis`. The user-chosen link is the authoritative signal, not the separate impact_category enum (which is a different categorization axis: Improved Quality means the initiative is also expected to reduce errors, escalations, etc., not just save time).
+
+**Fix shipped 2026-05-24 12:51 UTC** (n8n-ops rev `n8n-ops-00010-wrk`, Drive-only deploy):
+- Removed `listAllInitiativesWithCategory` from the route's first step.
+- Added `listInitiativeKpiLinksForTimeSaved()` that does ONE GET on `initiative_kpis` with embedded `strategic_ideas` + `kpis`, then filters in JS to rows where `kpi.unit='hours'` AND (`kpi.category='Time Savings'` OR `kpi.name ILIKE '%time saved%'`).
+- Dedup safety: when the same initiative appears under multiple Time Saved KPIs (rare), the BQ `flatLinks` array now dedupes by `(initiative_id, workflow_id)` so success_runs aren't multiplied in the aggregate.
+- Removed the dept→canonical-KPI lookup (`findCanonicalKpiForDept`) entirely; the kpi_id comes directly from the link.
+
+**Behaviour change observed live:** initiatives processed by the cron went from 2 → 4 (+ORM analysis, +Guesty Marketing Cowork Slack MAS). Their measurement rows landed with `n8n_auto` source. Ron's initiative now displays "+7.5 hours · Auto-calculated from n8n · refreshed just now" on the Marketing Time Saved KPI page. Total displayed for the KPI's linked initiatives went from ~615h → 769.7h.
+
+**Trade-off / known carry-over:** the broadened filter trusts whatever the user linked. If a workflow is cross-dept (e.g., a CX-production workflow linked to a Marketing initiative — see Session 13 Step 5 finding on PMM HubSpot's CSAT link), the cron will still sum it. That's intentional — the user explicitly created the link. The dept-rollup (`/kpi-rollup`, separate cron) remains dept-scoped and gives the cleaner department-wide view; the per-initiative measurements respect user intent.
+
+**KPI display label also normalized:** `kpis.name` was "Test - Time Saved" (presumably a debugging rename) — restored to "Time Saved" via direct UPDATE on `kpis` table.
+
+**Trip-wires / next watch points:**
+- The `kpi.unit='hours'` filter is the soft type-check. If anyone creates a Time Saved KPI with unit other than 'hours' (e.g. 'days', 'minutes'), the cron will silently exclude it. Documented for the next person who creates a non-hour Time Saved.
+- The cron still runs once a day at 06:15 UTC. When a user adds a workflow link, it takes up to 24h for the measurement to appear. If this becomes a UX complaint, the next step is an on-link Edge Function or a "Refresh now" button that triggers a per-initiative sync.
+
+---
+
 ## 2026-05-21 — Session 13 shipped: Ron feedback alignment (MTD aggregation + measurement history + user-typed fallback)
 
 Three coordinated landings closing Ron Madar-Hallevi's 2026-05-20 spec feedback on the Time Saved KPI rollup we shipped Session 9. n8n-ops + Hub Supabase + Hub UI all changed in one session because we own all three repos (no Kurt coordination needed). Plus the Hub Cloud Build approval gate disabled going forward.
