@@ -25,6 +25,20 @@ System / config / architectural decisions worth remembering. New entries on top.
 **Trip-wires / next watch points:**
 - The `kpi.unit='hours'` filter is the soft type-check. If anyone creates a Time Saved KPI with unit other than 'hours' (e.g. 'days', 'minutes'), the cron will silently exclude it. Documented for the next person who creates a non-hour Time Saved.
 - The cron still runs once a day at 06:15 UTC. When a user adds a workflow link, it takes up to 24h for the measurement to appear. If this becomes a UX complaint, the next step is an on-link Edge Function or a "Refresh now" button that triggers a per-initiative sync.
+### 2026-05-24 audit follow-up (n8n-ops-00012-mrz)
+
+Two issues caught by the post-fix robustness audit, both addressed in the same revision:
+
+- **C1 — `is_active` filter dropped.** The new `listInitiativeKpiLinksForTimeSaved` didn't filter on `kpis.is_active`, so an archived KPI would silently keep receiving daily `n8n_auto` measurements. The prior `findCanonicalKpiForDept` had this filter; restored it now (with the projection updated to include `is_active`). No archived KPIs in the current data so no live regression — but a meaningful long-term durability fix.
+- **C2 — Summary counters lied.** `summary.skipped_no_kpi` and `summary.skipped_wrong_category` were declared in the summary type but never incremented in the new path. Operators looking at a 3am Cloud Run log would see `skipped_no_kpi=0` and conclude nothing was excluded — even if 50 rows had been dropped. Replaced with a `kpi_filter: { null_kpi, inactive, wrong_unit, wrong_category_and_name }` block sourced from the helper's drop counts. Two warn-log paths added: (a) `null_kpi` spikes (transient PostgREST embed FK ambiguity); (b) a Time-Saved-shaped KPI with non-hour unit (the actionable misconfig case — auto-calc would produce nonsense). Reordered the JS filter so the unit check happens AFTER the category/name match, ensuring the warn fires on the right rows.
+
+Live `kpi_filter` after the deploy: `null_kpi=0, inactive=0, wrong_unit=20, wrong_category_and_name=0`. The 20 are legitimately non-Time-Saved KPIs (mostly %, score, count units) — informational, not actionable.
+
+Deferred from the audit:
+- M1/M2 PostgREST 1000-row cap on unpaginated fetches — current scale 150 rows total, no risk today.
+- H1 backfill migration making `kpis.category='Time Savings'` load-bearing instead of relying on the rename — only 1 Time Saved KPI exists today and it has category set; deferred until a second one appears.
+- L2 structured JSON logging — current `console.log` format is already JSON-friendly via implicit object stringification.
+
 
 ---
 
