@@ -4,6 +4,42 @@ System / config / architectural decisions worth remembering. New entries on top.
 
 ---
 
+## 2026-05-24 — On-link instant KPI refresh (DB trigger → n8n-ops bearer route)
+
+Closes the "wait until next 06:15 UTC cron" UX papercut from the Bug-Ron-001 follow-up list. Now: linking a workflow in the Hub UI updates the auto-calculated Time Saved value within ~2 seconds (live-measured: 1.75s).
+
+**Architecture:** AFTER INSERT/DELETE statement-level trigger on `public.initiative_workflow_links` → `notify_initiative_kpi_refresh()` (SECURITY DEFINER, reads token from Supabase Vault) → `pg_net.http_post` to n8n-ops `/initiative-kpi-refresh` (new bearer-token route, parallel to existing OIDC `/initiative-kpi-sync`) → scoped `runInitiativeKpiSync({ initiativeIds: [...] })` → measurement UPSERT or DELETE.
+
+**Components shipped:**
+
+- New n8n-ops route `/initiative-kpi-refresh` (rev `n8n-ops-00015-9p7`), bearer-token auth (constant-time compare), accepts `{ initiative_id }` or `{ initiative_ids: string[] }`, max 50 ids/call. Token: 32 random bytes in GCP Secret Manager (`initiative-kpi-refresh-token` v2) + Supabase Vault (`n8n_kpi_refresh_token`).
+- `runInitiativeKpiSync` extended with `initiativeIds?: string[]` option. Scope applies post-helper-filter so observability counters still reflect the full universe. Daily cron path unaffected.
+- Postgres triggers `initiative_workflow_links_refresh_insert` + `_refresh_delete` (statement-level, AFTER INSERT/DELETE), aggregating distinct initiative_ids from transition tables and firing ONE batched `pg_net.http_post` per statement.
+
+**Verified live:**
+
+| Test | Latency | Result |
+|---|---|---|
+| Single INSERT → measurement row written | ~1.75s | ✅ value=7.5, source=n8n_auto |
+| DELETE → measurement row removed (H3) | ~3s | ✅ remaining_rows=0; UI falls back to User estimate |
+| Bulk INSERT (3 rows, one statement) | ~3s | ✅ ONE pg_net call, batched array |
+| Auth: missing / wrong / correct bearer | n/a | ✅ 401 / 401 / 200 |
+
+**Pre-prod audit findings (all 4 mitigated before sign-off):**
+
+- **C1 — pg_net stores Authorization header in `net._http_response`** (auditor's headline risk): false-alarm in practice. PostgREST's API gateway refuses to expose the `net` schema entirely (returns `PGRST106 "Only the following schemas are exposed: public, graphql_public"`). `anon`/`authenticated` cannot reach the table over HTTPS, and direct DB access requires `service_role`+ creds which already grant equivalent privilege. The REVOKE attempt in the hardening migration is a no-op (Supabase auto-restores grants on managed extensions) — defense layer is the gateway, not Postgres ACLs. Verified live: both authenticated and anon HTTPS reads return PGRST106.
+- **C2 — Spam-trigger via anon/authenticated**: not possible. RLS on `initiative_workflow_links` requires `check_user_role('Dept Champion')` for INSERT. Anonymous users rejected at policy layer.
+- **H1 — Trigger storm on bulk INSERT**: switched from `FOR EACH ROW` to `FOR EACH STATEMENT` with transition tables (`REFERENCING NEW/OLD TABLE`). Function aggregates distinct `initiative_ids` and dispatches one batched call. Verified: 3-row bulk INSERT = 1 outbound call.
+- **H3 — Stale measurement after removing all workflows**: scoped sync now `DELETE`s today's measurement row when an initiative has 0 workflows linked. UI falls back to user-typed `expected_impact`. Daily cron path unchanged (defensive against transient zero-counts).
+
+**Trip-wires / known minor:**
+
+- Token rotation runbook (no automation): (1) `gcloud secrets versions add initiative-kpi-refresh-token --project=agentic-workflows-485210 --data-file=<new>`; (2) redeploy n8n-ops to pick up the new env var; (3) on Hub DB: `select vault.update_secret('<secret-id>', '<new>', 'n8n_kpi_refresh_token')`. Suggested cadence: 90 days.
+- n8n-ops Cloud Run `min-instances=0`. First on-link refresh after a quiet period costs ~250ms cold-start. Acceptable for daily-scale ops; revisit if it becomes UI-blocking.
+- Vault secret update isn't in a migration (token is out-of-band intentionally — keeping it OUT of git). The trigger degrades gracefully (warn + skip) if Vault is empty in a fresh env.
+
+---
+
 ## 2026-05-24 — Bug-Ron-001: broaden /initiative-kpi-sync to drive from explicit `initiative_kpis` links
 
 **Context:** Ron Madar-Hallevi flagged a "Guesty Marketing Cowork Slack MAS" initiative he'd linked to the Marketing Time Saved KPI + linked an active workflow ("Training Coverage Validation from Friction Alert", 18 runs × 25 min in May). The UI showed "+100 hours · User estimate" instead of an auto-calculated value. Two other initiatives ("ORM analysis and insights" + the one Ron flagged) were silently missed for the same reason.
