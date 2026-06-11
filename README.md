@@ -107,4 +107,6 @@ schemas or writing test queries with the MCP Toolbox (`toolbox --prebuilt bigque
 
 ## Innovation Hub integration
 
-The chat-ui is embedded into Guesty's Innovation Hub. A user's journey from idea → initiative → PoC → deployed workflow → measured KPI is documented in **[docs/innovation-hub/end-to-end-flow.md](docs/innovation-hub/end-to-end-flow.md)** — start there if you're joining the project. Architecture history + every design decision is captured in [docs/decision-log.md](docs/decision-log.md).
+The chat-ui is embedded into Guesty's Innovation Hub (iframe + postMessage). The integration is **organizational-split across three repos** as of 2026-06-11: this repo (chat-ui), `kurtpabilona-code/AI-Innovation-Hub-Vertex` (the Hub), and `alvarocubaa/n8n-ops` (the KPI/ops service).
+
+The cross-product design docs, A2A agent cards, the integration contract, and the roles/responsibilities matrix live in the cross-cutting home: **`cubaalvaro/claude-workspace-roots` → "AI Innovation Integration"** (start with `ROLES-AND-RESPONSIBILITIES.md` and `A2A-CONTRACT.md`). The chat-ui's own A2A card is [agent-card.json](agent-card.json). Full pre-split combined history is at the `pre-split-2026-06-11` git tag.

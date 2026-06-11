@@ -1,6 +1,6 @@
 // Embed-mode helpers for Direction 3 (chat-ui rendered inside Hub iframe
-// or popout window). See docs/innovation-hub/protocol-contract.md and
-// docs/innovation-hub/pop-out-design.md for the full protocols.
+// or popout window). See the A2A integration contract + design-docs in
+// claude-workspace-roots → "AI Innovation Integration" for the full protocols.
 
 // Allowlist of every URL the Hub can be reached at. iframe→parent
 // postMessages are delivered only if the parent's *actual* origin matches

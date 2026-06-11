@@ -1,6 +1,6 @@
 /**
  * Server-side helper for the redesign-v2 server-write path
- * (docs/innovation-hub/redesign-v2-server-write.md).
+ * (claude-workspace-roots → "AI Innovation Integration/design-docs/redesign-v2-server-write.md").
  *
  * The chat-ui owns the write: when the assistant emits `<create_initiative />`
  * or `<update_initiative />` alongside the planning JSON, we POST the validated
