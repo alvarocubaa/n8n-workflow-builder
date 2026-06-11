@@ -17,8 +17,11 @@ import sys
 from typing import Optional
 
 
-def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
-    """Run all audit checks on a workflow JSON file. Returns {check: (pass, detail)}."""
+def audit(wf_path: str, expected_creds: Optional[dict] = None, env: str = "sandbox") -> dict:
+    """Run all audit checks on a workflow JSON file. Returns {check: (pass, detail)}.
+
+    env="production" enables the promote-to-prod checks (#17 prod_audit_log_present).
+    """
     with open(wf_path) as f:
         raw = f.read()
         wf = json.loads(raw)
@@ -230,6 +233,81 @@ def audit(wf_path: str, expected_creds: Optional[dict] = None) -> dict:
             f"BQ query SELECTs csm from {bq_csm_select_nodes}, no redundant SF lookup"
         )
 
+    # --- 15. Workflow name format: "Name – @handle", no "[AI by ...]" prefix ---
+    wf_name = wf.get("name", "")
+    if not wf_name:
+        results["name_format"] = (False, "Workflow name is empty")
+    elif "[AI by" in wf_name:
+        results["name_format"] = (False, f"Legacy '[AI by ...]' prefix found: {wf_name!r}")
+    elif " – @" not in wf_name and " - @" not in wf_name:
+        results["name_format"] = (False, f"Missing ' – @handle' suffix: {wf_name!r}")
+    else:
+        results["name_format"] = (True, wf_name)
+
+    # --- 16. Credential naming convention warn: "[Tool] - @[Owner] - [Dept]" ---
+    # Warn-level only — legacy creds without the convention are intentional and outside this tool's scope.
+    cred_naming_re = re.compile(r"^.+\s-\s@.+\s-\s.+$")
+    nonconforming_creds = []
+    for node in nodes:
+        for ctype, cdata in node.get("credentials", {}).items():
+            cname = cdata.get("name", "")
+            if cname and not cred_naming_re.match(cname):
+                nonconforming_creds.append(f"{cname} (on {node.get('name', '?')})")
+    if nonconforming_creds:
+        # Pass=True so this is informational, not blocking. Detail surfaces the names.
+        results["cred_naming_warn"] = (
+            True,
+            f"WARN: {len(nonconforming_creds)} credential(s) do not match '[Tool] - @[Owner] - [Dept]': "
+            + ", ".join(sorted(set(nonconforming_creds)))
+        )
+    else:
+        results["cred_naming_warn"] = (True, "All credential names match convention")
+
+    # --- 17. Production deploy: audit log step present (active only when env=production) ---
+    if env == "production":
+        # Heuristic: workflow has at least one node that produces an external observable trail.
+        # Slack message, BQ insert/append, HTTP POST/PUT, or any service-write node.
+        audit_log_signals = []
+        for node in nodes:
+            ntype = (node.get("type", "") or "").lower()
+            params = node.get("parameters", {}) or {}
+            if "slack" in ntype and "trigger" not in ntype:
+                audit_log_signals.append(node["name"])
+            elif "googlebigquery" in ntype and params.get("operation", "").lower() in {"insert", "upsert", "append", "executequery"}:
+                audit_log_signals.append(node["name"])
+            elif "httprequest" in ntype:
+                method = (params.get("method", "") or "").upper()
+                if method in {"POST", "PUT", "PATCH"}:
+                    audit_log_signals.append(node["name"])
+        if audit_log_signals:
+            results["prod_audit_log_present"] = (True, f"Audit log signals: {audit_log_signals}")
+        else:
+            results["prod_audit_log_present"] = (
+                False,
+                "No terminal logging step found (Slack notification, BQ insert, or HTTP POST/PUT)"
+            )
+
+    # --- 18. Header sticky note present at top-left ---
+    sticky_nodes = [n for n in nodes if n.get("type", "") == "n8n-nodes-base.stickyNote"]
+    header_stickies = []
+    for n in sticky_nodes:
+        pos = n.get("position", [0, 0])
+        if isinstance(pos, list) and len(pos) >= 2:
+            x, y = pos[0], pos[1]
+            # Top-left = anything with x <= 0 AND y <= 0 (allows some flexibility)
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)) and x <= 0 and y <= 0:
+                header_stickies.append(n.get("name", "?"))
+    if header_stickies:
+        results["header_sticky_present"] = (True, f"Header sticky: {header_stickies[0]}")
+    elif sticky_nodes:
+        results["header_sticky_present"] = (
+            False,
+            f"WARN: stickies present but none at top-left (positions: "
+            + ", ".join(str(n.get("position")) for n in sticky_nodes) + ")"
+        )
+    else:
+        results["header_sticky_present"] = (False, "WARN: no header sticky note (expected one at top-left)")
+
     return results
 
 
@@ -255,10 +333,12 @@ def main():
     parser.add_argument("workflow", help="Path to workflow JSON file")
     parser.add_argument("--expected-creds", type=str, default=None,
                         help='Expected credentials as JSON: \'{"slackApi":"abc123"}\'')
+    parser.add_argument("--env", type=str, default="sandbox", choices=["sandbox", "production"],
+                        help="Workflow environment. 'production' enables the prod audit-log check (#17).")
     args = parser.parse_args()
 
     expected = json.loads(args.expected_creds) if args.expected_creds else None
-    results = audit(args.workflow, expected)
+    results = audit(args.workflow, expected, env=args.env)
     all_pass = print_results(results, args.workflow)
     sys.exit(0 if all_pass else 1)
 

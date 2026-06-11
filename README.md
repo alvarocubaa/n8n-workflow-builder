@@ -104,3 +104,7 @@ Detection: `K_SERVICE` env var (set automatically in Cloud Run) switches mcp-bri
 schemas or writing test queries with the MCP Toolbox (`toolbox --prebuilt bigquery --stdio`).
 
 **Key gotcha:** `zuora_analytics.invoices` joins to Guesty accounts via `mongo_account_id`, NOT `account_id`. See `bigquery/JOIN_MAP.md`.
+
+## Innovation Hub integration
+
+The chat-ui is embedded into Guesty's Innovation Hub. A user's journey from idea → initiative → PoC → deployed workflow → measured KPI is documented in **[docs/innovation-hub/end-to-end-flow.md](docs/innovation-hub/end-to-end-flow.md)** — start there if you're joining the project. Architecture history + every design decision is captured in [docs/decision-log.md](docs/decision-log.md).

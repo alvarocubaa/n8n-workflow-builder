@@ -43,5 +43,8 @@ __pycache__/
 logs/
 docker-compose.override.yml
 
+# Ephemeral MCP / browser-automation artifacts
+.playwright-mcp/
+
 # Old output dir (replaced by feedback-loop/)
 output/
