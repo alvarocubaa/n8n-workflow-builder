@@ -9,7 +9,6 @@
     - googleBigQuery
     - merge
     - set
-    - aggregate
     - slack
   expected_creds:
     googleApi: h7fJ82YhtOnUL58u
@@ -21,13 +20,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: QJgEHsbZfXQs6JVXK4fI
+    source_conversation: 2xu6FYUceHQUM56oxfRA
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
     workflow_name: "Build a weekly workflow running Monday at 8am UTC. Run tw..."
-    node_count: 7
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.768Z
     confidence: high
     workflow_json_file: harvested_finance_001_workflow.json

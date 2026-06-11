@@ -1,54 +1,41 @@
 - name: harvested_cs_012
-  description: "Harvested from roni.shif@guesty.com - {
-  \"nodes\": [
-    {
-      \"parameters\": {},
-      \"id\": ..."
+  description: "Harvested from roni.shif@guesty.com - so i completed the pixel tracking 
+
+Im debugging the logs..."
   department: cs
   prompt: >
-    {
-      "nodes": [
-        {
-          "parameters": {},
-          "id": "0ad502fd-6320-4e16-bec1-a2693f47f6c2",
-          "name": "Manual Trigger",
-          "type": "n8n-nodes-base.manualTrigger",
-          "typeVersion": 1,
-          "position": [
-            -2240,
-            -320
-          ]
-        },
-        {
-          "parameters": {
-            "authentication": "serviceAccount",
-            "documentId": {
-              "mode": "id",
-              "value": "103-8hxYCbPXk0Zl_dJLUpp0eeY4lyRt6r3-p3eXqZBY"
-            },
-            "sheetName": {
-              "mode...
+    so i completed the pixel tracking 
+    
+    Im debugging the logs now 
+    
+    1. Fix: Log only real data
+    
+    Sends 
+    
+    execution_idcsm_emailsent_atmeeting_countfailed_count1759329ana.loera@guesty.com2026-04-15T15:03:04.350+03:00501759329ana.loera@guesty.com2026-04-15T15:03:23.812+03:00601759320audrey.puylaert@guesty.com2026-04-15T15:03:28.777+03:00601759319carlos.villarreal@guesty.com2026-04-15T15:02:53.913+03:00501759319carlos.villarreal@guesty.com2026-04-15T15:03:14.409+03:00601759321josue.paredes@guesty.com2...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - httpRequest
+    - webhook
+    - code
+    - if
+    - googleSheets
+    - respondToWebhook
   expected_creds:
-    zendeskApi: 4zfIc5d8uJMBSFo2
+    googleSheetsOAuth2Api: RPi7Ecm1B3utIhYr
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: q3SszmLlN88bCLUYd7LH
+    source_conversation: HMeceimT5BJB3j3FfhsK
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "{
-  \"nodes\": [
-    {
-      \"parameters\": {},
-      \"id\": ..."
-    node_count: 1
+    workflow_name: "so i completed the pixel tracking 
+
+Im debugging the logs..."
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.213Z
-    confidence: medium
+    harvested_at: 2026-04-15T15:43:43.771Z
+    confidence: high
     workflow_json_file: harvested_cs_012_workflow.json

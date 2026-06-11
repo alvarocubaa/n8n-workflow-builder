@@ -1,36 +1,38 @@
 - name: harvested_cx_008
-  description: "Harvested from roni.shif@guesty.com - Invoice Email & ZD Ticket Automation — Requirements Doc
-T..."
+  description: "Harvested from kayla.adams@guesty.com - This Product Requirements Document (PRD) outlines the imp..."
   department: cx
   prompt: >
-    Invoice Email & ZD Ticket Automation — Requirements Doc
-    This canvas was generated using AI, which can produce inaccurate or harmful responses. Review for accuracy and safety before using.
+    This Product Requirements Document (PRD) outlines the implementation of an **n8n workflow** designed to automate country-specific event research using the **Gemini Deep Research Agent**. 
     
-    Overview
+    Because this agent requires asynchronous polling and background execution, the workflow will use a "Producer-Consumer" architecture.
     
-    This automation sends monthly invoice emails to Guesty Pro (GFP) customers and creates corresponding Zendesk tickets. The flow is split into two workflows to allow human review before sending.
+    ---
     
-    Scope & Account Types
-    
-    Accounts included in the automation are all accounts listed in the manual billing...
+    ## 1. Project Overview
+    * **Name:** Global Event Researcher (n8n + Gemini Deep Research)
+    * **Objective:** Automate the gathering of upcoming cultural, business, or politi...
   confirm_message: "Looks good, build it"
   expected_nodes:
+    - manualTrigger
     - googleSheets
+    - splitInBatches
+    - httpRequest
+    - wait
   expected_creds:
-    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+    googleSheetsOAuth2Api: vkdgHYUQNhtG8jsq
+    googlePalmApi: JrzPwNiVhZibKlAr
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: 2Gno8oBT0rz13Jc4YrDj
-    source_user: roni.shif@guesty.com
+    source_conversation: H8rgnY7lOBlnK5lJd5Vw
+    source_user: kayla.adams@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Invoice Email & ZD Ticket Automation — Requirements Doc
-T..."
-    node_count: 1
+    workflow_name: "This Product Requirements Document (PRD) outlines the imp..."
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.211Z
-    confidence: medium
+    harvested_at: 2026-04-15T15:43:43.771Z
+    confidence: high
     workflow_json_file: harvested_cx_008_workflow.json

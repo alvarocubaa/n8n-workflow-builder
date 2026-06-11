@@ -1,37 +1,293 @@
 {
+  "name": "BigQuery Agent Chat UI",
   "nodes": [
     {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Chat Trigger",
+      "type": "n8n-nodes-base.chatTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "bq-agent-chat-ui",
       "parameters": {
-        "url": "https://guesty3396.zendesk.com/api/v2/search.json",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "zendeskApi",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
+        "public": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Get or Init Session",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sessionId = $input.first().json.sessionId;\nconst userMessage = $input.first().json.chatInput;\n\nconst store = $getWorkflowStaticData('global');\nif (!store.sessions) {\n  store.sessions = {};\n}\n\nconst existingConvId = store.sessions[sessionId] || null;\n\nreturn [{\n  json: {\n    sessionId: sessionId,\n    userMessage: userMessage,\n    existingConvId: existingConvId,\n    needsNewConversation: existingConvId === null\n  }\n}];"
+      }
+    },
+    {
+      "id": "3d594a8b-1c2e-4f5a-9b6d-7e8f9a0b1c2d",
+      "name": "New Conversation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        710,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
             {
-              "name": "query",
-              "value": "=type:ticket organization:{{ $json.results[0].id }} -status:solved -status:closed"
+              "id": "a4f3e2d1-c0b9-4a87-8f6e-5d4c3b2a1908",
+              "leftValue": "={{ $json.needsNewConversation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
-        },
-        "options": {}
-      },
-      "id": "f27deab5-a93f-4431-b437-b175171cf32a",
-      "name": "Get Zendesk Open Tickets",
+        }
+      }
+    },
+    {
+      "id": "9b8a7c6d-5e4f-3a2b-1c0d-e9f8a7b6c5d4",
+      "name": "Create Conversation",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1040,
-        -7584
+        940,
+        160
       ],
-      "credentials": {
-        "zendeskApi": {
-          "id": "OTFp18SnDgGUSn9u",
-          "name": "Zendesk Sandbox - Info@guesty"
-        }
+      "parameters": {
+        "method": "POST",
+        "url": "https://geminidataanalytics.googleapis.com/v1beta/projects/guesty-n8n/locations/global/agents/agent_d5085d9a-9200-4467-8108-faf9a5ed8972/conversations",
+        "authentication": "serviceAccount",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "displayName": "n8n chat session"
+        },
+        "options": {}
       },
-      "onError": "continueRegularOutput"
+      "credentials": {
+        "googleApi": {
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
+        }
+      }
+    },
+    {
+      "id": "2e1d0c9b-8a7f-6e5d-4c3b-2a1f0e9d8c7b",
+      "name": "Store Conversation ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1170,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const sessionData = $node['Get or Init Session'].json;\nconst sessionId = sessionData.sessionId;\nconst userMessage = sessionData.userMessage;\n\nconst convName = $input.first().json.name;\nconst convId = convName.split('/').pop();\n\nconst store = $getWorkflowStaticData('global');\nif (!store.sessions) {\n  store.sessions = {};\n}\nstore.sessions[sessionId] = convId;\n\nreturn [{\n  json: {\n    sessionId: sessionId,\n    userMessage: userMessage,\n    conversationId: convId\n  }\n}];"
+      }
+    },
+    {
+      "id": "1f2e3d4c-5b6a-7908-8c9d-0e1f2a3b4c5d",
+      "name": "Use Existing Conversation",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        940,
+        440
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d4c3b2a1-f0e9-4d8c-7b6a-5f4e3d2c1b0a",
+              "name": "sessionId",
+              "value": "={{ $json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "e5d4c3b2-a1f0-4e9d-8c7b-6a5f4e3d2c1b",
+              "name": "userMessage",
+              "value": "={{ $json.userMessage }}",
+              "type": "string"
+            },
+            {
+              "id": "f6e5d4c3-b2a1-4f0e-9d8c-7b6a5f4e3d2c",
+              "name": "conversationId",
+              "value": "={{ $json.existingConvId }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition"
+      }
+    },
+    {
+      "id": "ba987654-3210-fedc-ba98-765432109fed",
+      "name": "Send Message to Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1630,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=https://geminidataanalytics.googleapis.com/v1beta/projects/guesty-n8n/locations/global/agents/agent_d5085d9a-9200-4467-8108-faf9a5ed8972/conversations/{{ $json.conversationId }}:chat",
+        "authentication": "serviceAccount",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "message": {
+            "content": "={{ $json.userMessage }}"
+          }
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
+        }
+      }
+    },
+    {
+      "id": "fedcba98-7654-3210-fedc-ba9876543210",
+      "name": "Respond to Chat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1860,
+        300
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.reply.content }}"
+      }
     }
   ],
-  "connections": {}
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get or Init Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get or Init Session": {
+      "main": [
+        [
+          {
+            "node": "New Conversation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Conversation?": {
+      "main": [
+        [
+          {
+            "node": "Create Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Use Existing Conversation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Conversation": {
+      "main": [
+        [
+          {
+            "node": "Store Conversation ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Conversation ID": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Existing Conversation": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Send Message to Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Message to Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

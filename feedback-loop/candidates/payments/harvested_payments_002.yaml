@@ -1,14 +1,13 @@
 - name: harvested_payments_002
-  description: "Harvested from alvaro.cuba@guesty.com - Create a weekly workflow running Monday at 7am UTC. Query..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery zuora_analy..."
   department: payments
   prompt: >
-    Create a weekly workflow running Monday at 7am UTC. Query BigQuery zuora_analytics.invoices for total invoice amounts grouped by mongo_account_id for the past month. Then query Salesforce for the matching Account records to get Account.Name and Account.Account_Owner_F__c. Use a Set node to format a reconciliation report with account name, owner, and total invoiced amount. Post to #payments-reconciliation in Slack.
+    Create a daily workflow that queries BigQuery zuora_analytics.invoices for unpaid invoices where status = 'Posted' and balance > 0 and the invoice is older than 30 days. Group by mongo_account_id and show total outstanding amount per account. Post an aging report to #payments-collections in Slack. Run daily at 9am UTC.
   confirm_message: "Looks good, build it"
   expected_nodes:
     - scheduleTrigger
     - googleBigQuery
-    - set
-    - aggregate
+    - code
     - slack
   expected_creds:
     googleApi: aLlYQkLWrmANkfFZ
@@ -20,13 +19,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: MrOkchpqDKrlKbHDsT4T
+    source_conversation: BPIeTb8Gvzniqg0xG170
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a weekly workflow running Monday at 7am UTC. Query..."
-    node_count: 5
+    workflow_name: "Create a daily workflow that queries BigQuery zuora_analy..."
+    node_count: 4
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_payments_002_workflow.json

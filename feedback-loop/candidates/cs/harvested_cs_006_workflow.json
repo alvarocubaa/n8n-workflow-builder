@@ -1,8 +1,8 @@
 {
-  "name": "CS Ticket Aging Report - Daily Slack",
+  "name": "Daily CS Churn Report to Slack",
   "nodes": [
     {
-      "id": "a3f1c2d4-9e8b-4a7c-b6d5-1e2f3a4b5c6d",
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
       "name": "Daily 9am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
@@ -22,8 +22,8 @@
       }
     },
     {
-      "id": "b7e2d3f5-0a9c-4b8d-c7e6-2f3a4b5c6d7e",
-      "name": "Query Aging Tickets",
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Query Churn Report",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
@@ -31,19 +31,21 @@
         300
       ],
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  account_name,\n  COUNT(ticket_id)                          AS open_ticket_count,\n  MIN(created_at)                           AS oldest_ticket_date,\n  COUNTIF(status = 'open')                  AS open_count,\n  COUNTIF(status = 'pending')               AS pending_count\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE status IN ('open', 'pending')\n  AND created_at < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)\n  AND account_name IS NOT NULL\nGROUP BY account_name\nORDER BY open_ticket_count DESC"
+        "sqlQuery": "SELECT\n  c.account_name,\n  c.from_date                              AS churn_date,\n  c.churn_reason_modified                  AS churn_reason,\n  c.customer_churn_reason,\n  c.churn_type,\n  c.account_segmentation,\n  c.geo_area,\n  ROUND(c.avg_mrr, 2)                      AS avg_mrr,\n  ROUND(c.churn_mrr_including_payments, 2) AS churn_mrr,\n  c.csm,\n  u.Name                                   AS account_owner,\n  c.etf\nFROM `guesty-data.csm.csm_churn_report` c\nLEFT JOIN `guesty-data.salesforce.sf_account` sf\n  ON c.account_id = sf.Guesty_Admin_ID__c\nLEFT JOIN `guesty-data.salesforce.sf_users` u\n  ON sf.OwnerId = u.Id\nWHERE c.from_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nORDER BY c.from_date DESC\nLIMIT 50",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
           "id": "VQ7CU7dKViVcv8Ah",
-          "name": "Google Service Account n8n-ai-cx-read"
+          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
         }
       }
     },
     {
-      "id": "c8f3e4a6-1b0d-4c9e-d8f7-3a4b5c6d7e8f",
+      "id": "3d594a8e-1b2f-4c6d-9e8a-5f7b0c1d2e3f",
       "name": "Build Slack Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -53,11 +55,11 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\nconst today = DateTime.now().toFormat('yyyy-MM-dd');\n\nif (!items || items.length === 0) {\n  return [{\n    json: {\n      message: ':white_check_mark: *CS Ticket Aging Report -- ' + today + '*\\nNo accounts with aging open/pending tickets today. Great work!'\n    }\n  }];\n}\n\nconst lines = items.map(function(item) {\n  const t = item.json;\n  const oldest = t.oldest_ticket_date ? String(t.oldest_ticket_date).substring(0, 10) : 'N/A';\n  const total = Number(t.open_ticket_count) || 0;\n  const ticketWord = total === 1 ? 'ticket' : 'tickets';\n  return '*' + t.account_name + '* -- ' + total + ' ' + ticketWord + ' | Oldest: ' + oldest + ' | open: ' + (Number(t.open_count) || 0) + ', pending: ' + (Number(t.pending_count) || 0);\n});\n\nconst message =\n  ':ticket: *CS Ticket Aging Report -- ' + today + '*\\n' +\n  'Accounts with open/pending tickets older than 7 days:\\n\\n' +\n  lines.join('\\n') +\n  '\\n\\n_Total accounts affected: ' + items.length + '_';\n\nreturn [{ json: { message: message } }];"
+        "jsCode": "const items = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nif (items.length === 0) {\n  return [{ json: { message: '*Daily Churn Report -- ' + today + '*\\n\\nNo churned accounts found in the last 30 days.' } }];\n}\n\nconst totalMRR = items.reduce(function(sum, i) {\n  return sum + (parseFloat(i.json.churn_mrr) || 0);\n}, 0);\n\nconst lines = items.map(function(i) {\n  const d = i.json;\n  const mrr = d.churn_mrr ? '$' + Math.round(parseFloat(d.churn_mrr)).toLocaleString('en-US') : 'N/A';\n  const etf = d.etf ? ' | ETF: ' + d.etf : '';\n  return '- *' + (d.account_name || 'Unknown') + '* | Owner: ' + (d.account_owner || 'N/A') + ' | CSM: ' + (d.csm || 'N/A') + ' | MRR: ' + mrr + ' | Reason: ' + (d.churn_reason || 'N/A') + ' | Type: ' + (d.churn_type || 'N/A') + ' | Segment: ' + (d.account_segmentation || 'N/A') + ' | Geo: ' + (d.geo_area || 'N/A') + etf;\n});\n\nconst header = '*Daily Churn Report -- ' + today + '*\\n*' + items.length + ' account(s) churned in the last 30 days | Total Churn MRR: $' + Math.round(totalMRR).toLocaleString('en-US') + '*';\n\nconst message = header + '\\n\\n' + lines.join('\\n');\n\nreturn [{ json: { message: message } }];"
       }
     },
     {
-      "id": "d9a4f5b7-2c1e-4d0f-e9a8-4b5c6d7e8f9a",
+      "id": "9b1e2f3a-4c5d-6e7f-8a9b-0c1d2e3f4a5b",
       "name": "Post to Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
@@ -71,7 +73,7 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cs-ticket-aging"
+          "value": "#cs-churn-alerts"
         },
         "text": "={{ $json.message }}",
         "otherOptions": {}
@@ -79,7 +81,7 @@
       "credentials": {
         "slackApi": {
           "id": "7H6auF31TpX7Wk7M",
-          "name": "Slack account 77"
+          "name": "Slack - @Who App - AI Team"
         }
       },
       "onError": "continueRegularOutput",
@@ -93,14 +95,14 @@
       "main": [
         [
           {
-            "node": "Query Aging Tickets",
+            "node": "Query Churn Report",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Query Aging Tickets": {
+    "Query Churn Report": {
       "main": [
         [
           {

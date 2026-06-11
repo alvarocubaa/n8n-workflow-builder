@@ -1,36 +1,32 @@
 - name: harvested_cs_005
-  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that queries BigQuery csm_churn_r..."
+  description: "Harvested from alvaro.cuba@guesty.com - Build a daily workflow that queries BigQuery zendesk_anal..."
   department: cs
   prompt: >
-    Create a daily workflow that queries BigQuery csm_churn_report for accounts with recent churn. Include the account owner from Salesforce. Post summary to #cs-churn-alerts in Slack. Run at 9am UTC daily.
+    Build a daily workflow that queries BigQuery zendesk_analytics.tickets_clean for Zendesk tickets where status is 'open' or 'pending' and the ticket is older than 7 days. Group by account_name and show count and oldest ticket date per account. Post the aging report to #cs-ticket-aging in Slack. Run daily at 9am UTC.
   confirm_message: "Looks good, build it"
   expected_nodes:
     - scheduleTrigger
     - googleBigQuery
-    - if
-    - salesforce
     - set
     - aggregate
     - slack
   expected_creds:
     googleApi: VQ7CU7dKViVcv8Ah
-    salesforceOAuth2Api: aBjJNGRAjYF66z5F
     slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
     - bq_projectId
-    - sf_config
     - slack_config
   _metadata:
-    source_conversation: Ga4exT48h13fQtLELJj4
+    source_conversation: UCI65ngTQeifIuJo824Y
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a daily workflow that queries BigQuery csm_churn_r..."
-    node_count: 9
+    workflow_name: "Build a daily workflow that queries BigQuery zendesk_anal..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_cs_005_workflow.json

@@ -1,8 +1,8 @@
 {
-  "name": "Payment Fee Mismatch Monitor",
+  "name": "Payment Fee Mismatch - Daily Alert",
   "nodes": [
     {
-      "id": "a3f1c2e4-9b7d-4e6a-8c0f-1d2e3f4a5b6c",
+      "id": "a3f1c2e4-9b7d-4e6a-8c5f-1d2e3f4a5b6c",
       "name": "Daily 8am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
@@ -22,8 +22,8 @@
       }
     },
     {
-      "id": "b4e2d3f5-0c8e-4f7b-9d1a-2e3f4a5b6c7d",
-      "name": "Product Catalog Fees",
+      "id": "b4e2d3f5-0c8e-5f7b-9d6a-2e3f4a5b6c7d",
+      "name": "BQ - Configured Fees",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
@@ -34,8 +34,10 @@
         "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  account_id,\n  account_name,\n  plan_name,\n  plan_value AS configured_fee,\n  charge_model,\n  uom\nFROM `guesty-data.zuora_analytics.product_catalog`\nWHERE LOWER(plan_name) LIKE '%payment gateway%'\n  AND effective_end_date > CURRENT_DATE()",
-        "options": {}
+        "sqlQuery": "SELECT\n  account_id,\n  account_name,\n  SUM(plan_value) AS configured_fee\nFROM `guesty-data.zuora_analytics.product_catalog`\nWHERE LOWER(plan_name) LIKE '%payment gateway%'\n  AND effective_end_date > CURRENT_DATE()\nGROUP BY account_id, account_name",
+        "options": {
+          "returnAsNumbers": true
+        }
       },
       "credentials": {
         "googleApi": {
@@ -45,8 +47,8 @@
       }
     },
     {
-      "id": "c5f3e4a6-1d9f-4a8c-0e2b-3f4a5b6c7d8e",
-      "name": "Invoice Items Past Month",
+      "id": "c5f3e4a6-1d9f-6a8c-0e7b-3f4a5b6c7d8e",
+      "name": "BQ - Invoiced Amounts",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
@@ -57,8 +59,10 @@
         "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  mongo_account_id AS account_id,\n  SUM(amount) AS invoiced_amount\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE LOWER(product_name) LIKE '%payment gateway%'\n  AND invoiceitem_servicestartdate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nGROUP BY mongo_account_id",
-        "options": {}
+        "sqlQuery": "SELECT\n  mongo_account_id AS account_id,\n  SUM(amount)          AS invoiced_amount,\n  COUNT(invoice_item_id) AS invoice_item_count\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE LOWER(product_name) LIKE '%payment gateway%'\n  AND invoiceitem_servicestartdate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\nGROUP BY mongo_account_id",
+        "options": {
+          "returnAsNumbers": true
+        }
       },
       "credentials": {
         "googleApi": {
@@ -68,29 +72,32 @@
       }
     },
     {
-      "id": "d6a4f5b7-2e0a-4b9d-1f3c-4a5b6c7d8e9f",
+      "id": "d6a4f5b7-2e0a-7b9d-1f8c-4a5b6c7d8e9f",
       "name": "Merge by Account ID",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        740,
+        720,
         300
       ],
       "parameters": {
         "mode": "combine",
         "combineBy": "combineByFields",
         "fieldsToMatchString": "account_id",
-        "joinMode": "keepEverything",
-        "options": {}
+        "joinMode": "keepMatches",
+        "outputDataFrom": "both",
+        "options": {
+          "fuzzyCompare": true
+        }
       }
     },
     {
-      "id": "e7b5a6c8-3f1b-4c0e-2a4d-5b6c7d8e9f0a",
-      "name": "Fee Mismatch Over 10%",
+      "id": "e7b5a6c8-3f1b-8c0e-2a9d-5b6c7d8e9f0a",
+      "name": "Fee Mismatch > 10%",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        980,
+        960,
         300
       ],
       "parameters": {
@@ -101,8 +108,8 @@
           "combinator": "and",
           "conditions": [
             {
-              "id": "f8c6b7d9-4a2c-4d1f-3b5e-6c7d8e9f0a1b",
-              "leftValue": "={{ (Math.abs(Number($json.invoiced_amount) - Number($json.configured_fee)) / Number($json.configured_fee)) }}",
+              "id": "f8c6b7d9-4a2c-9d1f-3b0e-6c7d8e9f0a1b",
+              "leftValue": "={{ Math.abs($json.invoiced_amount - $json.configured_fee) / $json.configured_fee }}",
               "rightValue": 0.1,
               "operator": {
                 "type": "number",
@@ -115,13 +122,13 @@
       }
     },
     {
-      "id": "f9d7c8e0-5b3d-4e2a-4c6f-7d8e9f0a1b2c",
+      "id": "f9d7c8e0-5b3d-0e2a-4c1f-7d8e9f0a1b2c",
       "name": "Post to Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1220,
-        200
+        1200,
+        160
       ],
       "parameters": {
         "resource": "message",
@@ -131,8 +138,7 @@
           "mode": "name",
           "value": "#payments-fee-alerts"
         },
-        "text": "=:warning: *Payment Fee Mismatch Detected*\n\n*Account:* {{ $json.account_name }} (`{{ $json.account_id }}`)\n*Plan:* {{ $json.plan_name }}\n*Configured Fee:* ${{ $json.configured_fee }} ({{ $json.uom }})\n*Invoiced Amount (last 30d):* ${{ $json.invoiced_amount }}\n*Deviation:* {{ (Math.abs(Number($json.invoiced_amount) - Number($json.configured_fee)) / Number($json.configured_fee) * 100).toFixed(1) }}%",
-        "otherOptions": {}
+        "text": "=:rotating_light: *Payment Fee Mismatch Detected*\n\n*Account:* {{ $json.account_name }} (`{{ $json.account_id }}`)\n*Configured Fee:* ${{ $json.configured_fee.toFixed(2) }}\n*Invoiced Amount (last 30d):* ${{ $json.invoiced_amount.toFixed(2) }}\n*Deviation:* {{ (Math.abs($json.invoiced_amount - $json.configured_fee) / $json.configured_fee * 100).toFixed(1) }}%\n*Invoice Line Items:* {{ $json.invoice_item_count }}"
       },
       "credentials": {
         "slackApi": {
@@ -151,19 +157,19 @@
       "main": [
         [
           {
-            "node": "Product Catalog Fees",
+            "node": "BQ - Configured Fees",
             "type": "main",
             "index": 0
           },
           {
-            "node": "Invoice Items Past Month",
+            "node": "BQ - Invoiced Amounts",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Product Catalog Fees": {
+    "BQ - Configured Fees": {
       "main": [
         [
           {
@@ -174,7 +180,7 @@
         ]
       ]
     },
-    "Invoice Items Past Month": {
+    "BQ - Invoiced Amounts": {
       "main": [
         [
           {
@@ -189,14 +195,14 @@
       "main": [
         [
           {
-            "node": "Fee Mismatch Over 10%",
+            "node": "Fee Mismatch > 10%",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fee Mismatch Over 10%": {
+    "Fee Mismatch > 10%": {
       "main": [
         [
           {

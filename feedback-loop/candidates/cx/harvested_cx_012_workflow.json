@@ -2,50 +2,197 @@
   "nodes": [
     {
       "parameters": {
-        "resource": "draft",
-        "subject": "=Guesty Billing - {{ $json.data[0].Account }}",
-        "emailType": "html",
-        "message": "=<p>Hi {{ $json.data[0][\"Contact name\"] }},</p>\n<br>\n<p>Please find your latest Guesty invoices attached.</p>\n<br>\n<p>Don't hesitate to reach out if you have any questions or concerns.</p>\n<br>\n<p>Best,<br>\nRaphi</p>",
-        "options": {
-          "attachmentsUi": {
-            "attachmentsBinary": [
-              {
-                "property": "={{ Object.keys($binary).join(',') }}"
-              }
-            ]
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
           },
-          "ccList": "={{ $json.data[0][\"CSM email\"] }}",
-          "sendTo": "={{ $json.data[0][\"Contact Emails\"] }}"
-        }
+          "conditions": [
+            {
+              "id": "e04df3dd-047e-4a9f-9e31-31dc9d6a909f",
+              "leftValue": "={{ $json.has_invoices }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.2,
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        2336,
-        -3752
+        -672,
+        -1568
       ],
-      "id": "2ed35387-9ac2-4832-92f5-75396c6d099e",
-      "name": "RONI",
-      "webhookId": "0434a786-1f35-49d0-8b6b-9acf47c8d452",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "3XKWZw8KuGVggGEH",
-          "name": "Gmail - @Ronishif - CS"
+      "id": "3d311ba5-8615-453f-8b34-6cc42bb02df6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "=https://rest.na.zuora.com/v1/invoices/{{ $json.invoice_id }}/files",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Zuora Auth1').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
         }
       },
-      "onError": "continueRegularOutput"
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -352,
+        -1520
+      ],
+      "id": "b1b569c0-e741-47f9-a248-1f4b6c7a0b11",
+      "name": "Invoice URL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a3f1c2e4-88b1-4d2a-9c3e-1f2a3b4c5d6e",
+              "leftValue": "={{ $json.invoiceFiles.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -112,
+        -1568
+      ],
+      "id": "c7d2e1f0-9a3b-4c5d-8e7f-2a1b3c4d5e6f",
+      "name": "Has Files?"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "invoiceFiles",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        128,
+        -1568
+      ],
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "Split Invoice Files"
+    },
+    {
+      "parameters": {
+        "url": "=https://rest.na.zuora.com{{ $json.pdfFileUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Zuora Auth1').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "=invoice_{{ $itemIndex }}"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        368,
+        -1568
+      ],
+      "id": "f93e42b9-54a9-4cd3-a2b4-4ffc1588f62e",
+      "name": "Download Invoice",
+      "alwaysOutputData": true
     }
   ],
   "connections": {
-    "RONI": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Invoice URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Invoice URL": {
+      "main": [
+        [
+          {
+            "node": "Has Files?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Files?": {
+      "main": [
+        [
+          {
+            "node": "Split Invoice Files",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Split Invoice Files": {
+      "main": [
+        [
+          {
+            "node": "Download Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Invoice": {
       "main": [
         []
       ]
     }
-  },
-  "pinData": {},
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
   }
 }

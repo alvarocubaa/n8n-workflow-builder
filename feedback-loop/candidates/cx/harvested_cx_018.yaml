@@ -1,53 +1,32 @@
 - name: harvested_cx_018
-  description: "Harvested from roni.shif@guesty.com - PRD — HQ Billing Automation (Updated)
-Overview
-A manually..."
+  description: "Harvested from uri.hertzwolf@guesty.com - [AI by uri.hertzwolf] CS Slack Bot - BigQuery Agent Q&A"
   department: cx
   prompt: >
-    PRD — HQ Billing Automation (Updated)
-    Overview
-    A manually triggered n8n automation that processes HQ billing accounts, fetches Zuora invoices, downloads relevant files, and drafts emails with the correct attachments based on each account's billing model.
-    
-    Trigger
-    Manual 
-    Source sheet: Google Sheet (HQ Billing — tab: N8N)
-    Account Types & Required Deliverables
-    Billing Model	Invoice PDF	Attachment CSV	Manual Billing GSheet
-    HQ pays for all	✅	✅	✅
-    Hybrid	✅	✅	✅
-    Subaccount	✅	❌	❌
-    Flow
-    Step 1 — Fetch A...
+    I have a Slack app for the CS team, and an agent in BigQuery that is an expert in this specific field. I want the CS team to be able to ask questions via the slack app, and have the Bigquery agent answer those questions in the same slack app.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - executeWorkflowTrigger
-    - googleSheets
+    - webhook
     - if
-    - set
-    - googleDrive
+    - respondToWebhook
     - httpRequest
-    - filter
-    - splitOut
-    - aggregate
-    - code
+    - set
+    - slack
   expected_creds:
-    googleApi: VQ7CU7dKViVcv8Ah
-    googleSheetsOAuth2Api: RPi7Ecm1B3utIhYr
-    googleDriveOAuth2Api: buZzVXa0qB706qpQ
+    googleServiceAccountApi: 2EJkTXIICSEva3cQ
+    slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
     - uuids
     - credentials
+    - slack_config
   _metadata:
-    source_conversation: yBh8Q2jldrkKLSIXAtfR
-    source_user: roni.shif@guesty.com
-    deployed: false
-    deployed_workflow_id: 
-    workflow_name: "PRD — HQ Billing Automation (Updated)
-Overview
-A manually..."
-    node_count: 18
-    complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.214Z
-    confidence: medium
+    source_conversation: KVhZFh2T9HoyX7zH03QF
+    source_user: uri.hertzwolf@guesty.com
+    deployed: true
+    deployed_workflow_id: J3vSnuh0fPy9KQxH
+    workflow_name: "[AI by uri.hertzwolf] CS Slack Bot - BigQuery Agent Q&A"
+    node_count: 9
+    complexity_score: 4
+    harvested_at: 2026-04-15T15:43:43.772Z
+    confidence: high
     workflow_json_file: harvested_cx_018_workflow.json

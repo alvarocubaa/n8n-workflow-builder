@@ -1,0 +1,1653 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "55a16683-a46b-478d-853b-83168ac3943e",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -816,
+        300
+      ],
+      "id": "a1b2c3d4-1111-4000-8000-000000000001",
+      "name": "Monday.com Trigger",
+      "webhookId": "e1e1d85e-14a0-4a94-80ab-9480369b0e8d"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"challenge\": \"{{ $json.body.challenge }}\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -576,
+        100
+      ],
+      "id": "a1b2c3d4-1112-4000-8000-000000000002",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "get",
+        "itemId": "={{ $json.body.event.pulseId.toString() }}"
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        300
+      ],
+      "id": "a1b2c3d4-1113-4000-8000-000000000003",
+      "name": "Get Monday Item",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const linkColumn = item.json.column_values.find(col => col.type === 'link');\n  let gdrive_url = '';\n  let gdrive_id = '';\n  if (linkColumn && linkColumn.value) {\n    const parsedValue = JSON.parse(linkColumn.value);\n    gdrive_url = parsedValue.url;\n    const match = gdrive_url.match(/\\/d\\/([a-zA-Z0-9_-]+)/);\n    if (match && match[1]) {\n      gdrive_id = match[1];\n    }\n  }\n  item.json.gdrive_url = gdrive_url;\n  item.json.gdrive_id = gdrive_id;\n}\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        300
+      ],
+      "id": "a1b2c3d4-1114-4000-8000-000000000004",
+      "name": "Extract GDrive ID"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.gdrive_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "exportLinks, mimeType, name"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -144,
+        300
+      ],
+      "id": "a1b2c3d4-1115-4000-8000-000000000005",
+      "name": "Get File Metadata",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "uTHnMFpCoMl5s70A",
+          "name": "Google Drive - @erik.cohen - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "changeColumnValue",
+        "boardId": "18403270901",
+        "itemId": "={{ $('Get Monday Item').item.json.id }}",
+        "columnId": "status",
+        "value": "={{ JSON.stringify({ index: 4 }) }}"
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        80,
+        300
+      ],
+      "id": "a1b2c3d4-1116-4000-8000-000000000006",
+      "name": "Set Status: Processing",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "addUpdate",
+        "itemId": "={{ $('Get Monday Item').item.json.id }}",
+        "value": "=Hi! We got your request at {{ $now.format('dd-MM / HH:mm') }} and started processing it. It can take up to an hour to generate all marketing assets. Thanks for your patience! *Tech Info - n8n executionID: {{ $execution.id }}"
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        320,
+        300
+      ],
+      "id": "a1b2c3d4-1117-4000-8000-000000000007",
+      "name": "Add Processing Update",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e01e87d6-568a-4e80-ac90-85e5f93dbb40",
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "vnd.google-apps",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Google format"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f4595cae-53cc-4257-97f4-471b03341d33",
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "vnd.google-apps",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notContains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Regular"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        560,
+        300
+      ],
+      "id": "a1b2c3d4-1118-4000-8000-000000000008",
+      "name": "Google or Regular File"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Extract GDrive ID').item.json.gdrive_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fields",
+              "value": "exportLinks"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        800,
+        180
+      ],
+      "id": "a1b2c3d4-1119-4000-8000-000000000009",
+      "name": "Get Export Links",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "NTCXq9HOttLY6Ige",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.exportLinks['application/pdf'] }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1040,
+        180
+      ],
+      "id": "a1b2c3d4-1120-4000-8000-000000000010",
+      "name": "Download Google File as PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "NTCXq9HOttLY6Ige",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Extract GDrive ID').item.json.gdrive_url }}",
+          "mode": "url"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        800,
+        420
+      ],
+      "id": "a1b2c3d4-1121-4000-8000-000000000011",
+      "name": "Download Regular File",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "uTHnMFpCoMl5s70A",
+          "name": "Google Drive - @erik.cohen - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cloud.llamaindex.ai/api/v2/parse/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "configuration",
+              "value": "{\"version\":\"latest\",\"tier\":\"agentic_plus\",\"output_options\":{\"markdown\":{\"tables\":{\"output_tables_as_markdown\":false}}}}"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1280,
+        300
+      ],
+      "id": "a1b2c3d4-1122-4000-8000-000000000012",
+      "name": "LlamaParse Upload",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SlfEa12NLco6kYMA",
+          "name": "LlamaIndex - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        300
+      ],
+      "id": "a1b2c3d4-1123-4000-8000-000000000013",
+      "name": "Wait 10s",
+      "webhookId": "cb1e5483-547c-4527-bda3-f7325ffc4751"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.cloud.llamaindex.ai/api/v2/parse/{{ $json.job ? $json.job.id : $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "expand",
+              "value": "markdown"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1720,
+        300
+      ],
+      "id": "a1b2c3d4-1124-4000-8000-000000000014",
+      "name": "Check Parse Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SlfEa12NLco6kYMA",
+          "name": "LlamaIndex - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1d2e3f4-aaaa-4000-8000-000000000001",
+                    "leftValue": "={{ $json.job ? $json.job.status : $json.status }}",
+                    "rightValue": "COMPLETED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "COMPLETED"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1d2e3f4-bbbb-4000-8000-000000000002",
+                    "leftValue": "={{ $json.job ? $json.job.status : $json.status }}",
+                    "rightValue": "PENDING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "PENDING"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "c1d2e3f4-cccc-4000-8000-000000000003",
+                    "leftValue": "={{ $json.job ? $json.job.status : $json.status }}",
+                    "rightValue": "RUNNING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "RUNNING"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1940,
+        300
+      ],
+      "id": "a1b2c3d4-1125-4000-8000-000000000015",
+      "name": "Is Parse Done?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d1e2f3a4-1111-4000-8000-000000000001",
+              "name": "markdown",
+              "value": "={{ $json.markdown.pages.map(p => p.markdown).join('\\n\\n---\\n\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2180,
+        300
+      ],
+      "id": "a1b2c3d4-1126-4000-8000-000000000016",
+      "name": "Combine Pages"
+    },
+    {
+      "parameters": {
+        "tableId": "content_md_storage",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "doc_name",
+              "fieldValue": "={{ $('Get File Metadata').item.json.name || 'Unnamed Document' }}"
+            },
+            {
+              "fieldId": "monday_item_id",
+              "fieldValue": "={{ $('Get Monday Item').item.json.id }}"
+            },
+            {
+              "fieldId": "parsed_text",
+              "fieldValue": "={{ $json.markdown }}"
+            },
+            {
+              "fieldId": "google_drive_id",
+              "fieldValue": "={{ $('Extract GDrive ID').item.json.gdrive_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        300
+      ],
+      "id": "a1b2c3d4-1127-4000-8000-000000000017",
+      "name": "Store Content in Supabase",
+      "credentials": {
+        "supabaseApi": {
+          "id": "7sgyYDL116CbjJqN",
+          "name": "AI Factory Database - @erik - AI Team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://docs.googleapis.com/v1/documents",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"ReTree / {{ $('Get File Metadata').item.json.name || 'New Marketing Asset' }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2620,
+        300
+      ],
+      "id": "a1b2c3d4-1128-4000-8000-000000000018",
+      "name": "Create Google Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "AFWbqVyABqTH873n",
+          "name": "Google Docs - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "name = '2. Repurposing Trees' and mimeType = 'application/vnd.google-apps.folder'",
+        "limit": 1,
+        "filter": {},
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2840,
+        300
+      ],
+      "id": "a1b2c3d4-1129-4000-8000-000000000019",
+      "name": "Get Repurposing Trees Folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "NTCXq9HOttLY6Ige",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $('Create Google Doc').item.json.documentId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "addParents",
+              "value": "={{ $('Get Repurposing Trees Folder').item.json.id }}"
+            },
+            {
+              "name": "removeParents",
+              "value": "root"
+            },
+            {
+              "name": "supportsAllDrives",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3060,
+        300
+      ],
+      "id": "a1b2c3d4-1130-4000-8000-000000000020",
+      "name": "Move Doc to Folder"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "content_md_storage",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "monday_item_id",
+              "keyValue": "={{ $('Get Monday Item').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        180
+      ],
+      "id": "a1b2c3d4-1131-4000-8000-000000000021",
+      "name": "Get Source Document",
+      "credentials": {
+        "supabaseApi": {
+          "id": "7sgyYDL116CbjJqN",
+          "name": "AI Factory Database - @erik - AI Team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "content_md_storage",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "doc_name",
+              "keyValue": "Guesty Content Writing Guidelines"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        3280,
+        420
+      ],
+      "id": "a1b2c3d4-1132-4000-8000-000000000022",
+      "name": "Get Brand Guidelines",
+      "credentials": {
+        "supabaseApi": {
+          "id": "7sgyYDL116CbjJqN",
+          "name": "AI Factory Database - @erik - AI Team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3500,
+        300
+      ],
+      "id": "a1b2c3d4-1133-4000-8000-000000000023",
+      "name": "Merge Docs"
+    },
+    {
+      "parameters": {
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "doc_name"
+            },
+            {
+              "fieldToAggregate": "parsed_text"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        3720,
+        300
+      ],
+      "id": "a1b2c3d4-1134-4000-8000-000000000024",
+      "name": "Aggregate Docs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst docNames = input.doc_name || [];\nconst parsedTexts = input.parsed_text || [];\nlet brand_guidelines = '';\nlet source_document = '';\nfor (let i = 0; i < docNames.length; i++) {\n  if (docNames[i] === 'Guesty Content Writing Guidelines') {\n    brand_guidelines = parsedTexts[i];\n  } else {\n    source_document = parsedTexts[i];\n  }\n}\nreturn [{ json: { brand_guidelines: brand_guidelines, source_document: source_document } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3940,
+        300
+      ],
+      "id": "a1b2c3d4-1135-4000-8000-000000000025",
+      "name": "Prepare Agent Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze the following HERO asset and produce a structured creative brief.\n\n<brand_guidelines>\n{{ $json.brand_guidelines }}\n</brand_guidelines>\n\n<hero_asset>\n{{ $json.source_document }}\n</hero_asset>\n\nExtract the core thesis, target audience, pain points, key arguments with evidence, content pillars, the single best hook, and the CTA theme. Return ONLY the JSON object, no markdown, no code fences.",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a Senior Content Strategist at Guesty, the leading property management platform for short-term rental operators. Your job is to analyze HERO marketing assets (whitepapers, guides, reports, eBooks) and extract a structured creative brief that the content team will use to repurpose the asset across multiple channels.\n\nGUESTY BRAND VOICE:\n- Authoritative but approachable -- we are the experts, not the lecturers\n- Data-driven: lead with insights, back with evidence\n- Operator-first: always speak to the pain points of property managers and hosts\n- Clear and direct: no jargon, no fluff, no passive voice\n- Empowering: our tone says you can do this, and we will help\n\nYOUR OUTPUT must be a valid JSON object with exactly these fields:\n{\n  \"core_thesis\": \"One sentence: the single most important claim this asset makes\",\n  \"target_audience\": \"Who this is written for\",\n  \"pain_points\": [\"pain point 1\", \"pain point 2\", \"pain point 3\"],\n  \"key_arguments\": [\n    {\"argument\": \"...\", \"supporting_evidence\": \"...\"}\n  ],\n  \"content_pillars\": [\"pillar 1\", \"pillar 2\", \"pillar 3\"],\n  \"hook\": \"The most compelling insight from this asset -- 1-2 sentences\",\n  \"cta_theme\": \"What action should readers take after consuming this content?\"\n}\n\nReturn ONLY the JSON object. No markdown, no code fences, no explanation."
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        4160,
+        300
+      ],
+      "id": "a1b2c3d4-1136-4000-8000-000000000026",
+      "name": "Orchestrator: Content Strategist"
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5",
+        "options": {
+          "temperature": 0.2,
+          "maxTokensToSample": 2048
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        4160,
+        500
+      ],
+      "id": "a1b2c3d4-1137-4000-8000-000000000027",
+      "name": "Claude - Orchestrator",
+      "credentials": {
+        "anthropicApi": {
+          "id": "NbTlK3SCKl7Xhoox",
+          "name": "Claude - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1f2a3b4-1111-4000-8000-000000000001",
+              "name": "creative_brief",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "e1f2a3b4-1112-4000-8000-000000000002",
+              "name": "doc_id",
+              "value": "={{ $('Create Google Doc').item.json.documentId }}",
+              "type": "string"
+            },
+            {
+              "id": "e1f2a3b4-1113-4000-8000-000000000003",
+              "name": "monday_item_id",
+              "value": "={{ $('Get Monday Item').item.json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4380,
+        300
+      ],
+      "id": "a1b2c3d4-1138-4000-8000-000000000028",
+      "name": "Store Creative Brief"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "writing_instructions",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        4600,
+        300
+      ],
+      "id": "a1b2c3d4-1139-4000-8000-000000000029",
+      "name": "Get All Writing Instructions",
+      "credentials": {
+        "supabaseApi": {
+          "id": "7sgyYDL116CbjJqN",
+          "name": "AI Factory Database - @erik - AI Team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        4820,
+        300
+      ],
+      "id": "a1b2c3d4-1140-4000-8000-000000000030",
+      "name": "Loop Over Asset Types"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1a2b3c4-1111-4000-8000-000000000001",
+              "name": "asset_type",
+              "value": "={{ $json.asset_type }}",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-1112-4000-8000-000000000002",
+              "name": "writing_instructions",
+              "value": "={{ $json.writing_instructions }}",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-1113-4000-8000-000000000003",
+              "name": "asset_display_name",
+              "value": "={{ $json.asset_type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-1114-4000-8000-000000000004",
+              "name": "creative_brief",
+              "value": "={{ $('Store Creative Brief').item.json.creative_brief }}",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-1115-4000-8000-000000000005",
+              "name": "doc_id",
+              "value": "={{ $('Store Creative Brief').item.json.doc_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f1a2b3c4-1116-4000-8000-000000000006",
+              "name": "monday_item_id",
+              "value": "={{ $('Store Creative Brief').item.json.monday_item_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5040,
+        300
+      ],
+      "id": "a1b2c3d4-1141-4000-8000-000000000031",
+      "name": "Prepare Asset Context"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Using the creative brief below, write the {{ $json.asset_display_name }} copy.\n\n<creative_brief>\n{{ $json.creative_brief }}\n</creative_brief>\n\n<asset_type_instructions>\n{{ $json.writing_instructions }}\n</asset_type_instructions>\n\nWrite the complete {{ $json.asset_display_name }} copy now. Follow the asset type rules exactly. Format in Markdown. Start directly with the copy -- no preamble, no explanation.",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "=You are a specialist Marketing Copywriter at Guesty, the leading property management platform for short-term rental operators. You write {{ $json.asset_display_name }} copy.\n\nGUESTY BRAND VOICE:\n- Authoritative but approachable\n- Data-driven: lead with insights, back with evidence\n- Operator-first: speak to property managers and hosts\n- Clear and direct: no jargon, no fluff, no passive voice\n- Empowering: you can do this, and we will help\n\nYOUR ASSET TYPE RULES:\n{{ $json.writing_instructions }}\n\nCRITICAL OUTPUT RULES:\n- Return ONLY the final copy, formatted in Markdown\n- Do not include any preamble, explanation, or meta-commentary\n- Do not say Here is your... or Based on the brief...\n- Start directly with the first line of copy"
+            }
+          ]
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        5260,
+        300
+      ],
+      "id": "a1b2c3d4-1142-4000-8000-000000000032",
+      "name": "Asset Writer Agent"
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5",
+        "options": {
+          "temperature": 0.5,
+          "maxTokensToSample": 4096
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        5260,
+        500
+      ],
+      "id": "a1b2c3d4-1143-4000-8000-000000000033",
+      "name": "Claude - Asset Writer",
+      "credentials": {
+        "anthropicApi": {
+          "id": "NbTlK3SCKl7Xhoox",
+          "name": "Claude - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1c2d3e4-1111-4000-8000-000000000001",
+              "name": "generated_copy",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "b1c2d3e4-1112-4000-8000-000000000002",
+              "name": "asset_display_name",
+              "value": "={{ $('Prepare Asset Context').item.json.asset_display_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b1c2d3e4-1113-4000-8000-000000000003",
+              "name": "doc_id",
+              "value": "={{ $('Prepare Asset Context').item.json.doc_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b1c2d3e4-1114-4000-8000-000000000004",
+              "name": "monday_item_id",
+              "value": "={{ $('Prepare Asset Context').item.json.monday_item_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5480,
+        300
+      ],
+      "id": "a1b2c3d4-1144-4000-8000-000000000034",
+      "name": "Store Generated Copy"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.doc_id }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": [\n    {\n      \"addDocumentTab\": {\n        \"tabProperties\": {\n          \"title\": \"{{ $json.asset_display_name }}\"\n        }\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5700,
+        300
+      ],
+      "id": "a1b2c3d4-1145-4000-8000-000000000035",
+      "name": "Create Doc Tab",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "AFWbqVyABqTH873n",
+          "name": "Google Docs - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1d2e3f4-1111-4000-8000-000000000001",
+              "name": "tab_id",
+              "value": "={{ $json.replies[0].addDocumentTab.tabProperties.tabId }}",
+              "type": "string"
+            },
+            {
+              "id": "c1d2e3f4-1112-4000-8000-000000000002",
+              "name": "doc_id",
+              "value": "={{ $('Store Generated Copy').item.json.doc_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c1d2e3f4-1113-4000-8000-000000000003",
+              "name": "asset_display_name",
+              "value": "={{ $('Store Generated Copy').item.json.asset_display_name }}",
+              "type": "string"
+            },
+            {
+              "id": "c1d2e3f4-1114-4000-8000-000000000004",
+              "name": "monday_item_id",
+              "value": "={{ $('Store Generated Copy').item.json.monday_item_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c1d2e3f4-1115-4000-8000-000000000005",
+              "name": "clean_text",
+              "value": "==== {{ $('Store Generated Copy').item.json.asset_display_name.toUpperCase() }} COPY ====\n\n{{ $('Store Generated Copy').item.json.generated_copy }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5920,
+        300
+      ],
+      "id": "a1b2c3d4-1146-4000-8000-000000000036",
+      "name": "Prepare Tab Content"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.doc_id }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDocsOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": [\n    {\n      \"insertText\": {\n        \"endOfSegmentLocation\": {\n          \"tabId\": \"{{ $json.tab_id }}\"\n        },\n        \"text\": {{ JSON.stringify($json.clean_text) }}\n      }\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        6140,
+        300
+      ],
+      "id": "a1b2c3d4-1147-4000-8000-000000000037",
+      "name": "Inject Copy into Tab",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "AFWbqVyABqTH873n",
+          "name": "Google Docs - @erik - Marketing / AI Team"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.monday.com/v2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "mondayComApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"mutation ($parentId: ID!, $itemName: String!, $colVals: JSON!) { create_subitem(parent_item_id: $parentId, item_name: $itemName, column_values: $colVals) { id } }\",\n  \"variables\": {\n    \"parentId\": \"{{ $('Prepare Tab Content').item.json.monday_item_id }}\",\n    \"itemName\": \"{{ $('Prepare Tab Content').item.json.asset_display_name }}\",\n    \"colVals\": \"{{ JSON.stringify({ link_mm1hr2cs: { url: 'https://docs.google.com/document/d/' + $('Prepare Tab Content').item.json.doc_id + '/edit?tab=' + $('Prepare Tab Content').item.json.tab_id, text: 'View ' + $('Prepare Tab Content').item.json.asset_display_name }, status: { label: 'Ready for review' } }) }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6360,
+        300
+      ],
+      "id": "a1b2c3d4-1148-4000-8000-000000000038",
+      "name": "Create Monday Subitem",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "changeColumnValue",
+        "boardId": "18403270901",
+        "itemId": "={{ $('Store Creative Brief').item.json.monday_item_id }}",
+        "columnId": "status",
+        "value": "={{ JSON.stringify({ index: 1 }) }}"
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        6580,
+        300
+      ],
+      "id": "a1b2c3d4-1149-4000-8000-000000000039",
+      "name": "Set Status: Ready for Review",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "boardItem",
+        "operation": "addUpdate",
+        "itemId": "={{ $('Store Creative Brief').item.json.monday_item_id }}",
+        "value": "Asset Generation Complete! All assets are ready in the subitems. CC: https://guesty.monday.com/users/59331203-amarelle-wenkert"
+      },
+      "type": "n8n-nodes-base.mondayCom",
+      "typeVersion": 1,
+      "position": [
+        6800,
+        300
+      ],
+      "id": "a1b2c3d4-1150-4000-8000-000000000040",
+      "name": "Add Completion Update",
+      "credentials": {
+        "mondayComApi": {
+          "id": "YesttFBJZtHO9Sbp",
+          "name": "Monday Token - @erik - AI team / Marketing"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monday.com Trigger": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Monday Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Monday Item": {
+      "main": [
+        [
+          {
+            "node": "Extract GDrive ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract GDrive ID": {
+      "main": [
+        [
+          {
+            "node": "Get File Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get File Metadata": {
+      "main": [
+        [
+          {
+            "node": "Set Status: Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status: Processing": {
+      "main": [
+        [
+          {
+            "node": "Add Processing Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Processing Update": {
+      "main": [
+        [
+          {
+            "node": "Google or Regular File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google or Regular File": {
+      "main": [
+        [
+          {
+            "node": "Get Export Links",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Regular File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Export Links": {
+      "main": [
+        [
+          {
+            "node": "Download Google File as PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Google File as PDF": {
+      "main": [
+        [
+          {
+            "node": "LlamaParse Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Regular File": {
+      "main": [
+        [
+          {
+            "node": "LlamaParse Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LlamaParse Upload": {
+      "main": [
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 10s": {
+      "main": [
+        [
+          {
+            "node": "Check Parse Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Parse Status": {
+      "main": [
+        [
+          {
+            "node": "Is Parse Done?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Parse Done?": {
+      "main": [
+        [
+          {
+            "node": "Combine Pages",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 10s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Pages": {
+      "main": [
+        [
+          {
+            "node": "Store Content in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Content in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Get Repurposing Trees Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Repurposing Trees Folder": {
+      "main": [
+        [
+          {
+            "node": "Move Doc to Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move Doc to Folder": {
+      "main": [
+        [
+          {
+            "node": "Get Source Document",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Brand Guidelines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Source Document": {
+      "main": [
+        [
+          {
+            "node": "Merge Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Brand Guidelines": {
+      "main": [
+        [
+          {
+            "node": "Merge Docs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Docs": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Docs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Docs": {
+      "main": [
+        [
+          {
+            "node": "Prepare Agent Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent Data": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator: Content Strategist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator: Content Strategist": {
+      "main": [
+        [
+          {
+            "node": "Store Creative Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Orchestrator": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrator: Content Strategist",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Creative Brief": {
+      "main": [
+        [
+          {
+            "node": "Get All Writing Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Writing Instructions": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Asset Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Asset Types": {
+      "main": [
+        [
+          {
+            "node": "Set Status: Ready for Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Asset Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Asset Context": {
+      "main": [
+        [
+          {
+            "node": "Asset Writer Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Asset Writer Agent": {
+      "main": [
+        [
+          {
+            "node": "Store Generated Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude - Asset Writer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Asset Writer Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Generated Copy": {
+      "main": [
+        [
+          {
+            "node": "Create Doc Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Doc Tab": {
+      "main": [
+        [
+          {
+            "node": "Prepare Tab Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Tab Content": {
+      "main": [
+        [
+          {
+            "node": "Inject Copy into Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inject Copy into Tab": {
+      "main": [
+        [
+          {
+            "node": "Create Monday Subitem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Monday Subitem": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Asset Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status: Ready for Review": {
+      "main": [
+        [
+          {
+            "node": "Add Completion Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Monday.com Trigger": [
+      {
+        "headers": {
+          "host": "guesty.app.n8n.cloud",
+          "content-type": "application/json"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "event": {
+            "app": "monday",
+            "type": "update_column_value",
+            "triggerTime": "2026-04-13T14:01:10.150Z",
+            "subscriptionId": 679676018,
+            "isRetry": false,
+            "userId": 93768523,
+            "boardId": 18403270901,
+            "groupId": "topics",
+            "pulseId": 11733616225,
+            "pulseName": "Guesty Website vs Others",
+            "columnId": "status",
+            "columnType": "color",
+            "columnTitle": "Status",
+            "value": {
+              "label": {
+                "index": 3,
+                "text": "Ready for AI",
+                "style": {
+                  "color": "#007eb5",
+                  "border": "#3db0df",
+                  "var_name": "blue-links"
+                },
+                "is_done": false
+              },
+              "post_id": null
+            },
+            "previousValue": null,
+            "changedAt": 1776088869.438966,
+            "isTopGroup": true,
+            "triggerUuid": "192d6ec32bd46a861af7d0da06671f7e"
+          }
+        },
+        "webhookUrl": "https://guesty.app.n8n.cloud/webhook/55a16683-a46b-478d-853b-83168ac3943e",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
+}

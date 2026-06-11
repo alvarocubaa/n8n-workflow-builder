@@ -1,29 +1,42 @@
 - name: harvested_cs_010
-  description: "Harvested from roni.shif@guesty.com - [AI by roni.shif] Universal Client Reporting - HQ + Non-HQ"
+  description: "Harvested from roni.shif@guesty.com - my input is binary data and I need to filter some of it b..."
   department: cs
   prompt: >
-    Here is the high-level guideline document you can hand off to your n8n builder. It explains exactly how to refactor the existing workflow into the scalable, modular architecture required for both HQ and Non-HQ clients.
+    my input is binary data and I need to filter some of it by the birnary file NAME 
     
-    ***
-    
-    # Builder Guidelines: Universal Client Reporting Automation
-    **Objective:** Refactor the existing monolithic HQ reporting workflow into a "Core Engine" (Sub-workflow) powered by dynamic "Sourcing Triggers." This ensures we can process both HQ (Many-to-One) and Non-HQ/At-Ri...
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "url": "=https://rest.na.zuora.com{{ $json.pdfFileUrl }}",
+            "sendHeaders": true,
+            "headerParameters": {
+              "parameters": [
+                {
+                  "name": "Authorization",
+                  "value": "=Bearer {{ $('Zuora Auth1').item.json.access_token }}"
+                }
+              ]
+            },
+            "options": {
+              "response": {
+         ...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - set
+    - aggregate
   expected_creds:
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: iGYjAAytXxl4L8fEL7aG
+    source_conversation: FHxVq6X8FgqWUAhlv23Q
     source_user: roni.shif@guesty.com
-    deployed: true
-    deployed_workflow_id: AlTAZjQ2mwuj8JAu
-    workflow_name: "[AI by roni.shif] Universal Client Reporting - HQ + Non-HQ"
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "my input is binary data and I need to filter some of it b..."
     node_count: 1
-    complexity_score: 4
-    harvested_at: 2026-04-01T09:38:06.212Z
+    complexity_score: 1
+    harvested_at: 2026-04-15T15:43:43.771Z
     confidence: medium
     workflow_json_file: harvested_cs_010_workflow.json

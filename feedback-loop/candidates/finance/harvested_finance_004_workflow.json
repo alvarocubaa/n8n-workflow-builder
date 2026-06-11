@@ -1,0 +1,205 @@
+{
+  "name": "Zuora Payment Gateway Fee Reconciliation",
+  "nodes": [
+    {
+      "id": "a3f1c2d4-8e5b-4a7c-9f0d-1b2e3c4d5e6f",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b4e2d3f5-9f6c-4b8d-a0e1-2c3d4e5f6a7b",
+      "name": "Query Fee Mismatches",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "WITH configured_fees AS (\n  SELECT\n    account_id,\n    account_name,\n    subscription_name,\n    plan_name,\n    plan_value          AS configured_fee,\n    charge_model,\n    effective_end_date\n  FROM `guesty-data.zuora_analytics.product_catalog`\n  WHERE LOWER(plan_name) LIKE '%payment gateway%'\n    AND effective_end_date > CURRENT_DATE()\n),\n\ninvoiced_amounts AS (\n  SELECT\n    mongo_account_id    AS account_id,\n    subscription_name,\n    SUM(amount)         AS total_invoiced\n  FROM `guesty-data.zuora_analytics.invoice_items`\n  WHERE invoice_item_created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)\n    AND LOWER(product_name) LIKE '%payment gateway%'\n  GROUP BY mongo_account_id, subscription_name\n)\n\nSELECT\n  cf.account_id,\n  cf.account_name,\n  cf.subscription_name,\n  cf.plan_name,\n  cf.configured_fee,\n  ia.total_invoiced,\n  ROUND(ia.total_invoiced - cf.configured_fee, 4) AS fee_delta,\n  cf.charge_model,\n  cf.effective_end_date\nFROM configured_fees cf\nJOIN invoiced_amounts ia\n  ON cf.account_id = ia.account_id\n  AND cf.subscription_name = ia.subscription_name\nWHERE ROUND(ia.total_invoiced - cf.configured_fee, 4) != 0\nORDER BY ABS(ia.total_invoiced - cf.configured_fee) DESC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "c5f3e4a6-0a7d-4c9e-b1f2-3d4e5f6a7b8c",
+      "name": "Any Mismatches Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "d6a4f5b7-1b8e-4d0f-c2a3-4e5f6a7b8c9d",
+              "leftValue": "={{ $json.account_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e7b5a6c8-2c9f-4e1a-d3b4-5f6a7b8c9d0e",
+      "name": "Build Alert Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst today = new Date().toISOString().slice(0, 10);\n\nconst lines = items.map(function(item) {\n  const m = item.json;\n  const configured = Number(m.configured_fee).toFixed(2);\n  const invoiced = Number(m.total_invoiced).toFixed(2);\n  const delta = Number(m.fee_delta).toFixed(2);\n  const sign = Number(m.fee_delta) > 0 ? '+' : '';\n  return '- *' + m.account_name + '* | Sub: ' + m.subscription_name + ' | Plan: ' + m.plan_name + ' | Configured: $' + configured + ' | Invoiced: $' + invoiced + ' | Delta: ' + sign + '$' + delta;\n}).join('\\n');\n\nconst text = ':rotating_light: *Payment Gateway Fee Reconciliation Alert*\\nDate: ' + today + ' | Window: Last 30 days\\n\\n*' + items.length + ' account(s) with fee mismatches found:*\\n\\n' + lines + '\\n\\n_Review in BigQuery: guesty-data.zuora_analytics_';\n\nreturn [{ json: { slackText: text } }];"
+      }
+    },
+    {
+      "id": "f8c6b7d9-3d0a-4f2b-e4c5-6a7b8c9d0e1f",
+      "name": "Post Mismatch Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1120,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-alerts"
+        },
+        "text": "={{ $json.slackText }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "b1f9e0a2-6a3d-4c5e-b7f8-9d0e1f2a3b4c",
+      "name": "Post All Clear",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        900,
+        440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-alerts"
+        },
+        "text": "=:white_check_mark: *Payment Gateway Fee Reconciliation* | {{ $now.toFormat('yyyy-MM-dd') }}\n\nNo fee mismatches found in the last 30 days. All configured fees match invoiced amounts.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query Fee Mismatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Fee Mismatches": {
+      "main": [
+        [
+          {
+            "node": "Any Mismatches Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Mismatches Found?": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post All Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert Message": {
+      "main": [
+        [
+          {
+            "node": "Post Mismatch Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

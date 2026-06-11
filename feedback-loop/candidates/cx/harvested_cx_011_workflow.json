@@ -1,180 +1,189 @@
 {
+  "name": "Email Open Pixel Tracker",
   "nodes": [
     {
-      "parameters": {
-        "fieldToSplitOut": "all_attendee_emails",
-        "options": {
-          "destinationFieldName": "email",
-          "delimiter": ","
-        }
-      },
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Split Attendees",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
+      "id": "a3f1c2d4-8b7e-4f9a-b1c2-d3e4f5a6b7c8",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
-        -7680,
-        -1296
-      ]
+        240,
+        300
+      ],
+      "webhookId": "track-open-pixel-001",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "track-open",
+        "responseMode": "responseNode",
+        "options": {}
+      }
     },
     {
+      "id": "b4e2d3f5-9c8f-4a0b-c2d3-e4f5a6b7c8d9",
+      "name": "Append to Email Opens Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": false,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1GmQkwmlz0NSQZ9yj2kMui1vu_F4kior0UHNDEeV43eo"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Email Opens"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $now.toISO() }}",
+            "csm_email": "={{ $json.query.csm }}",
+            "batch_id": "={{ $json.query.bid }}",
+            "user_agent": "={{ $json.headers['user-agent'] }}"
           },
-          "conditions": [
+          "matchingColumns": [],
+          "schema": [
             {
-              "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-              "leftValue": "={{ $json.email.trim() }}",
-              "rightValue": "@guesty.com",
-              "operator": {
-                "type": "string",
-                "operation": "notContains"
-              }
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "csm_email",
+              "displayName": "csm_email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "batch_id",
+              "displayName": "batch_id",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user_agent",
+              "displayName": "user_agent",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
             }
-          ],
-          "combinator": "and"
+          ]
         },
         "options": {}
       },
-      "id": "3d594a2f-1b8e-4c91-b6d3-8f2e1a0c7b45",
-      "name": "Filter External",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
-      "position": [
-        -7488,
-        -1296
-      ]
-    },
-    {
-      "parameters": {
-        "resource": "search",
-        "query": "=SELECT Id, Name, Main_Contact_Email__c, Guesty_Admin_ID__c, (SELECT FirstName, LastName, Email FROM Contacts WHERE Email != null) FROM Account WHERE Main_Contact_Email__c = '{{ $json.email.trim() }}' OR Id IN (SELECT AccountId FROM Contact WHERE Email = '{{ $json.email.trim() }}') LIMIT 1"
-      },
-      "id": "9b1e4f2a-6c3d-4e8b-a1f5-2d7c0b9e3a16",
-      "name": "Find SF Account",
-      "type": "n8n-nodes-base.salesforce",
-      "typeVersion": 1,
-      "position": [
-        -7296,
-        -1296
-      ],
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput",
       "credentials": {
-        "salesforceOAuth2Api": {
-          "id": "fCB6gfK7EaGpMnZy",
-          "name": "Salesforce Production Read"
+        "googleSheetsOAuth2Api": {
+          "id": "vkdgHYUQNhtG8jsq",
+          "name": "Inbal - Google Sheets"
         }
       }
     },
     {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "loose",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "a4d8e1f3-9b2c-4a7d-b6e5-1c3f8d2a0e94",
-              "leftValue": "={{ $json.Id }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty",
-                "singleValue": true
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "c2e7b4a9-5f1d-4b8c-9e3a-6d0f2c8b1e47",
-      "name": "Filter No Match",
-      "type": "n8n-nodes-base.filter",
-      "typeVersion": 2.2,
+      "id": "c5f3e4a6-0d9a-4b1c-d3e4-f5a6b7c8d9e0",
+      "name": "Return Pixel GIF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        -7104,
-        -1296
-      ]
+        720,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const gifBase64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';\nconst buffer = Buffer.from(gifBase64, 'base64');\nreturn [{\n  binary: {\n    data: await this.helpers.prepareBinaryData(buffer, 'pixel.gif', 'image/gif')\n  },\n  json: {}\n}];"
+      }
     },
     {
-      "parameters": {
-        "maxItems": 1
-      },
-      "id": "e8a3c6f1-2d9b-4e7a-b5c4-0f1d3e8a2c69",
-      "name": "First Match Only",
-      "type": "n8n-nodes-base.limit",
-      "typeVersion": 1,
+      "id": "d6a4f5b7-1e0b-4c2d-e4f5-a6b7c8d9e0f1",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
       "position": [
-        -6912,
-        -1296
-      ]
+        960,
+        300
+      ],
+      "parameters": {
+        "respondWith": "binary",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "image/gif"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+              },
+              {
+                "name": "Pragma",
+                "value": "no-cache"
+              }
+            ]
+          }
+        }
+      }
     }
   ],
   "connections": {
-    "Split Attendees": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "Filter External",
+            "node": "Append to Email Opens Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Filter External": {
+    "Append to Email Opens Sheet": {
       "main": [
         [
           {
-            "node": "Find SF Account",
+            "node": "Return Pixel GIF",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Find SF Account": {
+    "Return Pixel GIF": {
       "main": [
         [
           {
-            "node": "Filter No Match",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter No Match": {
-      "main": [
-        [
-          {
-            "node": "First Match Only",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "First Match Only": {
-      "main": [
-        [
-          {
-            "node": "Get Account Analytics1",
+            "node": "Respond to Webhook",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
+  },
+  "settings": {
+    "executionOrder": "v1"
   }
 }

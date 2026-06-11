@@ -1,33 +1,34 @@
 - name: harvested_cx_003
-  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow at 8am UTC. Query BigQuery zendes..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that reads recent Zendesk tickets..."
   department: cx
   prompt: >
-    Create a daily workflow at 8am UTC. Query BigQuery zendesk_analytics.tickets_clean for tickets where status = 'open' and updated_at is older than 14 days. For each ticket in the results, use the native Zendesk node to add an internal comment saying 'Auto-reminder: This ticket has been open for 14+ days. Please review and update.' After processing all tickets, post a summary count of tickets commented on to #cx-ticket-hygiene in Slack.
+    Create a daily workflow that reads recent Zendesk tickets from the past 24 hours using the native Zendesk node. For each ticket, classify whether the customer message contains upsell intent (e.g., asking about upgrades, new features, higher plans). Use an AI/LLM node for the classification — do not use Code nodes. Post tickets with detected upsell intent to #cx-upsell-opportunities in Slack with ticket ID, subject, account name, and the AI confidence score. Run daily at 10am UTC.
   confirm_message: "Looks good, build it"
   expected_nodes:
     - scheduleTrigger
-    - googleBigQuery
     - zendesk
-    - aggregate
+    - @n8n/n8n-nodes-langchain.chainLlm
+    - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
+    - set
+    - if
     - slack
   expected_creds:
-    googleApi: PAAimNTryrvB72dp
     zendeskApi: OTFp18SnDgGUSn9u
+    googlePalmApi: JrzPwNiVhZibKlAr
     slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
     - uuids
     - credentials
-    - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: QrGEsgYgeAfFx9HqM1rz
+    source_conversation: PWLrvxtGc6l84Pp48Txy
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a daily workflow at 8am UTC. Query BigQuery zendes..."
-    node_count: 5
+    workflow_name: "Create a daily workflow that reads recent Zendesk tickets..."
+    node_count: 7
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_cx_003_workflow.json

@@ -1,29 +1,35 @@
 - name: harvested_cs_009
-  description: "Harvested from alvaro.cuba@guesty.com - Here is the high-level guideline document you can hand of..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a production workflow that polls Salesforce every ..."
   department: cs
   prompt: >
-    Here is the high-level guideline document you can hand off to your n8n builder. It explains exactly how to refactor the existing workflow into the scalable, modular architecture required for both HQ and Non-HQ clients.
-    
-    ***
-    
-    # Builder Guidelines: Universal Client Reporting Automation
-    **Objective:** Refactor the existing monolithic HQ reporting workflow into a "Core Engine" (Sub-workflow) powered by dynamic "Sourcing Triggers." This ensures we can process both HQ (Many-to-One) and Non-HQ/At-Ri...
+    Create a production workflow that polls Salesforce every day at 6pm for updated opportunities. Use production credentials. When an opportunity is updated, query Salesforce for the opportunity details including Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, and Account.Guesty_Admin_ID__c. Filter for renewal record type (RecordTypeId = "0125p000001101UAAQ") where Last_Stage__c contains "declined" and churn date is after 2024-01-01. Then query BigQuery csm_churn_report for max...
   confirm_message: "Looks good, build it"
   expected_nodes:
+    - scheduleTrigger
+    - salesforce
+    - if
+    - googleBigQuery
     - set
+    - slack
   expected_creds:
+    salesforceOAuth2Api: fCB6gfK7EaGpMnZy
+    googleApi: VQ7CU7dKViVcv8Ah
+    slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
+    - sf_config
+    - slack_config
   _metadata:
-    source_conversation: xf5HHGXXBNZZo8XByqLW
+    source_conversation: vdavc3gS7XihiHHFyqKQ
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Here is the high-level guideline document you can hand of..."
-    node_count: 1
+    workflow_name: "Create a production workflow that polls Salesforce every ..."
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.210Z
-    confidence: medium
+    harvested_at: 2026-04-15T15:43:43.770Z
+    confidence: high
     workflow_json_file: harvested_cs_009_workflow.json

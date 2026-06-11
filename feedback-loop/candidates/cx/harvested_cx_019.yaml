@@ -1,0 +1,31 @@
+- name: harvested_cx_019
+  description: "Harvested from yoni.sharon@guesty.com - Build me a workflow that pulls the ads run in the past mo..."
+  department: cx
+  prompt: >
+    Build me a workflow that pulls the ads run in the past month from Hostaway, Lodgify and Hospitable, and tracks those ads that remain to find winning ads they have from Google's transparency center and Meta's ad library, along with links to these ads
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - set
+    - httpRequest
+    - splitOut
+    - merge
+    - googleSheets
+    - filter
+  expected_creds:
+    googleSheetsOAuth2Api: 7ORQ8IRh8B5Gh30x
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: 7JsuQLQ0bNONUnVOtXLR
+    source_user: yoni.sharon@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Build me a workflow that pulls the ads run in the past mo..."
+    node_count: 17
+    complexity_score: 1
+    harvested_at: 2026-04-15T15:43:43.772Z
+    confidence: high
+    workflow_json_file: harvested_cx_019_workflow.json

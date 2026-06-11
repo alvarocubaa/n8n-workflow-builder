@@ -2,30 +2,268 @@
   "nodes": [
     {
       "parameters": {
-        "url": "=https://guesty3396.zendesk.com/api/v2/users/search.json?query=email:{{ $('Read GSheet').item.json['Requester Email'] }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "zendeskApi",
+        "path": "track-open",
+        "responseMode": "responseNode",
         "options": {}
       },
-      "id": "7289a757-6f3a-4be3-a476-502021655886",
-      "name": "Get Zendesk Org",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "1e43673a-a3de-4b9e-b168-37daf34aa7aa",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
-        -1376,
-        -480
+        -800,
+        -32
       ],
-      "alwaysOutputData": true,
+      "webhookId": "track-open-pixel-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "const h = $json.headers || {};\nconst ua = h['user-agent'] || '';\n\nconst botSignatures = [\n  'GoogleImageProxy',\n  'Yahoo! Slurp',\n  'Googlebot',\n  'bingbot',\n  'Twitterbot',\n  'facebookexternalhit',\n  'AdsBot',\n  'Slackbot',\n  'LinkedInBot'\n];\n\nconst isBot = botSignatures.some(sig => ua.includes(sig));\n\nreturn [{\n  json: {\n    is_human: !isBot,\n    execution_id: ($json.query && $json.query.bid) || '',\n    csm_email: ($json.query && $json.query.csm) || '',\n    opened_at: new Date().toISOString(),\n    user_agent: ua,\n    ip: h['cf-connecting-ip'] || h['x-forwarded-for'] || ''\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -32
+      ],
+      "id": "edf45aff-4449-4c29-a223-0ef841aabecc",
+      "name": "Normalize + Detect Bot"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ce18d8a9-52f5-4a5f-b53c-488c26482c0a",
+              "leftValue": "={{ $json.is_human }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -320,
+        -32
+      ],
+      "id": "e75a1b1a-56c8-4085-abe3-1d5fdf7943d1",
+      "name": "Is Human?"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1GmQkwmlz0NSQZ9yj2kMui1vu_F4kior0UHNDEeV43eo",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1002,
+          "mode": "list",
+          "cachedResultName": "Opens",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1GmQkwmlz0NSQZ9yj2kMui1vu_F4kior0UHNDEeV43eo/edit#gid=1002"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "execution_id": "={{ $json.execution_id }}",
+            "csm_email": "={{ $json.csm_email }}",
+            "opened_at": "={{ $json.opened_at }}",
+            "user_agent": "={{ $json.user_agent }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "csm_email",
+              "displayName": "csm_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "opened_at",
+              "displayName": "opened_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_agent",
+              "displayName": "user_agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "102220b4-1747-45e1-857d-4c02f6c4c17a",
+      "name": "Append to Email Opens Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -80,
+        -32
+      ],
       "credentials": {
-        "zendeskApi": {
-          "id": "4zfIc5d8uJMBSFo2",
-          "name": "Zendesk account 5"
+        "googleSheetsOAuth2Api": {
+          "id": "RPi7Ecm1B3utIhYr",
+          "name": "Google Sheets - Roni Shif"
         }
       }
+    },
+    {
+      "parameters": {
+        "jsCode": "const gifBase64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';\nconst buffer = Buffer.from(gifBase64, 'base64');\n\nreturn [{\n  binary: {\n    data: await this.helpers.prepareBinaryData(buffer, 'pixel.gif', 'image/gif')\n  },\n  json: {}\n}];"
+      },
+      "id": "34f6ca68-a8ed-41b9-ac12-bb301e7a1d6b",
+      "name": "Return Pixel GIF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "set",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "image/gif"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
+              },
+              {
+                "name": "Pragma",
+                "value": "no-cache"
+              }
+            ]
+          }
+        }
+      },
+      "id": "89a305db-781a-4a29-b11c-9b0082393e18",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -320,
+        200
+      ]
     }
   ],
-  "connections": {},
-  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Detect Bot",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Return Pixel GIF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Detect Bot": {
+      "main": [
+        [
+          {
+            "node": "Is Human?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Human?": {
+      "main": [
+        [
+          {
+            "node": "Append to Email Opens Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Return Pixel GIF": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook": [
+      {
+        "headers": {
+          "host": "guesty.app.n8n.cloud",
+          "user-agent": "Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)",
+          "accept-encoding": "gzip, br",
+          "cf-connecting-ip": "66.249.84.13",
+          "x-forwarded-for": "66.249.84.13, 172.68.22.65"
+        },
+        "params": {},
+        "query": {
+          "csm": "zafar.khan@guesty.com",
+          "bid": "1759331"
+        },
+        "body": {},
+        "webhookUrl": "https://guesty.app.n8n.cloud/webhook/track-open",
+        "executionMode": "production"
+      }
+    ]
+  },
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"

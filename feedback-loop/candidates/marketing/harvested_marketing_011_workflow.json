@@ -1,0 +1,747 @@
+{
+  "name": "Competitor Event Intelligence Tracker v7",
+  "nodes": [
+    {
+      "id": "a1f3c2d4-8e7b-4a9c-b5d6-1e2f3a4b5c6d",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2e4d5f6-9a8c-4b7d-c6e7-2f3a4b5c6d7e",
+      "name": "Get Competitors List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        220,
+        200
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "mode": "id",
+          "value": "1THwZ8bVYaINIIYS6fiGzCWbLeU2mLSf8bH4SWZ4Refo"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Competitors"
+        },
+        "range": "A:D"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4jA8N85DnTpkvyeV",
+          "name": "Google Sheets - @erik.cohen"
+        }
+      }
+    },
+    {
+      "id": "c3f5e6a7-0b9d-4c8e-d7f8-3a4b5c6d7e8f",
+      "name": "Get Guesty Events",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        220,
+        420
+      ],
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "mode": "id",
+          "value": "1THwZ8bVYaINIIYS6fiGzCWbLeU2mLSf8bH4SWZ4Refo"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Events guesty is attending"
+        },
+        "range": "A:B"
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4jA8N85DnTpkvyeV",
+          "name": "Google Sheets - @erik.cohen"
+        }
+      }
+    },
+    {
+      "id": "d4a6f7b8-1c0e-4d9f-e8a9-4b5c6d7e8f9a",
+      "name": "Combine Inputs",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition"
+      }
+    },
+    {
+      "id": "e5b7a8c9-2d1f-4e0a-f9b0-5c6d7e8f9a0b",
+      "name": "Loop Over Competitors",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "f6c8b9d0-3e2a-4f1b-a0c1-6d7e8f9a0b1c",
+      "name": "Scrape Events Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "url": "={{ $json['Events Website'] }}",
+          "formats": [
+            "markdown"
+          ],
+          "onlyMainContent": true
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngaBlIhFMFTZFajQ",
+          "name": "firecrawl"
+        }
+      }
+    },
+    {
+      "id": "a7d9c0e1-4f3b-4a2c-b1d2-7e8f9a0b1c2d",
+      "name": "Scrape LinkedIn Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        880,
+        420
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": {
+          "url": "={{ $json['LinkedIn URL'] }}",
+          "formats": [
+            "markdown"
+          ],
+          "onlyMainContent": true,
+          "includeTags": [
+            "img"
+          ]
+        }
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "ngaBlIhFMFTZFajQ",
+          "name": "firecrawl"
+        }
+      }
+    },
+    {
+      "id": "b8e0d1f2-5a4c-4b3d-c2e3-8f9a0b1c2d3e",
+      "name": "Merge Scraped Content",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition"
+      }
+    },
+    {
+      "id": "c9f1e2a3-6b5d-4c4e-d3f4-9a0b1c2d3e4f",
+      "name": "AI Event Extractor",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "=Competitor: {{ $json['Competitor Name'] }}\n\nEVENTS WEBSITE CONTENT:\n{{ $('Scrape Events Website').item.json.data.markdown }}\n\nLINKEDIN PAGE CONTENT:\n{{ $('Scrape LinkedIn Page').item.json.data.markdown }}\n\nGUESTY EVENTS LIST:\n{{ $('Get Guesty Events').all().map(e => e.json['Event Name']).join(', ') }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are an event intelligence analyst. Extract all THIRD-PARTY events this competitor is attending, sponsoring, speaking at, or exhibiting at. STRICT EXCLUSION RULES - do NOT include: (1) webinars hosted or owned by the competitor themselves, (2) product demos or product launches run by the competitor, (3) internal company events, training sessions, or town halls, (4) any event where the competitor is the sole organizer or host. ONLY include events where the competitor is a participant, sponsor, speaker, or exhibitor alongside other companies. For each qualifying event found, check if it appears in the Guesty Events List. Return ONLY a valid JSON array, no markdown, no code fences. Each item must have these exact fields: event_name (string), event_date (string, use Unknown if not found), city (string, the city where the event takes place, use Unknown if not found, use Virtual if online), state (string, the state or province, use Unknown if not applicable or not found, use N/A for non-US events), country (string, the country where the event takes place, use Unknown if not found, use Online if virtual), event_url (string, the direct URL to the event website or registration page - look for hyperlinks in the scraped content associated with the event name, use the competitor events page URL as fallback if no specific event URL is found), source (either Events Website or LinkedIn or Both), guesty_attending (either Yes or No or Unknown - Yes only if the event name closely matches one in the Guesty Events List), photo_urls (array of image URLs found on LinkedIn related to this event, empty array if none). If no qualifying events are found, return an empty array []."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "Extract all third-party events for competitor: {{ $json['Competitor Name'] }}"
+            }
+          ]
+        },
+        "hasOutputParser": false
+      }
+    },
+    {
+      "id": "d0a2f3b4-7c6e-4d5f-e4a5-0b1c2d3e4f5a",
+      "name": "Gemini LM",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        500
+      ],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "e1b3a4c5-8d7f-4e6a-f5b6-1c2d3e4f5a6b",
+      "name": "Parse AI Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2c4b5d6-9e8a-4f7b-a6c7-2d3e4f5a6b7c",
+              "name": "competitor_name",
+              "value": "={{ $('Loop Over Competitors').item.json['Competitor Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "a3d5c6e7-0f9b-4a8c-b7d8-3e4f5a6b7c8d",
+              "name": "events_parsed",
+              "value": "={{ JSON.parse($json.text) }}",
+              "type": "array"
+            },
+            {
+              "id": "b4e6d7f8-1a0c-4b9d-c8e9-4f5a6b7c8d9e",
+              "name": "run_date",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c5f7e8a9-2b1d-4c0e-d9f0-5a6b7c8d9e0f",
+      "name": "Split Events Into Rows",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "fieldToSplitOut": "events_parsed",
+        "options": {}
+      }
+    },
+    {
+      "id": "d6a8f9b0-3c2e-4d1f-e0a1-6b7c8d9e0f1a",
+      "name": "Prepare Flat Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e7b9a0c1-4d3f-4e2a-f1b2-7c8d9e0f1a2b",
+              "name": "run_date",
+              "value": "={{ $('Parse AI Output').item.json.run_date }}",
+              "type": "string"
+            },
+            {
+              "id": "f8c0b1d2-5e4a-4f3b-a2c3-8d9e0f1a2b3c",
+              "name": "competitor_name",
+              "value": "={{ $('Parse AI Output').item.json.competitor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "a9d1c2e3-6f5b-4a4c-b3d4-9e0f1a2b3c4d",
+              "name": "event_name",
+              "value": "={{ $json.events_parsed.event_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b0e2d3f4-7a6c-4b5d-c4e5-0f1a2b3c4d5e",
+              "name": "event_date",
+              "value": "={{ $json.events_parsed.event_date }}",
+              "type": "string"
+            },
+            {
+              "id": "c1f3e4a5-8b7d-4c6e-d5f6-1a2b3c4d5e6f",
+              "name": "city",
+              "value": "={{ $json.events_parsed.city }}",
+              "type": "string"
+            },
+            {
+              "id": "d2a4f5b6-9c8e-4d7f-e6a7-2b3c4d5e6f7a",
+              "name": "state",
+              "value": "={{ $json.events_parsed.state }}",
+              "type": "string"
+            },
+            {
+              "id": "e3b5a6c7-0d9f-4e8a-f7b8-3c4d5e6f7a8b",
+              "name": "country",
+              "value": "={{ $json.events_parsed.country }}",
+              "type": "string"
+            },
+            {
+              "id": "f4c6b7d8-1e0a-4f9b-a8c9-4d5e6f7a8b9c",
+              "name": "event_url",
+              "value": "={{ $json.events_parsed.event_url }}",
+              "type": "string"
+            },
+            {
+              "id": "a5d7c8e9-2f1b-4a0c-b9d0-5e6f7a8b9c0d",
+              "name": "source",
+              "value": "={{ $json.events_parsed.source }}",
+              "type": "string"
+            },
+            {
+              "id": "b6e8d9f0-3a2c-4b1d-c0e1-6f7a8b9c0d1e",
+              "name": "guesty_attending",
+              "value": "={{ $json.events_parsed.guesty_attending }}",
+              "type": "string"
+            },
+            {
+              "id": "c7f9e0a1-4b3d-4c2e-d1f2-7a8b9c0d1e2f",
+              "name": "photo_urls",
+              "value": "={{ $json.events_parsed.photo_urls }}",
+              "type": "array"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "aa1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+      "name": "Split Photo URLs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        500
+      ],
+      "parameters": {
+        "fieldToSplitOut": "photo_urls",
+        "options": {}
+      }
+    },
+    {
+      "id": "ee5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8a9b",
+      "name": "Prepare Photo Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2420,
+        500
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "11a1b2c3-d4e5-4f6a-b7c8-d9e0f1a2b3c4",
+              "name": "Run Date",
+              "value": "={{ $json.run_date }}",
+              "type": "string"
+            },
+            {
+              "id": "22b2c3d4-e5f6-4a7b-c8d9-e0f1a2b3c4d5",
+              "name": "Event Name",
+              "value": "={{ $json.event_name }}",
+              "type": "string"
+            },
+            {
+              "id": "33c3d4e5-f6a7-4b8c-d9e0-f1a2b3c4d5e6",
+              "name": "Event URL",
+              "value": "={{ $json.event_url }}",
+              "type": "string"
+            },
+            {
+              "id": "44d4e5f6-a7b8-4c9d-e0f1-a2b3c4d5e6f7",
+              "name": "Competitor",
+              "value": "={{ $json.competitor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "55e5f6a7-b8c9-4d0e-f1a2-b3c4d5e6f7a8",
+              "name": "Photo URL",
+              "value": "={{ $json.photo_urls }}",
+              "type": "string"
+            },
+            {
+              "id": "66f6a7b8-c9d0-4e1f-a2b3-c4d5e6f7a8b9",
+              "name": "Photo",
+              "value": "==IMAGE(\"{{ $json.photo_urls }}\")",
+              "type": "string"
+            },
+            {
+              "id": "77a7b8c9-d0e1-4f2a-b3c4-d5e6f7a8b9c0",
+              "name": "Source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ff6a7b8c-9d0e-1f2a-3b4c-5d6e7f8a9b0c",
+      "name": "Write Photo Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2640,
+        500
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1THwZ8bVYaINIIYS6fiGzCWbLeU2mLSf8bH4SWZ4Refo"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Event Photos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Run Date": "={{ $json['Run Date'] }}",
+            "Event Name": "={{ $json['Event Name'] }}",
+            "Event URL": "={{ $json['Event URL'] }}",
+            "Competitor": "={{ $json.Competitor }}",
+            "Photo URL": "={{ $json['Photo URL'] }}",
+            "Photo": "={{ $json.Photo }}",
+            "Source": "={{ $json.Source }}"
+          }
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4jA8N85DnTpkvyeV",
+          "name": "Google Sheets - @erik.cohen"
+        }
+      }
+    },
+    {
+      "id": "bb2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
+      "name": "Collect All Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "all_rows",
+        "options": {}
+      }
+    },
+    {
+      "id": "cc3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f",
+      "name": "Pivot Into Event Matrix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const rows = $input.first().json.all_rows;\nconst runDate = rows[0]?.run_date || '';\n\n// Get unique competitor names\nconst competitors = [...new Set(rows.map(r => r.competitor_name))];\n\n// Build event map keyed by event_name\nconst eventMap = {};\nfor (const row of rows) {\n  const key = row.event_name;\n  if (!eventMap[key]) {\n    eventMap[key] = {\n      'Run Date': runDate,\n      'Event Name': row.event_name,\n      'Event Date': row.event_date,\n      'City': row.city,\n      'State': row.state,\n      'Country': row.country,\n      'Event URL': row.event_url,\n      'Guesty Attending?': row.guesty_attending\n    };\n    for (const c of competitors) {\n      eventMap[key][c] = 'X';\n    }\n  }\n  eventMap[key][row.competitor_name] = 'V';\n  if (row.guesty_attending === 'Yes') {\n    eventMap[key]['Guesty Attending?'] = 'Yes';\n  }\n  if (!eventMap[key]['Event URL'] || eventMap[key]['Event URL'] === '') {\n    eventMap[key]['Event URL'] = row.event_url;\n  }\n}\n\nreturn Object.values(eventMap).map(row => ({ json: row }));"
+      }
+    },
+    {
+      "id": "dd4e5f6a-7b8c-9d0e-1f2a-3b4c5d6e7f8a",
+      "name": "Write Tracker Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2640,
+        300
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1THwZ8bVYaINIIYS6fiGzCWbLeU2mLSf8bH4SWZ4Refo"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Competitor Event Tracker"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4jA8N85DnTpkvyeV",
+          "name": "Google Sheets - @erik.cohen"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get Competitors List",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Guesty Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Competitors List": {
+      "main": [
+        [
+          {
+            "node": "Combine Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Guesty Events": {
+      "main": [
+        [
+          {
+            "node": "Combine Inputs",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Inputs": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Competitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Competitors": {
+      "main": [
+        [
+          {
+            "node": "Scrape Events Website",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Scrape LinkedIn Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Events Website": {
+      "main": [
+        [
+          {
+            "node": "Merge Scraped Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape LinkedIn Page": {
+      "main": [
+        [
+          {
+            "node": "Merge Scraped Content",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Scraped Content": {
+      "main": [
+        [
+          {
+            "node": "AI Event Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Event Extractor": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini LM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Event Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Output": {
+      "main": [
+        [
+          {
+            "node": "Split Events Into Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Events Into Rows": {
+      "main": [
+        [
+          {
+            "node": "Prepare Flat Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Flat Row": {
+      "main": [
+        [
+          {
+            "node": "Collect All Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Photo URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Photo URLs": {
+      "main": [
+        [
+          {
+            "node": "Prepare Photo Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Photo Row": {
+      "main": [
+        [
+          {
+            "node": "Write Photo Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect All Results": {
+      "main": [
+        [
+          {
+            "node": "Pivot Into Event Matrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pivot Into Event Matrix": {
+      "main": [
+        [
+          {
+            "node": "Write Tracker Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

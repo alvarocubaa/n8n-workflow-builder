@@ -1,188 +1,69 @@
 {
-  "name": "Daily Upsell Intent Detector - Zendesk + Gemini",
+  "name": "Ticket Router - VIP vs Standard",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Daily 10am UTC",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "id": "a3f1c2d4-8e5b-4a7c-9f0d-1b2e3c4d5e6f",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
       "position": [
         240,
         300
       ],
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 10 * * *"
-            }
-          ]
-        }
+        "httpMethod": "POST",
+        "path": "ticket-router",
+        "responseMode": "onReceived"
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "Get Zendesk Tickets (Last 24h)",
-      "type": "n8n-nodes-base.zendesk",
-      "typeVersion": 1,
+      "id": "b4e2d3f5-9f6c-4b8d-a0e1-2c3f4d5e6f7a",
+      "name": "Lookup Account in BigQuery",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
       "position": [
-        460,
+        480,
         300
       ],
       "parameters": {
-        "resource": "ticket",
-        "operation": "getAll",
-        "ticketType": "regular",
-        "returnAll": true,
-        "options": {
-          "query": "updated_at>24hours"
-        }
+        "operation": "executeQuery",
+        "sqlQuery": "=SELECT\n  account_id,\n  account_name,\n  package AS plan_name,\n  avg_mrr AS mrr\nFROM `guesty-data.guesty_analytics.dim_accounts`\nWHERE account_id = '{{ $json.body.account_id }}'\nLIMIT 1",
+        "projectId": "guesty-data",
+        "options": {}
       },
       "credentials": {
-        "zendeskApi": {
-          "id": "OTFp18SnDgGUSn9u",
-          "name": "Zendesk Sandbox - Info@guesty"
+        "googleApi": {
+          "id": "PAAimNTryrvB72dp",
+          "name": "Google Service Account - CX translate"
         }
       }
     },
     {
-      "id": "8e1f2a3b-4c5d-6e7f-8a9b-0c1d2e3f4a5b",
-      "name": "Gemini Flash",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
-      "typeVersion": 1,
-      "position": [
-        680,
-        500
-      ],
-      "parameters": {
-        "modelName": "models/gemini-2.5-flash",
-        "options": {
-          "temperature": 0
-        }
-      },
-      "credentials": {
-        "googlePalmApi": {
-          "id": "JrzPwNiVhZibKlAr",
-          "name": "Google Gemini Guesty n8n CX"
-        }
-      }
-    },
-    {
-      "id": "3d594a5e-1b2f-4c8e-9f1a-2b3c4d5e6f7a",
-      "name": "Classify Upsell Intent",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.9,
-      "position": [
-        680,
-        300
-      ],
-      "parameters": {
-        "promptType": "define",
-        "text": "=Ticket ID: {{ $json.id }}\nSubject: {{ $json.subject }}\nDescription: {{ $json.description }}",
-        "messages": {
-          "messageValues": [
-            {
-              "type": "SystemMessagePromptTemplate",
-              "message": "You are a customer success analyst at Guesty, a property management software company. Your job is to detect upsell intent in Zendesk support tickets.\n\nUpsell intent means the customer is asking about or expressing interest in: upgrading to a higher plan, adding more properties or listings, unlocking new features, requesting a demo of premium features, asking about pricing for additional seats or modules, or expanding their current subscription.\n\nAnalyze the ticket subject and description provided. Return ONLY a valid JSON object with no markdown, no code fences, and no extra text. The JSON must have exactly these fields:\n- upsell_intent: boolean (true if upsell intent detected, false otherwise)\n- confidence: string (high, medium, or low)\n- confidence_score: number between 0 and 100\n- reason: string (one sentence explaining your decision)"
-            },
-            {
-              "type": "HumanMessagePromptTemplate",
-              "message": "=Ticket ID: {{ $json.id }}\nSubject: {{ $json.subject }}\nDescription: {{ $json.description }}\n\nDoes this ticket contain upsell intent? Return JSON only."
-            }
-          ]
-        },
-        "hasOutputParser": false
-      }
-    },
-    {
-      "id": "9b2c3d4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e",
-      "name": "Parse AI Response",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        900,
-        300
-      ],
-      "parameters": {
-        "mode": "manual",
-        "assignments": {
-          "assignments": [
-            {
-              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-              "name": "ticket_id",
-              "value": "={{ $('Get Zendesk Tickets (Last 24h)').item.json.id }}",
-              "type": "string"
-            },
-            {
-              "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-              "name": "subject",
-              "value": "={{ $('Get Zendesk Tickets (Last 24h)').item.json.subject }}",
-              "type": "string"
-            },
-            {
-              "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-              "name": "account_name",
-              "value": "={{ $('Get Zendesk Tickets (Last 24h)').item.json.organization_id }}",
-              "type": "string"
-            },
-            {
-              "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
-              "name": "upsell_intent",
-              "value": "={{ JSON.parse($json.text).upsell_intent }}",
-              "type": "boolean"
-            },
-            {
-              "id": "e5f6a7b8-c9d0-1234-efab-345678901234",
-              "name": "confidence",
-              "value": "={{ JSON.parse($json.text).confidence }}",
-              "type": "string"
-            },
-            {
-              "id": "f6a7b8c9-d0e1-2345-fabc-456789012345",
-              "name": "confidence_score",
-              "value": "={{ JSON.parse($json.text).confidence_score }}",
-              "type": "number"
-            },
-            {
-              "id": "a7b8c9d0-e1f2-3456-abcd-567890123456",
-              "name": "reason",
-              "value": "={{ JSON.parse($json.text).reason }}",
-              "type": "string"
-            },
-            {
-              "id": "b8c9d0e1-f2a3-4567-bcde-678901234567",
-              "name": "ticket_url",
-              "value": "={{ 'https://guesty33961681113172.zendesk.com/agent/tickets/' + $('Get Zendesk Tickets (Last 24h)').item.json.id }}",
-              "type": "string"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "c9d0e1f2-a3b4-5678-cdef-789012345678",
-      "name": "Upsell Intent Detected?",
+      "id": "c5f3e4a6-a07d-4c9e-b1f2-3d4a5e6f7b8c",
+      "name": "MRR Greater Than 5000?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1120,
+        720,
         300
       ],
       "parameters": {
         "conditions": {
           "options": {
-            "version": 2
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
           },
           "combinator": "and",
           "conditions": [
             {
-              "id": "d0e1f2a3-b4c5-6789-defa-890123456789",
-              "leftValue": "={{ $json.upsell_intent }}",
-              "rightValue": true,
+              "id": "d6a4f5b7-b18e-4d0f-c2a3-4e5b6f7c8d9e",
+              "leftValue": "={{ $json.mrr }}",
+              "rightValue": 5000,
               "operator": {
-                "type": "boolean",
-                "operation": "true"
+                "type": "number",
+                "operation": "gt"
               }
             }
           ]
@@ -190,13 +71,13 @@
       }
     },
     {
-      "id": "e1f2a3b4-c5d6-7890-efab-901234567890",
-      "name": "Post to Slack",
+      "id": "e7b5a6c8-c29f-4e1a-d3b4-5f6c7d8e9f0a",
+      "name": "Slack - VIP Ticket",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1340,
-        200
+        960,
+        160
       ],
       "parameters": {
         "resource": "message",
@@ -204,99 +85,85 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cx-upsell-opportunities"
+          "value": "#cx-vip-tickets"
         },
-        "messageType": "block",
-        "blocksUi": {
-          "blocksValues": [
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "=:rocket: *Upsell Opportunity Detected*\n\n*Ticket:* <{{ $json.ticket_url }}|#{{ $json.ticket_id }}>\n*Subject:* {{ $json.subject }}\n*Account:* {{ $json.account_name }}\n*Confidence:* {{ $json.confidence }} ({{ $json.confidence_score }}%)\n*Reason:* {{ $json.reason }}"
-              }
-            }
-          ]
-        }
+        "text": "=:star: *VIP Ticket Alert*\n\n*Account:* {{ $('Lookup Account in BigQuery').item.json.account_name }}\n*Plan:* {{ $('Lookup Account in BigQuery').item.json.plan_name }}\n*MRR:* ${{ $('Lookup Account in BigQuery').item.json.mrr }}\n*Ticket ID:* {{ $('Webhook').item.json.body.ticket_id }}\n*Priority:* {{ $('Webhook').item.json.body.priority }}\n*Subject:* {{ $('Webhook').item.json.body.subject }}",
+        "otherOptions": {}
       },
       "credentials": {
         "slackApi": {
           "id": "RdxjTWVc6DaiNrIY",
           "name": "Slack account - BotToken"
         }
+      }
+    },
+    {
+      "id": "f8c6b7d9-d3a0-4f2b-e4c5-6a7d8e9f0b1c",
+      "name": "Slack - Standard Ticket",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        960,
+        440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-standard-tickets"
+        },
+        "text": "=:ticket: *New Ticket*\n\n*Account:* {{ $('Lookup Account in BigQuery').item.json.account_name }}\n*Plan:* {{ $('Lookup Account in BigQuery').item.json.plan_name }}\n*MRR:* ${{ $('Lookup Account in BigQuery').item.json.mrr }}\n*Ticket ID:* {{ $('Webhook').item.json.body.ticket_id }}\n*Priority:* {{ $('Webhook').item.json.body.priority }}\n*Subject:* {{ $('Webhook').item.json.body.subject }}",
+        "otherOptions": {}
       },
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 3000
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      }
     }
   ],
   "connections": {
-    "Daily 10am UTC": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "Get Zendesk Tickets (Last 24h)",
+            "node": "Lookup Account in BigQuery",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Zendesk Tickets (Last 24h)": {
+    "Lookup Account in BigQuery": {
       "main": [
         [
           {
-            "node": "Classify Upsell Intent",
+            "node": "MRR Greater Than 5000?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gemini Flash": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Classify Upsell Intent",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Classify Upsell Intent": {
+    "MRR Greater Than 5000?": {
       "main": [
         [
           {
-            "node": "Parse AI Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse AI Response": {
-      "main": [
-        [
-          {
-            "node": "Upsell Intent Detected?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upsell Intent Detected?": {
-      "main": [
-        [
-          {
-            "node": "Post to Slack",
+            "node": "Slack - VIP Ticket",
             "type": "main",
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Slack - Standard Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   }

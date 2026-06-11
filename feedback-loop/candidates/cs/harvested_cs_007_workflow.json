@@ -1,29 +1,28 @@
 {
-  "name": "CS Churn Alert - Daily SF Poll",
+  "name": "SF Opportunity Updated - Renewal Alert to Slack",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Daily 6pm Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.3,
+      "id": "a3f7c2d1-84b6-4e9a-b531-2c7d8e4f1a09",
+      "name": "Salesforce Trigger - Opportunity Updated",
+      "type": "n8n-nodes-base.salesforceTrigger",
+      "typeVersion": 1,
       "position": [
         240,
         300
       ],
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "cronExpression",
-              "expression": "0 18 * * *"
-            }
-          ]
+        "triggerOn": "opportunityUpdated"
+      },
+      "credentials": {
+        "salesforceOAuth2Api": {
+          "id": "fCB6gfK7EaGpMnZy",
+          "name": "Salesforce Production Read - Cross Dept"
         }
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "Query SF Opportunities",
+      "id": "b8e1d4c9-3a72-4f5b-9c6e-7d2a1b8f3e05",
+      "name": "Get Opportunity Details",
       "type": "n8n-nodes-base.salesforce",
       "typeVersion": 1,
       "position": [
@@ -33,20 +32,19 @@
       "parameters": {
         "resource": "search",
         "operation": "query",
-        "query": "SELECT Id, Name, RecordTypeId, StageName, Last_Stage__c, Churn_Date__c, LastModifiedDate, Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, Account.Guesty_Admin_ID__c FROM Opportunity WHERE RecordTypeId = '0125p000001101UAAQ' AND Last_Stage__c LIKE '%declined%' AND Churn_Date__c > 2024-01-01T00:00:00Z AND LastModifiedDate = LAST_N_DAYS:1 ORDER BY LastModifiedDate DESC LIMIT 200"
+        "query": "=SELECT Id, Name, StageName, RecordType.Name, Account.Name, Account.Guesty_Admin_ID__c FROM Opportunity WHERE Id = '{{ $json.Id }}'"
       },
       "credentials": {
         "salesforceOAuth2Api": {
           "id": "fCB6gfK7EaGpMnZy",
-          "name": "Salesforce Production Read"
+          "name": "Salesforce Production Read - Cross Dept"
         }
-      },
-      "onError": "continueRegularOutput"
+      }
     },
     {
-      "id": "3d594a8e-1b2c-4f5d-9e6a-7b8c9d0e1f2a",
-      "name": "Has Results?",
-      "type": "n8n-nodes-base.if",
+      "id": "c5a9e3f7-1b4d-4c8a-a2e6-9f3b7d1c5e82",
+      "name": "Filter - Renewal Only",
+      "type": "n8n-nodes-base.filter",
       "typeVersion": 2.3,
       "position": [
         680,
@@ -55,144 +53,57 @@
       "parameters": {
         "conditions": {
           "options": {
-            "version": 2
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
           },
           "combinator": "and",
           "conditions": [
             {
-              "id": "c1a2b3d4-e5f6-4a7b-8c9d-1e2f3a4b5c6d",
-              "leftValue": "={{ $json.totalSize }}",
-              "rightValue": 0,
+              "id": "d4f2a8b1-6c3e-4d7f-b9a5-1e8c2f6d4b73",
+              "leftValue": "={{ $json['RecordType.Name'] }}",
+              "rightValue": "Renewal",
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "string",
+                "operation": "equals"
               }
             }
           ]
-        }
+        },
+        "looseTypeValidation": false
       }
     },
     {
-      "id": "9b8a7c6d-5e4f-3a2b-1c0d-ef9a8b7c6d5e",
-      "name": "Split Opportunities",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        900,
-        220
-      ],
-      "parameters": {
-        "fieldToSplitOut": "records",
-        "options": {}
-      }
-    },
-    {
-      "id": "2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b",
-      "name": "BQ - Get max_paid_listings",
+      "id": "e7b3d1a5-9c4f-4e2b-8d6a-3f1c7e9b5d28",
+      "name": "Query BigQuery - Churn Report",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        1120,
-        220
+        900,
+        300
       ],
       "parameters": {
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "=SELECT account_id, MAX(last_month_paid_listings) AS max_paid_listings FROM `guesty-data.csm.csm_churn_report` WHERE account_id = '{{ $json.Account.Guesty_Admin_ID__c }}' GROUP BY account_id"
+        "sqlQuery": "=SELECT\n  account_id,\n  account_name,\n  churn_reason,\n  avg_mrr\nFROM `guesty-data.csm.csm_churn_report`\nWHERE account_id = '{{ $('Filter - Renewal Only').item.json['Account.Guesty_Admin_ID__c'] }}'\nORDER BY from_date DESC\nLIMIT 1",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
-          "id": "h7fJ82YhtOnUL58u",
-          "name": "Google BigQuery - N8N Service Account"
+          "id": "VQ7CU7dKViVcv8Ah",
+          "name": "Google Service Account n8n-ai-cx-read - Cross Dept"
         }
       }
     },
     {
-      "id": "b1c2d3e4-f5a6-7b8c-9d0e-1f2a3b4c5d6e",
-      "name": "Merge SF and BQ Data",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1340,
-        220
-      ],
-      "parameters": {
-        "mode": "manual",
-        "assignments": {
-          "assignments": [
-            {
-              "id": "d4e5f6a7-b8c9-4d0e-af12-3b4c5d6e7f8a",
-              "name": "opportunity_id",
-              "value": "={{ $('Split Opportunities').item.json.Id }}",
-              "type": "string"
-            },
-            {
-              "id": "e5f6a7b8-c9d0-4e1f-b023-4c5d6e7f8a9b",
-              "name": "opportunity_name",
-              "value": "={{ $('Split Opportunities').item.json.Name }}",
-              "type": "string"
-            },
-            {
-              "id": "f6a7b8c9-d0e1-4f2a-c134-5d6e7f8a9b0c",
-              "name": "account_name",
-              "value": "={{ $('Split Opportunities').item.json.Account.Name }}",
-              "type": "string"
-            },
-            {
-              "id": "a7b8c9d0-e1f2-4a3b-d245-6e7f8a9b0c1d",
-              "name": "account_owner",
-              "value": "={{ $('Split Opportunities').item.json.Account.Account_Owner_F__c }}",
-              "type": "string"
-            },
-            {
-              "id": "b8c9d0e1-f2a3-4b4c-e356-7f8a9b0c1d2e",
-              "name": "average_mrr",
-              "value": "={{ $('Split Opportunities').item.json.Account.Average_MRR__c }}",
-              "type": "number"
-            },
-            {
-              "id": "c9d0e1f2-a3b4-4c5d-f467-8a9b0c1d2e3f",
-              "name": "guesty_admin_id",
-              "value": "={{ $('Split Opportunities').item.json.Account.Guesty_Admin_ID__c }}",
-              "type": "string"
-            },
-            {
-              "id": "d0e1f2a3-b4c5-4d6e-a578-9b0c1d2e3f4a",
-              "name": "last_stage",
-              "value": "={{ $('Split Opportunities').item.json.Last_Stage__c }}",
-              "type": "string"
-            },
-            {
-              "id": "e1f2a3b4-c5d6-4e7f-b689-0c1d2e3f4a5b",
-              "name": "churn_date",
-              "value": "={{ $('Split Opportunities').item.json.Churn_Date__c }}",
-              "type": "string"
-            },
-            {
-              "id": "f2a3b4c5-d6e7-4f8a-c79a-1d2e3f4a5b6c",
-              "name": "last_modified",
-              "value": "={{ $('Split Opportunities').item.json.LastModifiedDate }}",
-              "type": "string"
-            },
-            {
-              "id": "a3b4c5d6-e7f8-4a9b-d8ab-2e3f4a5b6c7d",
-              "name": "max_paid_listings",
-              "value": "={{ $json.max_paid_listings }}",
-              "type": "number"
-            }
-          ]
-        },
-        "options": {}
-      }
-    },
-    {
-      "id": "c7d8e9f0-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
-      "name": "Post Churn Alert to Slack",
+      "id": "f2c8a4e6-7d1b-4f3c-9e5a-8b2d6f4c1a97",
+      "name": "Post to Slack - cs-renewals",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1560,
-        220
+        1120,
+        300
       ],
       "parameters": {
         "resource": "message",
@@ -200,26 +111,14 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#cs-churn-notifications"
+          "value": "#cs-renewals"
         },
-        "messageType": "block",
-        "blocksUi": {
-          "blocksValues": [
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "=:rotating_light: *Churn Alert* -- {{ $json.account_name }}\n\n*Stage:* {{ $json.last_stage }}\n*Account Owner:* {{ $json.account_owner }}\n*Avg MRR:* ${{ $json.average_mrr }}\n*Max Paid Listings:* {{ $json.max_paid_listings }}\n*Churn Date:* {{ $json.churn_date }}\n*Guesty Admin ID:* {{ $json.guesty_admin_id }}\n*Last Modified:* {{ $json.last_modified }}\n*Opportunity:* {{ $json.opportunity_name }} ({{ $json.opportunity_id }})"
-              }
-            }
-          ]
-        },
-        "otherOptions": {}
+        "text": "=*Renewal Opportunity Updated*\n*Account:* {{ $('Filter - Renewal Only').item.json['Account.Name'] }}\n*Opportunity:* {{ $('Filter - Renewal Only').item.json.Name }}\n*Stage:* {{ $('Filter - Renewal Only').item.json.StageName }}\n*Guesty Admin ID:* {{ $('Filter - Renewal Only').item.json['Account.Guesty_Admin_ID__c'] }}\n*Churn Reason:* {{ $json.churn_reason }}\n*Avg MRR:* ${{ $json.avg_mrr }}"
       },
       "credentials": {
         "slackApi": {
           "id": "7H6auF31TpX7Wk7M",
-          "name": "Slack account 77"
+          "name": "Slack - @Who App - AI Team"
         }
       },
       "onError": "continueRegularOutput",
@@ -229,67 +128,44 @@
     }
   ],
   "connections": {
-    "Daily 6pm Trigger": {
+    "Salesforce Trigger - Opportunity Updated": {
       "main": [
         [
           {
-            "node": "Query SF Opportunities",
+            "node": "Get Opportunity Details",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Query SF Opportunities": {
+    "Get Opportunity Details": {
       "main": [
         [
           {
-            "node": "Has Results?",
+            "node": "Filter - Renewal Only",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Results?": {
+    "Filter - Renewal Only": {
       "main": [
         [
           {
-            "node": "Split Opportunities",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Split Opportunities": {
-      "main": [
-        [
-          {
-            "node": "BQ - Get max_paid_listings",
+            "node": "Query BigQuery - Churn Report",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BQ - Get max_paid_listings": {
+    "Query BigQuery - Churn Report": {
       "main": [
         [
           {
-            "node": "Merge SF and BQ Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Merge SF and BQ Data": {
-      "main": [
-        [
-          {
-            "node": "Post Churn Alert to Slack",
+            "node": "Post to Slack - cs-renewals",
             "type": "main",
             "index": 0
           }

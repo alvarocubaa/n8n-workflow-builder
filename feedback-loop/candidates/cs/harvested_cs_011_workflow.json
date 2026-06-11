@@ -2,57 +2,28 @@
   "nodes": [
     {
       "parameters": {
-        "url": "=https://guesty3396.zendesk.com/api/v2/users/{{ $json.requester_id }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "oAuth2Api",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {}
-          ]
-        },
-        "options": {}
+        "jsCode": "const allData = $input.all();\n\n// If no SF match was found upstream, skip this iteration cleanly\nif (allData.find(i => i.json._no_match)) {\n    return [{\n        json: {\n            context: {\n                meeting_type: \"Unknown\",\n                meeting_title: \"No account match found\",\n                account_name: \"Unknown Account\",\n                analytics: {},\n                _skip: true\n            }\n        }\n    }];\n}\n\n// --- 1. Salesforce Account Data ---\nconst sfItem = allData.find(i => i.json.Id && i.json.Name) || {};\nconst sfData = sfItem.json || {};\n\n// --- 2. Emails ---\nlet emails = allData.find(i => i.json.Emails)?.json.Emails || [];\nif (emails.length === 1 && emails[0].notice) emails = 'No email data found for this account.';\n\n// --- 3. Feature & Add-On Recommendations ---\nlet recommendations = allData.find(i => i.json['Feature & Add On'])?.json['Feature & Add On'] || [];\nrecommendations = Array.isArray(recommendations) ? recommendations.filter(rec => Object.keys(rec).length > 0) : [];\nif (recommendations.length === 0) recommendations = 'No add-on or feature recommendations found.';\n\n// --- 4. Zendesk Tickets ---\nlet tickets = allData.find(i => i.json['Zendesk Tickets'])?.json['Zendesk Tickets'] || [];\nif (tickets.length === 1 && tickets[0].notice) tickets = 'No Zendesk tickets found for this account.';\n\n// --- 5. Call Transcripts ---\nlet transcripts = allData.find(i => i.json['Call Transcripts'])?.json['Call Transcripts'] || [];\nif (transcripts.length === 1 && transcripts[0].notice) transcripts = 'No Modjo call transcripts found for this account.';\n\n// --- 6. Product Adoption - take first row only ---\nlet productAdoption = allData.find(i => i.json['Product Adoption'])?.json['Product Adoption'] || [];\nproductAdoption = Array.isArray(productAdoption) && productAdoption.length > 0 ? productAdoption[0] : null;\nif (!productAdoption) productAdoption = 'No product adoption data found.';\n\n// --- 7. All Opportunities - split into 3 buckets ---\nconst allOpps = allData.find(i => i.json['All Opportunities'])?.json['All Opportunities'] || [];\n\n// --- 8. Account Summary ---\nlet accountSummary = allData.find(i => i.json['Account Summary'])?.json['Account Summary'] || [];\naccountSummary = Array.isArray(accountSummary) && accountSummary.length > 0 ? accountSummary[0] : null;\nif (!accountSummary) accountSummary = 'No account summary available.';\n\nconst closedLostAddons = allOpps\n  .filter(o => o.StageName === 'Closed Lost' && o.Plan_Change_Source__c === 'Add-On Center')\n  .map(o => ({\n    name: o.Name,\n    close_date: o.CloseDate,\n    lost_reason: o.Lost_Reason__c || 'N/A'\n  }));\n\nconst activeAddons = allOpps\n  .filter(o => o.StageName === 'Closed Won' && o.Plan_Change_Source__c === 'Add-On Center')\n  .map(o => ({\n    name: o.Name,\n    close_date: o.CloseDate,\n    amount: o.Amount || null\n  }));\n\nconst onboardingOpp = allOpps.find(o =>\n  o.IsWon === true && o.Plan_Change_Source__c !== 'Add-On Center'\n) || null;\n\nconst onboardingData = onboardingOpp ? {\n  name: onboardingOpp.Name,\n  close_date: onboardingOpp.CloseDate,\n  modjo_ho_summary: onboardingOpp.Modjo_HO_Summary__c || null,\n  mmf_start_date: onboardingOpp.MMF_Start_Date_60__c || null,\n  mmf_amount: onboardingOpp.Converted_MMF_MAF_Amount__c || null,\n  pricing_model: onboardingOpp.Pricing_Model_Type_F__c || null,\n  opt_out_days: onboardingOpp.Opt_Out_Period_Days__c || null,\n  contract_term: onboardingOpp.Contract_Term__c || null\n} : null;\n\n// --- 9. Meeting Metadata ---\n// FIX: removed underscore prefix from all 4 field references (was _meeting_type, _poc_email, _meeting_title, _csm_email)\nconst meetingData = {\n  meeting_type:  sfData.meeting_type  || null,\n  poc_email:     sfData.poc_email     || null,\n  title:         sfData.meeting_title || null,\n  csm_email:     sfData.csm_email     || null\n};\nconst displayEmails = meetingData.poc_email\n  ? meetingData.poc_email.replace(/'/g, '').replace(/,/g, ', ')\n  : 'N/A';\n\nreturn [{\n  json: {\n    context: {\n      meeting_type:        meetingData.meeting_type || 'Sync',\n      meeting_title:       meetingData.title || meetingData.Meeting_Name || 'Meeting with ' + (sfData.Name || 'Client'),\n      poc_email:           displayEmails,\n      account_name:        sfData.Name || 'Unknown Account',\n      analytics: {\n        Id:                                  sfData.Id,\n        Guesty_Admin_ID__c:                  sfData.Guesty_Admin_ID__c,\n        Main_Contact_Email__c:               sfData.Main_Contact_Email__c,\n        Account_Owner_Sentiment__c:          sfData.Account_Owner_Sentiment__c,\n        Months_in_Service__c:                sfData.Months_in_Service__c,\n        Number_of_Active_Listed_Listings__c: sfData.Number_of_Active_Listed_Listings__c,\n        Average_MRR__c:                      sfData.Average_MRR__c,\n        MTD_Revenue__c:                      sfData.MTD_Revenue__c,\n        Last_Month_Revenue__c:               sfData.Last_Month_Revenue__c,\n        Last_Call_Date__c:                   sfData.Last_Call_Date__c,\n        Onboarding_Status__c:                sfData.Onboarding_Status__c,\n        Recent_Health_Score__c:              sfData.Recent_Health_Score__c,\n        Last_EBR_Date__c:                    sfData.Last_EBR_Date__c,\n        Next_Renewal_Date__c:                sfData.Next_Renewal_Date__c,\n        Upcoming_EBR_Date__c:                sfData.Upcoming_EBR_Date__c\n      },\n      email_history:       emails,\n      zendesk_history:     tickets,\n      call_transcripts:    transcripts,\n      account_summary:     accountSummary,\n      recommendations:     recommendations,\n      product_adoption:    productAdoption,\n      closed_lost_addons:  closedLostAddons.length > 0 ? closedLostAddons : 'No previously rejected add-ons found.',\n      active_addons:       activeAddons.length > 0 ? activeAddons : 'No active add-ons found.',\n      onboarding_data:     onboardingData || 'No onboarding opportunity data found.'\n    }\n  }\n}];"
       },
-      "id": "bcb01151-c4f0-43ae-8ede-4a1bec172160",
-      "name": "Get user ",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
-        928,
-        -6656
+        -1504,
+        352
       ],
-      "credentials": {
-        "oAuth2Api": {
-          "id": "B1ksdYFDJ8LJKaTJ",
-          "name": "Zendesk Production - Read - OAuth2 Generic - Cross Dept"
-        }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-              "name": "ticket_id",
-              "value": "={{ $('Split Out').item.json.id }}",
-              "type": "string"
-            }
-          ]
-        },
-        "includeOtherFields": true,
-        "options": {}
-      },
-      "id": "e7d788de-0db5-4349-8907-e02d62189048",
-      "name": "Map Ticket ID",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        1200,
-        -6624
-      ]
+      "id": "38893271-4936-48da-bc5d-2dc74e13d36c",
+      "name": "Code in JavaScript7"
     }
   ],
-  "connections": {}
+  "connections": {
+    "Code in JavaScript7": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "59d25e80a43399aa8b0dda76e8d50db598a236c86afa5214fb71f146f3235df5"
+  }
 }

@@ -2,8 +2,8 @@
   "name": "Churn Alert -- Renewal Declined Opportunities",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-      "name": "Every Day at 6pm",
+      "id": "a3f1c2d4-8e7b-4a9c-b1d2-e3f4a5b6c7d8",
+      "name": "Daily 6PM Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
@@ -22,83 +22,40 @@
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "Get Updated Opportunities",
+      "id": "b4e2d3f5-9f8c-4b0d-c2e3-f4a5b6c7d8e9",
+      "name": "SF: Get Updated Renewal Opportunities",
       "type": "n8n-nodes-base.salesforce",
       "typeVersion": 1,
       "position": [
-        460,
+        480,
         300
       ],
       "parameters": {
         "resource": "search",
         "operation": "query",
-        "query": "SELECT Id, Name, StageName, Last_Stage__c, Churn_Date__c, RecordTypeId, Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, Account.Guesty_Admin_ID__c FROM Opportunity WHERE RecordTypeId = '0125p000001101UAAQ' AND Last_Stage__c LIKE '%declined%' AND Churn_Date__c > 2024-01-01T00:00:00Z AND LastModifiedDate >= LAST_N_DAYS:1 ORDER BY LastModifiedDate DESC LIMIT 200"
+        "query": "SELECT Id, Name, RecordTypeId, StageName, Last_Stage__c, Churn_Date__c, LastModifiedDate, Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, Account.Guesty_Admin_ID__c FROM Opportunity WHERE RecordTypeId = '0125p000001101UAAQ' AND Last_Stage__c LIKE '%declined%' AND Churn_Date__c > 2024-01-01T00:00:00Z AND LastModifiedDate >= LAST_N_DAYS:1 ORDER BY LastModifiedDate DESC"
       },
+      "onError": "continueRegularOutput",
       "credentials": {
         "salesforceOAuth2Api": {
           "id": "fCB6gfK7EaGpMnZy",
           "name": "Salesforce Production Read - Cross Dept"
         }
-      },
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "3d594a8e-1b2c-4f5d-9e6a-7b8c9d0e1f2a",
-      "name": "Any Results?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        680,
-        300
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2
-          },
-          "combinator": "and",
-          "conditions": [
-            {
-              "id": "a1f2e3d4-b5c6-4d7e-8f9a-0b1c2d3e4f5a",
-              "leftValue": "={{ $json.totalSize }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ]
-        }
       }
     },
     {
-      "id": "9b8a7c6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d",
-      "name": "Split Opportunities",
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        900,
-        220
-      ],
-      "parameters": {
-        "fieldToSplitOut": "records",
-        "include": "noOtherFields"
-      }
-    },
-    {
-      "id": "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
-      "name": "Get Max Paid Listings",
+      "id": "c5f3e4a6-0a9d-4c1e-d3f4-a5b6c7d8e9f0",
+      "name": "BQ: Get Max Paid Listings",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        1120,
-        220
+        720,
+        300
       ],
       "parameters": {
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "=SELECT account_id, account_name, MAX(last_month_paid_listings) AS max_paid_listings FROM `guesty-data.csm.csm_churn_report` WHERE account_id = '{{ $json.Account.Guesty_Admin_ID__c }}' GROUP BY account_id, account_name LIMIT 1"
+        "sqlQuery": "=SELECT account_id, account_name, MAX(last_month_paid_listings) AS max_paid_listings FROM `guesty-data.csm.mrr_calculator` WHERE account_id = '{{ $json.Account.Guesty_Admin_ID__c }}' GROUP BY account_id, account_name LIMIT 1"
       },
       "credentials": {
         "googleApi": {
@@ -108,13 +65,13 @@
       }
     },
     {
-      "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
-      "name": "Post Churn Alert",
+      "id": "d6a4f5b7-1b0e-4d2f-e4a5-b6c7d8e9f0a1",
+      "name": "Slack: Post Churn Alert",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1340,
-        220
+        960,
+        300
       ],
       "parameters": {
         "resource": "message",
@@ -124,79 +81,53 @@
           "mode": "name",
           "value": "#cs-churn-notifications"
         },
-        "text": "={{ '[CHURN ALERT] Renewal Declined\\n\\nAccount: ' + $('Split Opportunities').item.json.Account.Name + '\\nAccount Owner: ' + $('Split Opportunities').item.json.Account.Account_Owner_F__c + '\\nAvg MRR: $' + $('Split Opportunities').item.json.Account.Average_MRR__c + '\\nChurn Date: ' + $('Split Opportunities').item.json.Churn_Date__c + '\\nLast Stage: ' + $('Split Opportunities').item.json.Last_Stage__c + '\\nOpportunity: ' + $('Split Opportunities').item.json.Name + '\\nMax Paid Listings: ' + ($json.max_paid_listings ?? 'N/A') + '\\nGuesty Admin ID: ' + $('Split Opportunities').item.json.Account.Guesty_Admin_ID__c }}"
+        "text": "=:rotating_light: *Churn Alert -- Renewal Declined*\n\n*Account:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Account.Name }}\n*Account Owner:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Account.Account_Owner_F__c }}\n*Avg MRR:* ${{ $('SF: Get Updated Renewal Opportunities').item.json.Account.Average_MRR__c }}\n*Churn Date:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Churn_Date__c }}\n*Last Stage:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Last_Stage__c }}\n*Opportunity:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Name }}\n*Max Paid Listings:* {{ $json.max_paid_listings ?? 'N/A' }}\n*Guesty Admin ID:* {{ $('SF: Get Updated Renewal Opportunities').item.json.Account.Guesty_Admin_ID__c }}"
       },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
       "credentials": {
         "slackApi": {
           "id": "7H6auF31TpX7Wk7M",
           "name": "Slack - @Who App - AI Team"
         }
-      },
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 3000
+      }
     }
   ],
   "connections": {
-    "Every Day at 6pm": {
+    "Daily 6PM Trigger": {
       "main": [
         [
           {
-            "node": "Get Updated Opportunities",
+            "node": "SF: Get Updated Renewal Opportunities",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Updated Opportunities": {
+    "SF: Get Updated Renewal Opportunities": {
       "main": [
         [
           {
-            "node": "Any Results?",
+            "node": "BQ: Get Max Paid Listings",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Any Results?": {
+    "BQ: Get Max Paid Listings": {
       "main": [
         [
           {
-            "node": "Split Opportunities",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Split Opportunities": {
-      "main": [
-        [
-          {
-            "node": "Get Max Paid Listings",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Max Paid Listings": {
-      "main": [
-        [
-          {
-            "node": "Post Churn Alert",
+            "node": "Slack: Post Churn Alert",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "settings": {
-    "executionOrder": "v1"
   }
 }

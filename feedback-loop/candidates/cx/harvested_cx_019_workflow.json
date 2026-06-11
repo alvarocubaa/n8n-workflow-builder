@@ -1,0 +1,888 @@
+{
+  "name": "Competitor Meta Ads Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "a3f7c2d1-84e6-4b19-9f02-d5c8e1a07b34",
+      "name": "Every Monday 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1e2f3a4-5c6d-7e8f-9a0b-c1d2e3f4a5b6",
+              "name": "date_30_days_ago",
+              "value": "={{ $now.minus({days: 30}).toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "c2d3e4f5-6a7b-8c9d-0e1f-a2b3c4d5e6f7",
+              "name": "date_today",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-b3c4d5e6f7a8",
+      "name": "Set Date Window",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/v19.0/ads_archive",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_terms",
+              "value": "Hostaway"
+            },
+            {
+              "name": "ad_reached_countries",
+              "value": "US"
+            },
+            {
+              "name": "ad_type",
+              "value": "ALL"
+            },
+            {
+              "name": "ad_delivery_date_min",
+              "value": "={{ $node[\"Set Date Window\"].json.date_30_days_ago }}"
+            },
+            {
+              "name": "fields",
+              "value": "id,ad_creative_body,ad_creative_link_title,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "access_token",
+              "value": "YOUR_META_ACCESS_TOKEN_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-c4d5e6f7a8b9",
+      "name": "Meta API - Hostaway",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/v19.0/ads_archive",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_terms",
+              "value": "Lodgify"
+            },
+            {
+              "name": "ad_reached_countries",
+              "value": "US"
+            },
+            {
+              "name": "ad_type",
+              "value": "ALL"
+            },
+            {
+              "name": "ad_delivery_date_min",
+              "value": "={{ $node[\"Set Date Window\"].json.date_30_days_ago }}"
+            },
+            {
+              "name": "fields",
+              "value": "id,ad_creative_body,ad_creative_link_title,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "access_token",
+              "value": "YOUR_META_ACCESS_TOKEN_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-d5e6f7a8b9c0",
+      "name": "Meta API - Lodgify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/v19.0/ads_archive",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_terms",
+              "value": "Hospitable"
+            },
+            {
+              "name": "ad_reached_countries",
+              "value": "US"
+            },
+            {
+              "name": "ad_type",
+              "value": "ALL"
+            },
+            {
+              "name": "ad_delivery_date_min",
+              "value": "={{ $node[\"Set Date Window\"].json.date_30_days_ago }}"
+            },
+            {
+              "name": "fields",
+              "value": "id,ad_creative_body,ad_creative_link_title,ad_snapshot_url,page_name,ad_delivery_start_time,ad_delivery_stop_time"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "access_token",
+              "value": "YOUR_META_ACCESS_TOKEN_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-e6f7a8b9c0d1",
+      "name": "Meta API - Hospitable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-f7a8b9c0d1e2",
+      "name": "Split Hostaway Ads",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-a8b9c0d1e2f3",
+      "name": "Split Lodgify Ads",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-b9c0d1e2f3a4",
+      "name": "Split Hospitable Ads",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e1f2a3b4-c5d6-4e7f-8a9b-c0d1e2f3a4b5",
+              "name": "Advertiser",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f2a3b4c5-d6e7-4f8a-9b0c-d1e2f3a4b5c6",
+              "name": "Ad ID",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a3b4c5d6-e7f8-4a9b-0c1d-e2f3a4b5c6d7",
+              "name": "Page Name",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b4c5d6e7-f8a9-4b0c-1d2e-f3a4b5c6d7e8",
+              "name": "Ad Text",
+              "value": "={{ $json.ad_creative_body }}",
+              "type": "string"
+            },
+            {
+              "id": "c5d6e7f8-a9b0-4c1d-2e3f-a4b5c6d7e8f9",
+              "name": "Ad Title",
+              "value": "={{ $json.ad_creative_link_title }}",
+              "type": "string"
+            },
+            {
+              "id": "d6e7f8a9-b0c1-4d2e-3f4a-b5c6d7e8f9a0",
+              "name": "Start Date",
+              "value": "={{ $json.ad_delivery_start_time ? $json.ad_delivery_start_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e7f8a9b0-c1d2-4e3f-4a5b-c6d7e8f9a0b1",
+              "name": "End Date",
+              "value": "={{ $json.ad_delivery_stop_time ? $json.ad_delivery_stop_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f8a9b0c1-d2e3-4f4a-5b6c-d7e8f9a0b1c2",
+              "name": "Status",
+              "value": "={{ $json.ad_delivery_stop_time ? 'Ended' : 'Active' }}",
+              "type": "string"
+            },
+            {
+              "id": "a9b0c1d2-e3f4-4a5b-6c7d-e8f9a0b1c2d3",
+              "name": "Days Running",
+              "value": "={{ $json.ad_delivery_start_time ? Math.floor(($now.toMillis() - new Date($json.ad_delivery_start_time).getTime()) / 86400000) : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "b0c1d2e3-f4a5-4b6c-7d8e-f9a0b1c2d3e4",
+              "name": "Ad Link",
+              "value": "=https://www.facebook.com/ads/library/?id={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c1d2e3f4-a5b6-4c7d-8e9f-a0b1c2d3e4f5",
+              "name": "Ad Preview",
+              "value": "={{ $json.ad_snapshot_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f0a-b1c2d3e4f5a6",
+      "name": "Set Hostaway Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e3f4a5b6-c7d8-4e9f-0a1b-c2d3e4f5a6b7",
+              "name": "Advertiser",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f4a5b6c7-d8e9-4f0a-1b2c-d3e4f5a6b7c8",
+              "name": "Ad ID",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a5b6c7d8-e9f0-4a1b-2c3d-e4f5a6b7c8d9",
+              "name": "Page Name",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b6c7d8e9-f0a1-4b2c-3d4e-f5a6b7c8d9e0",
+              "name": "Ad Text",
+              "value": "={{ $json.ad_creative_body }}",
+              "type": "string"
+            },
+            {
+              "id": "c7d8e9f0-a1b2-4c3d-4e5f-a6b7c8d9e0f1",
+              "name": "Ad Title",
+              "value": "={{ $json.ad_creative_link_title }}",
+              "type": "string"
+            },
+            {
+              "id": "d8e9f0a1-b2c3-4d4e-5f6a-b7c8d9e0f1a2",
+              "name": "Start Date",
+              "value": "={{ $json.ad_delivery_start_time ? $json.ad_delivery_start_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e9f0a1b2-c3d4-4e5f-6a7b-c8d9e0f1a2b3",
+              "name": "End Date",
+              "value": "={{ $json.ad_delivery_stop_time ? $json.ad_delivery_stop_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f0a1b2c3-d4e5-4f6a-7b8c-d9e0f1a2b3c4",
+              "name": "Status",
+              "value": "={{ $json.ad_delivery_stop_time ? 'Ended' : 'Active' }}",
+              "type": "string"
+            },
+            {
+              "id": "a1b2c3d4-e5f6-4a7b-8c9d-e0f1a2b3c4d5",
+              "name": "Days Running",
+              "value": "={{ $json.ad_delivery_start_time ? Math.floor(($now.toMillis() - new Date($json.ad_delivery_start_time).getTime()) / 86400000) : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "b2c3d4e5-f6a7-4b8c-9d0e-f1a2b3c4d5e6",
+              "name": "Ad Link",
+              "value": "=https://www.facebook.com/ads/library/?id={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c3d4e5f6-a7b8-4c9d-0e1f-a2b3c4d5e6f7",
+              "name": "Ad Preview",
+              "value": "={{ $json.ad_snapshot_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-b3c4d5e6f7a9",
+      "name": "Set Lodgify Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e5f6a7b8-c9d0-4e1f-2a3b-c4d5e6f7a8ba",
+              "name": "Advertiser",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "f6a7b8c9-d0e1-4f2a-3b4c-d5e6f7a8b9cb",
+              "name": "Ad ID",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "a7b8c9d0-e1f2-4a3b-4c5d-e6f7a8b9c0dc",
+              "name": "Page Name",
+              "value": "={{ $json.page_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b8c9d0e1-f2a3-4b4c-5d6e-f7a8b9c0d1ed",
+              "name": "Ad Text",
+              "value": "={{ $json.ad_creative_body }}",
+              "type": "string"
+            },
+            {
+              "id": "c9d0e1f2-a3b4-4c5d-6e7f-a8b9c0d1e2fe",
+              "name": "Ad Title",
+              "value": "={{ $json.ad_creative_link_title }}",
+              "type": "string"
+            },
+            {
+              "id": "d0e1f2a3-b4c5-4d6e-7f8a-b9c0d1e2f3af",
+              "name": "Start Date",
+              "value": "={{ $json.ad_delivery_start_time ? $json.ad_delivery_start_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "e1f2a3b4-c5d6-4e7f-8a9b-c0d1e2f3a4b0",
+              "name": "End Date",
+              "value": "={{ $json.ad_delivery_stop_time ? $json.ad_delivery_stop_time.substring(0,10) : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f2a3b4c5-d6e7-4f8a-9b0c-d1e2f3a4b5c1",
+              "name": "Status",
+              "value": "={{ $json.ad_delivery_stop_time ? 'Ended' : 'Active' }}",
+              "type": "string"
+            },
+            {
+              "id": "a3b4c5d6-e7f8-4a9b-0c1d-e2f3a4b5c6d2",
+              "name": "Days Running",
+              "value": "={{ $json.ad_delivery_start_time ? Math.floor(($now.toMillis() - new Date($json.ad_delivery_start_time).getTime()) / 86400000) : 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "b4c5d6e7-f8a9-4b0c-1d2e-f3a4b5c6d7e3",
+              "name": "Ad Link",
+              "value": "=https://www.facebook.com/ads/library/?id={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "c5d6e7f8-a9b0-4c1d-2e3f-a4b5c6d7e8f4",
+              "name": "Ad Preview",
+              "value": "={{ $json.ad_snapshot_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-b5c6d7e8f9a5",
+      "name": "Set Hospitable Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-c6d7e8f9a0b6",
+      "name": "Merge All Ads",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "mode": "id",
+          "value": "1KoZ1lPNFeOwElo9fGvx01ChbWUw9t5PhLwarqewOjy4"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Raw Ads"
+        },
+        "startIndex": 1,
+        "endIndex": 1000,
+        "options": {}
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-d7e8f9a0b1c7",
+      "name": "Clear Raw Ads Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1KoZ1lPNFeOwElo9fGvx01ChbWUw9t5PhLwarqewOjy4"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Raw Ads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Advertiser": "={{ $json.Advertiser }}",
+            "Ad ID": "={{ $json['Ad ID'] }}",
+            "Page Name": "={{ $json['Page Name'] }}",
+            "Ad Text": "={{ $json['Ad Text'] }}",
+            "Ad Title": "={{ $json['Ad Title'] }}",
+            "Start Date": "={{ $json['Start Date'] }}",
+            "End Date": "={{ $json['End Date'] }}",
+            "Status": "={{ $json.Status }}",
+            "Days Running": "={{ $json['Days Running'] }}",
+            "Ad Link": "={{ $json['Ad Link'] }}",
+            "Ad Preview": "={{ $json['Ad Preview'] }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-e8f9a0b1c2d8",
+      "name": "Write to Raw Ads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "b0c1d2e3-f4a5-4b6c-7d8e-f9a0b1c2d3e9",
+              "leftValue": "={{ $json['Days Running'] }}",
+              "rightValue": 20,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            },
+            {
+              "id": "c1d2e3f4-a5b6-4c7d-8e9f-a0b1c2d3e4f0",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Active",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f0a-b1c2d3e4f5a7",
+      "name": "Filter Winning Ads",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "mode": "id",
+          "value": "1KoZ1lPNFeOwElo9fGvx01ChbWUw9t5PhLwarqewOjy4"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Winning Ads"
+        },
+        "startIndex": 1,
+        "endIndex": 1000,
+        "options": {}
+      },
+      "id": "e3f4a5b6-c7d8-4e9f-0a1b-c2d3e4f5a6b8",
+      "name": "Clear Winning Ads Tab",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1980,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "id",
+          "value": "1KoZ1lPNFeOwElo9fGvx01ChbWUw9t5PhLwarqewOjy4"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Winning Ads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Advertiser": "={{ $json.Advertiser }}",
+            "Ad ID": "={{ $json['Ad ID'] }}",
+            "Page Name": "={{ $json['Page Name'] }}",
+            "Ad Text": "={{ $json['Ad Text'] }}",
+            "Ad Title": "={{ $json['Ad Title'] }}",
+            "Start Date": "={{ $json['Start Date'] }}",
+            "End Date": "={{ $json['End Date'] }}",
+            "Status": "={{ $json.Status }}",
+            "Days Running": "={{ $json['Days Running'] }}",
+            "Ad Link": "={{ $json['Ad Link'] }}",
+            "Ad Preview": "={{ $json['Ad Preview'] }}"
+          }
+        },
+        "options": {
+          "valueInputMode": "USER_ENTERED"
+        }
+      },
+      "id": "f4a5b6c7-d8e9-4f0a-1b2c-d3e4f5a6b7c9",
+      "name": "Write to Winning Ads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Monday 8am": {
+      "main": [
+        [
+          {
+            "node": "Set Date Window",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Date Window": {
+      "main": [
+        [
+          {
+            "node": "Meta API - Hostaway",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Meta API - Lodgify",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Meta API - Hospitable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta API - Hostaway": {
+      "main": [
+        [
+          {
+            "node": "Split Hostaway Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta API - Lodgify": {
+      "main": [
+        [
+          {
+            "node": "Split Lodgify Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Meta API - Hospitable": {
+      "main": [
+        [
+          {
+            "node": "Split Hospitable Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Hostaway Ads": {
+      "main": [
+        [
+          {
+            "node": "Set Hostaway Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Lodgify Ads": {
+      "main": [
+        [
+          {
+            "node": "Set Lodgify Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Hospitable Ads": {
+      "main": [
+        [
+          {
+            "node": "Set Hospitable Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Hostaway Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge All Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Lodgify Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge All Ads",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Set Hospitable Fields": {
+      "main": [
+        [
+          {
+            "node": "Merge All Ads",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge All Ads": {
+      "main": [
+        [
+          {
+            "node": "Clear Raw Ads Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Raw Ads Tab": {
+      "main": [
+        [
+          {
+            "node": "Write to Raw Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write to Raw Ads": {
+      "main": [
+        [
+          {
+            "node": "Filter Winning Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Winning Ads": {
+      "main": [
+        [
+          {
+            "node": "Clear Winning Ads Tab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear Winning Ads Tab": {
+      "main": [
+        [
+          {
+            "node": "Write to Winning Ads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

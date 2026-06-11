@@ -1,20 +1,18 @@
 - name: harvested_cs_007
-  description: "Harvested from alvaro.cuba@guesty.com - Create a production workflow that polls Salesforce every ..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a workflow triggered by Salesforce when an Opportu..."
   department: cs
   prompt: >
-    Create a production workflow that polls Salesforce every day at 6pm for updated opportunities. Use production credentials. When an opportunity is updated, query Salesforce for the opportunity details including Account.Name, Account.Account_Owner_F__c, Account.Average_MRR__c, and Account.Guesty_Admin_ID__c. Filter for renewal record type (RecordTypeId = "0125p000001101UAAQ") where Last_Stage__c contains "declined" and churn date is after 2024-01-01. Then query BigQuery csm_churn_report for max...
+    Create a workflow triggered by Salesforce when an Opportunity is updated. Query the updated Opportunity for RecordType.Name, StageName, Account.Name, and Account.Guesty_Admin_ID__c. Use a Filter node to keep only opportunities where RecordType.Name = 'Renewal'. Query BigQuery csm.csm_churn_report using the Guesty_Admin_ID__c to get max_paid_listings and churn_reason. Post a renewal status update to #cs-renewals in Slack. Use production credentials.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - scheduleTrigger
+    - salesforceTrigger
     - salesforce
-    - if
-    - splitOut
+    - filter
     - googleBigQuery
-    - set
     - slack
   expected_creds:
     salesforceOAuth2Api: fCB6gfK7EaGpMnZy
-    googleApi: h7fJ82YhtOnUL58u
+    googleApi: VQ7CU7dKViVcv8Ah
     slackApi: 7H6auF31TpX7Wk7M
   checks:
     - encoding
@@ -24,13 +22,13 @@
     - sf_config
     - slack_config
   _metadata:
-    source_conversation: hp0ytcw5XWxPI6CKb0jj
+    source_conversation: uAvVogJk80i18m7MuSoj
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a production workflow that polls Salesforce every ..."
-    node_count: 7
+    workflow_name: "Create a workflow triggered by Salesforce when an Opportu..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.210Z
+    harvested_at: 2026-04-15T15:43:43.770Z
     confidence: high
     workflow_json_file: harvested_cs_007_workflow.json

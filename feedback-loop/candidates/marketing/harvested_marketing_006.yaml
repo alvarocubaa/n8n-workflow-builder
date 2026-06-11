@@ -1,0 +1,34 @@
+- name: harvested_marketing_006
+  description: "Harvested from alvaro.cuba@guesty.com - Create a weekly workflow that runs every Monday at 6am UT..."
+  department: marketing
+  prompt: >
+    Create a weekly workflow that runs every Monday at 6am UTC. Step 1: Use an HTTP Request node to call the Semrush API domain analytics endpoint. Use GET method to https://api.semrush.com/?type=domain_ranks&key={{SEMRUSH_API_KEY}}&domain=guesty.com&database=us (use a placeholder API key). Parse the CSV response. Step 2: Use a second HTTP Request to get keyword rankings: https://api.semrush.com/?type=domain_organic&key={{SEMRUSH_API_KEY}}&domain=guesty.com&database=us&display_limit=20 Step 3: Us...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - httpRequest
+    - code
+    - googleSheets
+    - sort
+    - limit
+    - merge
+    - slack
+  expected_creds:
+    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
+    slackOAuth2Api: 5Ii5X9IFid1S8rIE
+  checks:
+    - encoding
+    - uuids
+    - credentials
+    - slack_config
+  _metadata:
+    source_conversation: kFkdKVLKOqRGWXuaK0Jn
+    source_user: alvaro.cuba@guesty.com
+    deployed: false
+    deployed_workflow_id: 
+    workflow_name: "Create a weekly workflow that runs every Monday at 6am UT..."
+    node_count: 12
+    complexity_score: 1
+    harvested_at: 2026-04-15T15:43:43.770Z
+    confidence: high
+    workflow_json_file: harvested_marketing_006_workflow.json

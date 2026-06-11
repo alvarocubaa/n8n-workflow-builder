@@ -20,13 +20,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: d50DRRXHlbyhwicuYWgf
+    source_conversation: pzFz9nLcGibjii3xzvqm
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
     workflow_name: "Build a daily workflow with two BigQuery queries run in p..."
     node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.210Z
+    harvested_at: 2026-04-15T15:43:43.770Z
     confidence: high
     workflow_json_file: harvested_payments_004_workflow.json

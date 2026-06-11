@@ -2,7 +2,7 @@
   "name": "Zuora Payment Gateway Fee Reconciliation",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "id": "a1f3c2e4-9b7d-4e6f-8a0c-1d2e3f4a5b6c",
       "name": "Daily 9am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
@@ -22,20 +22,19 @@
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "id": "b2e4d6f8-0a1c-4b3d-9e5f-2a3b4c5d6e7f",
       "name": "Query Fee Mismatches",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        480,
+        460,
         300
       ],
       "parameters": {
         "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "WITH configured_fees AS (\n  SELECT\n    pc.account_id,\n    pc.account_name,\n    pc.plan_name,\n    pc.plan_value AS configured_fee,\n    pc.charge_model,\n    pc.subscription_name\n  FROM `guesty-data.zuora_analytics.product_catalog` pc\n  WHERE LOWER(pc.plan_name) LIKE '%payment gateway%'\n    AND pc.effective_end_date > CURRENT_DATE()\n),\ninvoiced_fees AS (\n  SELECT\n    ii.mongo_account_id,\n    ii.subscription_name,\n    ii.product_name,\n    SUM(ii.amount) AS total_invoiced\n  FROM `guesty-data.zuora_analytics.invoice_items` ii\n  JOIN `guesty-data.zuora_analytics.invoices` inv\n    ON ii.invoice_id = inv.invoice_id\n  WHERE ii.invoiceitem_servicestartdate >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)\n    AND inv.zuora_invoice_status = 'Posted'\n    AND LOWER(ii.product_name) LIKE '%payment gateway%'\n  GROUP BY ii.mongo_account_id, ii.subscription_name, ii.product_name\n)\nSELECT\n  cf.account_id,\n  cf.account_name,\n  cf.plan_name,\n  cf.configured_fee,\n  IFNULL(inf.total_invoiced, 0) AS total_invoiced,\n  ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4) AS delta\nFROM configured_fees cf\nLEFT JOIN invoiced_fees inf\n  ON cf.account_id = inf.mongo_account_id\n  AND cf.subscription_name = inf.subscription_name\nWHERE ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4) != 0\nORDER BY ABS(ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4)) DESC\nLIMIT 200",
-        "options": {}
+        "sqlQuery": "WITH configured_fees AS (\n  SELECT\n    account_id,\n    account_name,\n    subscription_name,\n    plan_name,\n    plan_value          AS configured_fee,\n    charge_model,\n    chargetype\n  FROM `guesty-data.zuora_analytics.product_catalog`\n  WHERE LOWER(plan_name) LIKE '%payment gateway%'\n    AND effective_end_date > CURRENT_DATE()\n),\n\ninvoiced_fees AS (\n  SELECT\n    ii.mongo_account_id,\n    ii.subscription_name,\n    SUM(ii.amount)      AS total_invoiced\n  FROM `guesty-data.zuora_analytics.invoice_items` ii\n  JOIN `guesty-data.zuora_analytics.invoices` inv\n    ON ii.invoice_id = inv.invoice_id\n  WHERE LOWER(ii.product_name) LIKE '%payment gateway%'\n    AND inv.invoice_date >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)\n    AND inv.status = 'Posted'\n  GROUP BY ii.mongo_account_id, ii.subscription_name\n)\n\nSELECT\n  cf.account_id,\n  cf.account_name,\n  cf.subscription_name,\n  cf.plan_name,\n  cf.configured_fee,\n  cf.charge_model,\n  IFNULL(inf.total_invoiced, 0)                         AS total_invoiced,\n  ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4) AS delta\nFROM configured_fees cf\nLEFT JOIN invoiced_fees inf\n  ON cf.account_id = inf.mongo_account_id\n  AND cf.subscription_name = inf.subscription_name\nWHERE ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4) != 0\n  OR inf.mongo_account_id IS NULL\nORDER BY ABS(ROUND(IFNULL(inf.total_invoiced, 0) - cf.configured_fee, 4)) DESC"
       },
       "credentials": {
         "googleApi": {
@@ -45,27 +44,38 @@
       }
     },
     {
-      "id": "3b1e4f2a-9c8d-4e7f-b6a5-2d1c0e9f8b7a",
-      "name": "Aggregate Results",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
+      "id": "c3f5e7a9-1b2c-4d4e-af6f-3b4c5d6e7f8a",
+      "name": "Summarize Mismatches",
+      "type": "n8n-nodes-base.summarize",
+      "typeVersion": 1.1,
       "position": [
-        720,
+        680,
         300
       ],
       "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "mismatches",
-        "include": "allFields"
+        "fieldsToSummarize": {
+          "values": [
+            {
+              "aggregation": "countUnique",
+              "field": "account_id",
+              "outputFieldName": "mismatch_count"
+            },
+            {
+              "aggregation": "sum",
+              "field": "delta",
+              "outputFieldName": "total_delta"
+            }
+          ]
+        }
       }
     },
     {
-      "id": "9d8c7b6a-5e4f-4d3c-b2a1-0f9e8d7c6b5a",
+      "id": "d4a6f8b0-2c3d-4e5f-b07a-4c5d6e7f8a9b",
       "name": "Any Mismatches?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        960,
+        900,
         300
       ],
       "parameters": {
@@ -76,8 +86,8 @@
           "combinator": "and",
           "conditions": [
             {
-              "id": "a1f2e3d4-b5c6-4d7e-8f9a-0b1c2d3e4f5a",
-              "leftValue": "={{ $json.mismatches.length }}",
+              "id": "e5b7c9d1-3d4e-4f60-c18b-5d6e7f8a9b0c",
+              "leftValue": "={{ $json.mismatch_count }}",
               "rightValue": 0,
               "operator": {
                 "type": "number",
@@ -89,28 +99,58 @@
       }
     },
     {
-      "id": "2e3f4a5b-6c7d-4e8f-9a0b-1c2d3e4f5a6b",
-      "name": "Build Alert Message",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "e5c7d9f1-4e5f-4a71-d29c-6e7f8a9b0c1d",
+      "name": "Build Mismatch List",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
       "position": [
-        1200,
+        1120,
         180
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const mismatches = $input.first().json.mismatches || [];\nconst today = new Date().toISOString().slice(0, 10);\n\nconst lines = mismatches.map(function(m) {\n  const name = m.account_name || m.account_id;\n  const plan = m.plan_name || 'Unknown Plan';\n  const configured = parseFloat(m.configured_fee || 0).toFixed(2);\n  const invoiced = parseFloat(m.total_invoiced || 0).toFixed(2);\n  const delta = parseFloat(m.delta || 0).toFixed(2);\n  const sign = parseFloat(delta) > 0 ? '+' : '';\n  return '*' + name + '* (' + m.account_id + ')\\n  Plan: ' + plan + '\\n  Configured: $' + configured + ' | Invoiced (30d): $' + invoiced + ' | Delta: ' + sign + '$' + delta;\n});\n\nconst header = ':rotating_light: *Payment Gateway Fee Mismatch Alert* :rotating_light:\\n*Date:* ' + today + '\\n*Mismatches found:* ' + mismatches.length + '\\n';\nconst body = lines.join('\\n\\n');\nconst footer = '\\n\\n_Source: guesty-data.zuora_analytics | Review mismatches in BigQuery_';\n\nreturn [{\n  json: {\n    slack_message: header + '\\n' + body + footer,\n    mismatch_count: mismatches.length\n  }\n}];\n"
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "mismatches",
+        "include": "specifiedFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "account_id"
+            },
+            {
+              "fieldName": "account_name"
+            },
+            {
+              "fieldName": "subscription_name"
+            },
+            {
+              "fieldName": "plan_name"
+            },
+            {
+              "fieldName": "configured_fee"
+            },
+            {
+              "fieldName": "total_invoiced"
+            },
+            {
+              "fieldName": "delta"
+            }
+          ]
+        }
       }
     },
     {
-      "id": "4f5a6b7c-8d9e-4f0a-b1c2-3d4e5f6a7b8c",
+      "id": "f6d8e0a2-5f60-4b82-e3ad-7f8a9b0c1d2e",
       "name": "Post Mismatch Alert",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1440,
+        1340,
         180
       ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
       "parameters": {
         "resource": "message",
         "operation": "post",
@@ -119,7 +159,7 @@
           "mode": "name",
           "value": "#finance-alerts"
         },
-        "text": "={{ $json.slack_message }}",
+        "text": "={{ ':rotating_light: *Payment Gateway Fee Reconciliation Alert* :rotating_light:\\n' + '*Date:* ' + $now.toFormat('yyyy-MM-dd') + '\\n' + '*Mismatched Accounts:* ' + $('Summarize Mismatches').first().json.mismatch_count + '\\n' + '*Total Delta:* $' + $('Summarize Mismatches').first().json.total_delta.toFixed(2) + '\\n\\n' + '*Account Details (sorted by largest delta):*\\n' + $json.mismatches.map(m => '- *' + m.account_name + '* (' + m.account_id + ')\\n  Plan: ' + m.plan_name + ' | Sub: ' + m.subscription_name + '\\n  Configured: $' + m.configured_fee + ' | Invoiced: $' + m.total_invoiced + ' | Delta: $' + m.delta).join('\\n') }}",
         "otherOptions": {}
       },
       "credentials": {
@@ -127,21 +167,21 @@
           "id": "g3NQlNzyjFofD87l",
           "name": "bot_user_oauth_token_slack_app_workflows_builder"
         }
-      },
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 3000
+      }
     },
     {
-      "id": "6b7c8d9e-0f1a-4b2c-3d4e-5f6a7b8c9d0e",
+      "id": "a7e9f1b3-6a71-4c93-f4be-8a9b0c1d2e3f",
       "name": "Post All Clear",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1200,
-        440
+        1120,
+        420
       ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
       "parameters": {
         "resource": "message",
         "operation": "post",
@@ -150,7 +190,7 @@
           "mode": "name",
           "value": "#finance-alerts"
         },
-        "text": "=:white_check_mark: *Payment Gateway Fee Check -- All Clear*\n*Date:* {{ $now.toFormat('yyyy-MM-dd') }}\nNo fee mismatches found in the last 30 days. All configured payment gateway fees match invoiced amounts.",
+        "text": "={{ ':white_check_mark: *Payment Gateway Fee Reconciliation* (' + $now.toFormat('yyyy-MM-dd') + ')\\nNo fee mismatches found in the last 30 days. All configured fees match invoiced amounts.' }}",
         "otherOptions": {}
       },
       "credentials": {
@@ -158,11 +198,7 @@
           "id": "g3NQlNzyjFofD87l",
           "name": "bot_user_oauth_token_slack_app_workflows_builder"
         }
-      },
-      "onError": "continueRegularOutput",
-      "retryOnFail": true,
-      "maxTries": 2,
-      "waitBetweenTries": 3000
+      }
     }
   ],
   "connections": {
@@ -181,14 +217,14 @@
       "main": [
         [
           {
-            "node": "Aggregate Results",
+            "node": "Summarize Mismatches",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Aggregate Results": {
+    "Summarize Mismatches": {
       "main": [
         [
           {
@@ -203,7 +239,7 @@
       "main": [
         [
           {
-            "node": "Build Alert Message",
+            "node": "Build Mismatch List",
             "type": "main",
             "index": 0
           }
@@ -217,7 +253,7 @@
         ]
       ]
     },
-    "Build Alert Message": {
+    "Build Mismatch List": {
       "main": [
         [
           {

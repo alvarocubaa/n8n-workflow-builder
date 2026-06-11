@@ -1,0 +1,187 @@
+{
+  "name": "Zuora Payment Gateway Fee Reconciliation",
+  "nodes": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Daily 9am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "name": "Query Fee Mismatches",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
+        "projectId": "guesty-data",
+        "sqlQuery": "WITH configured_fees AS (\n  SELECT\n    account_id,\n    account_name,\n    subscription_name,\n    plan_name,\n    plan_value AS configured_fee,\n    charge_model\n  FROM `guesty-data.zuora_analytics.product_catalog`\n  WHERE LOWER(plan_name) LIKE '%payment gateway%'\n    AND effective_end_date > CURRENT_DATE()\n),\n\ninvoiced_fees AS (\n  SELECT\n    mongo_account_id,\n    subscription_name,\n    product_name,\n    SUM(amount) AS total_invoiced\n  FROM `guesty-data.zuora_analytics.invoice_items`\n  WHERE LOWER(product_name) LIKE '%payment gateway%'\n    AND CAST(invoice_item_created_at AS TIMESTAMP) >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)\n  GROUP BY mongo_account_id, subscription_name, product_name\n)\n\nSELECT\n  cf.account_name,\n  cf.account_id,\n  cf.plan_name,\n  cf.charge_model,\n  cf.configured_fee,\n  ROUND(inv.total_invoiced, 2) AS total_invoiced,\n  ROUND(inv.total_invoiced - cf.configured_fee, 2) AS delta\nFROM configured_fees cf\nJOIN invoiced_fees inv\n  ON cf.account_id = inv.mongo_account_id\n  AND cf.subscription_name = inv.subscription_name\nWHERE inv.total_invoiced != cf.configured_fee\nORDER BY ABS(inv.total_invoiced - cf.configured_fee) DESC\nLIMIT 50",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "3d594a8e-1b2f-4c6e-9f8a-2b7e5d1c4f90",
+      "name": "Any Mismatches Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "a1f3c2e4-9b7d-4e6f-8a2c-1d5e7f9b3c4a",
+              "leftValue": "={{ $json.account_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8b2e4f6a-3c1d-4e7f-9a5b-6d8e2f4c1b3a",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        180
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst today = new Date().toISOString().slice(0, 10);\n\nconst lines = items.map(function(item) {\n  const d = item.json;\n  return '- *' + d.account_name + '* (' + d.account_id + ')\\n  Plan: ' + d.plan_name + ' | Model: ' + d.charge_model + '\\n  Configured: $' + d.configured_fee + ' | Invoiced: $' + d.total_invoiced + ' | Delta: $' + d.delta;\n});\n\nconst text =\n  ':warning: *Payment Gateway Fee Reconciliation Alert* -- ' + today + '\\n\\n' +\n  '*' + items.length + ' account(s) have mismatched payment gateway fees in the last 30 days:*\\n\\n' +\n  lines.join('\\n\\n') +\n  '\\n\\n_Sorted by largest discrepancy. Max 50 results shown._';\n\nreturn [{ json: { slackText: text } }];"
+      }
+    },
+    {
+      "id": "5e7f9b1d-2c4e-4f6a-8b3c-1d5e7f9b2c4e",
+      "name": "Post to #finance-alerts",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        1200,
+        180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#finance-alerts"
+        },
+        "text": "={{ $json.slackText }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "id": "9f1b3d5e-7a2c-4e6f-8b4d-2c6e8f1b3d5e",
+      "name": "No Mismatches - Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        960,
+        440
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Daily 9am UTC": {
+      "main": [
+        [
+          {
+            "node": "Query Fee Mismatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Fee Mismatches": {
+      "main": [
+        [
+          {
+            "node": "Any Mismatches Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Mismatches Found?": {
+      "main": [
+        [
+          {
+            "node": "Build Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Mismatches - Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [
+          {
+            "node": "Post to #finance-alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

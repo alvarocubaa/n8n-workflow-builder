@@ -1,54 +1,31 @@
 - name: harvested_cx_015
-  description: "Harvested from roni.shif@guesty.com - {
-  \"nodes\": [
-    {
-      \"parameters\": {},
-      \"id\": ..."
+  description: "Harvested from roni.shif@guesty.com - this is the tasks i have for this worfklow 
+ADD COMMENTOR..."
   department: cx
   prompt: >
-    {
-      "nodes": [
-        {
-          "parameters": {},
-          "id": "0ad502fd-6320-4e16-bec1-a2693f47f6c2",
-          "name": "Manual Trigger",
-          "type": "n8n-nodes-base.manualTrigger",
-          "typeVersion": 1,
-          "position": [
-            -1312,
-            -1872
-          ]
-        },
-        {
-          "parameters": {
-            "authentication": "serviceAccount",
-            "documentId": {
-              "mode": "id",
-              "value": "103-8hxYCbPXk0Zl_dJLUpp0eeY4lyRt6r3-p3eXqZBY"
-            },
-            "sheetName": {
-              "mod...
+    this is the tasks i have for this worfklow 
+    ADD COMMENTORS- not requester + Change Kareen's email + prod crendtials work + nothing is hardcoded 
+    
+    Commentors - are the 4th colimn in the sheet
+    
+    Timestamp	Account	Requester Email	Contacts	Followers	Group	All brands: issue Type	GPro: Multi-level category	Knowledge Exists	Subject	Message Body	Author ID	Guesty ID	Billing Type	GPro/GLite Domain	Invoice PDF URL	Attachements URL	Manual Billing CSV URL	Brand	Ticket form	Status	ZD Ticket ID	ZD Ticket URL...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - httpRequest
+    - if
   expected_creds:
-    httpBearerAuth: RuVOaOP3GPBqgNCu
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: nOtCRS4Iehr5b3DP6O1a
+    source_conversation: bYJaD5Gt3tpgwvTR98DG
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "{
-  \"nodes\": [
-    {
-      \"parameters\": {},
-      \"id\": ..."
+    workflow_name: "this is the tasks i have for this worfklow 
+ADD COMMENTOR..."
     node_count: 1
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.213Z
+    harvested_at: 2026-04-15T15:43:43.772Z
     confidence: medium
     workflow_json_file: harvested_cx_015_workflow.json

@@ -1,0 +1,37 @@
+- name: harvested_marketing_011
+  description: "Harvested from samantha.burd@guesty.com - [AI by samantha.burd] Competitor Event Intelligence Tracker v7"
+  department: marketing
+  prompt: >
+    I want to build a workflow for competitor event analysis. My goal is to track which competitors are attending which events. Furthermore, also compare if Guesty is attending those events. I'd like to scrap both their website and their linkedin page for these details. If possible, I would like photos from the events the competitors are attending, and added on their linkedin, to also be documented.
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - googleSheets
+    - merge
+    - splitInBatches
+    - httpRequest
+    - @n8n/n8n-nodes-langchain.chainLlm
+    - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
+    - set
+    - splitOut
+    - aggregate
+    - code
+  expected_creds:
+    googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
+    httpBearerAuth: ngaBlIhFMFTZFajQ
+    googlePalmApi: LL8fLgZSrUn8oZtV
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: sD72vHQClg4hXH4VGgYB
+    source_user: samantha.burd@guesty.com
+    deployed: true
+    deployed_workflow_id: fN57Bxb2mL8R9IDc
+    workflow_name: "[AI by samantha.burd] Competitor Event Intelligence Tracker v7"
+    node_count: 19
+    complexity_score: 4
+    harvested_at: 2026-04-15T15:43:43.772Z
+    confidence: high
+    workflow_json_file: harvested_marketing_011_workflow.json

@@ -1,36 +1,48 @@
 - name: harvested_cx_013
-  description: "Harvested from roni.shif@guesty.com - HQ Billing Automation — Full Project Brief
-🎯 Project Ove..."
+  description: "Harvested from roni.shif@guesty.com - THIS IS URGENT 
+
+The following workflow is recieving an e..."
   department: cx
   prompt: >
-    HQ Billing Automation — Full Project Brief
-    🎯 Project Overview
-    An end-to-end billing automation system for Guesty Pro HQ accounts that:
+    THIS IS URGENT 
     
-    Automatically generates and sends monthly invoice emails with PDF attachments
-    Logs every email action to a master Google Sheet
-    Creates Zendesk support tickets from that sheet — triggered either automatically or via a Slack slash command
-    The Google Sheet is the single source of truth — everything flows through it.
+    The following workflow is recieving an error from Gsheet that it is getting too many requests
     
-    🏗️ Architecture — 3 Components
-    Workflow 1 (...
+    THis is live in pro i do not have time to restructure the workflow how do i fix it 
+    
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "options": {}
+          },
+          "type": "n8n-nodes-base.splitInBatches",
+          "typeVersion": 3,
+          "position": [
+            -2480,
+            -1552
+          ],
+          "id": "84ab0327-38b5-41d6-ae61-d2f63b2f92fc",
+          "name": "Loop Over Guesty Account ID"
+     ...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - if
+    - wait
   expected_creds:
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: Z0dF6Gt1LwlyJ1m9vpda
+    source_conversation: AkQ9AqIf1HMCKQ10tQ5X
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "HQ Billing Automation — Full Project Brief
-🎯 Project Ove..."
-    node_count: 1
+    workflow_name: "THIS IS URGENT 
+
+The following workflow is recieving an e..."
+    node_count: 2
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.212Z
+    harvested_at: 2026-04-15T15:43:43.771Z
     confidence: medium
     workflow_json_file: harvested_cx_013_workflow.json
