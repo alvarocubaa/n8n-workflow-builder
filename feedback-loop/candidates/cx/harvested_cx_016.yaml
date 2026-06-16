@@ -1,45 +1,57 @@
 - name: harvested_cx_016
-  description: "Harvested from roni.shif@guesty.com - [
-  {
-    \"row_number\": 9492,
-    \"account\": \"1703de57-6b..."
+  description: "Harvested from roni.shif@guesty.com - {
+  \"nodes\": [
+    {
+      \"parameters\": {
+        \"optio..."
   department: cx
   prompt: >
-    [
-      {
-        "row_number": 9492,
-        "account": "1703de57-6b98-4e39-80c5-da98296ce61b",
-        "Batch": "",
-        "Account Name": "Surftides Plaza Rentals",
-        "Item Name ": "Locks Manager",
-        "item": "8a3699dd8990514f0189913044712581",
-        "UOM": "Locks Manager",
-        "UOM_Id": "8a3699dd8990514f0189913044712581",
-        "description": "February 2026 Addons Import",
-        "amount": 153,
-        "invoicedate": "2026-02-28",
-        "duedate": "2026-02-28",
-        "Service Start Date": "2026-02-01",
-        "Service End...
+    {
+      "nodes": [
+        {
+          "parameters": {
+            "options": {}
+          },
+          "type": "n8n-nodes-base.splitInBatches",
+          "typeVersion": 3,
+          "position": [
+            -2240,
+            -1472
+          ],
+          "id": "84ab0327-38b5-41d6-ae61-d2f63b2f92fc",
+          "name": "Loop Over Guesty Account ID"
+        },
+        {
+          "parameters": {
+            "resource": "account",
+            "operation": "getAll",
+            "returnAll": true,
+            "options": {
+              "fields": "Name, Guesty_Admin_ID__c, Zuora_...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - code
+    - executeWorkflowTrigger
+    - set
+    - if
+    - gmail
   expected_creds:
+    gmailOAuth2: 4BConxQW0qmylDKE
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: ozba5RK7ZQDnFormlIfP
+    source_conversation: f6dwyKzEiMFhgRni1KpH
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "[
-  {
-    \"row_number\": 9492,
-    \"account\": \"1703de57-6b..."
-    node_count: 1
+    workflow_name: "{
+  \"nodes\": [
+    {
+      \"parameters\": {
+        \"optio..."
+    node_count: 6
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.213Z
-    confidence: medium
+    harvested_at: 2026-04-15T15:43:43.772Z
+    confidence: high
     workflow_json_file: harvested_cx_016_workflow.json

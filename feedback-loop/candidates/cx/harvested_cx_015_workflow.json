@@ -2,26 +2,56 @@
   "nodes": [
     {
       "parameters": {
-        "url": "=https://guesty3396.zendesk.com/api/v2/users/search.json?query=email:{{ $('Read GSheet').item.json['Requester Email'] }}",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpBearerAuth",
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ffffffff-ffff-4fff-8fff-ffffffffffff",
+              "leftValue": "={{ $('Set Core Fields').item.json.attachments_url[0] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $('Set Core Fields').item.json.attachments_url[0] }}",
+              "rightValue": "N/A",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "00000000-0000-4000-8000-000000000002",
+              "leftValue": "={{ $('Set Core Fields').item.json.attachments_url[0] }}",
+              "rightValue": "N/A - Subaccount",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
         "options": {}
       },
-      "id": "604a6df5-2b76-42f6-bbfe-77e5701747c9",
-      "name": "SANDBOX - Get Zendesk Org1",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "e03e9126-7803-4e9e-8a61-4a02a2eb40d3",
+      "name": "IF Attachment URL Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
       "position": [
-        -416,
-        -1872
-      ],
-      "alwaysOutputData": true,
-      "credentials": {
-        "httpBearerAuth": {
-          "id": "RuVOaOP3GPBqgNCu",
-          "name": "Zendesk - Read and Write - @Ronishif"
-        }
-      }
+        -3568,
+        -560
+      ]
     }
   ],
   "connections": {}

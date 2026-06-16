@@ -1,0 +1,46 @@
+- name: harvested_marketing_010
+  description: "Harvested from erik.cohen@guesty.com - [AI by erik.cohen] Untitled Workflow"
+  department: marketing
+  prompt: >
+    I have a workflow that takes a HERO asset from monday and repurpose it to three other asset types (Download Cadence, Eblast, Gated LP) using Claude API (both prompt caching at the beginning and then simple generate HTTP requests)
+    
+    I want to recreate it as a main agent with lots of sub-agents for each asset type that we want to create, and then maybe even add a "Loop over items" node that chunk the amount of assets we want to create into separated items, and then a switch node that sends each ...
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - webhook
+    - respondToWebhook
+    - mondayCom
+    - code
+    - httpRequest
+    - switch
+    - googleDrive
+    - wait
+    - set
+    - supabase
+    - merge
+    - aggregate
+    - @n8n/n8n-nodes-langchain.chainLlm
+    - @n8n/n8n-nodes-langchain.lmChatAnthropic
+    - splitInBatches
+  expected_creds:
+    mondayComApi: YesttFBJZtHO9Sbp
+    googleDriveOAuth2Api: NTCXq9HOttLY6Ige
+    httpHeaderAuth: SlfEa12NLco6kYMA
+    supabaseApi: 7sgyYDL116CbjJqN
+    googleDocsOAuth2Api: AFWbqVyABqTH873n
+    anthropicApi: NbTlK3SCKl7Xhoox
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: sSqOVZcOohGjWdoIm6Vj
+    source_user: erik.cohen@guesty.com
+    deployed: true
+    deployed_workflow_id: 3CSeVMBDPe5V2Sz6
+    workflow_name: "[AI by erik.cohen] Untitled Workflow"
+    node_count: 40
+    complexity_score: 4
+    harvested_at: 2026-04-15T15:43:43.771Z
+    confidence: medium
+    workflow_json_file: harvested_marketing_010_workflow.json

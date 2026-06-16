@@ -1,37 +1,48 @@
 - name: harvested_cx_012
-  description: "Harvested from roni.shif@guesty.com - Fetches account list from Google Sheet
-Looks up the Zuora..."
+  description: "Harvested from roni.shif@guesty.com - ENDPOINT URL 
+
+https://rest.na.zuora.com{{ $json.invoiceF..."
   department: cx
   prompt: >
-    Fetches account list from Google Sheet
-    Looks up the Zuora Account ID via Salesforce
-    Authenticates with Zuora and fetches the account's invoice summary
-    Filters for valid invoices (Posted, last 30 days, amount > 0)
-    Downloads the PDF invoice 
-    FIlters by account BILLING MODEL - CRITICAL 
-    IF TRUE TO NOT SUBACCOUNT THEN CALL Zuoura to get CSV attachment from Zuora +
-    Calls a subworkflow to generate a manual billing Google Sheet. 
-    IF TRUE / IF FALSE 
-    Creates a Gmail draft CONTAINING  
-    IF TRUE -> all ...
+    ENDPOINT URL 
+    
+    https://rest.na.zuora.com{{ $json.invoiceFiles[0].pdfFileUrl }}
+    
+    inoput
+    Invoice URL
+    2 items
+    invoiceFiles
+    invoiceFiles[0]
+    id
+    cae90932d1984dcdb1d77c7804396627
+    versionNumber
+    1775462793320
+    pdfFileUrl
+    /v1/files/8a3680f19d4efbed019d61d440656a24
+    success
+    true
+    
+    output https://rest.na.zuora.com[undefined]
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - gmail
+    - if
+    - httpRequest
+    - splitOut
   expected_creds:
-    gmailOAuth2: 3XKWZw8KuGVggGEH
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: WfwS1Cz3FYGE5tCK6EeP
+    source_conversation: 6Bl6rOgmHedfG3Ni950g
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Fetches account list from Google Sheet
-Looks up the Zuora..."
-    node_count: 1
+    workflow_name: "ENDPOINT URL 
+
+https://rest.na.zuora.com{{ $json.invoiceF..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.212Z
+    harvested_at: 2026-04-15T15:43:43.771Z
     confidence: medium
     workflow_json_file: harvested_cx_012_workflow.json

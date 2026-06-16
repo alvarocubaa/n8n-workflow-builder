@@ -1182,48 +1182,41 @@ export class SingleSessionHTTPServer {
         });
       }
       
-      // Enhanced authentication check with specific logging
+      // Authentication check.
+      // Supports two modes:
+      //   Local / direct:   Authorization: Bearer <AUTH_TOKEN>
+      //   Cloud Run SA-to-SA: Authorization: Bearer <Google-identity-token>  +  X-MCP-Auth: <AUTH_TOKEN>
+      //     In Cloud Run the identity token satisfies the IAM run.invoker check at the network
+      //     layer; the MCP token in X-MCP-Auth satisfies this application-level check.
       const authHeader = req.headers.authorization;
-      
-      // Check if Authorization header is missing
-      if (!authHeader) {
-        logger.warn('Authentication failed: Missing Authorization header', { 
+      const mcpAuthHeader = req.headers['x-mcp-auth'] as string | undefined;
+
+      // Derive which token to validate against AUTH_TOKEN:
+      //   - If X-MCP-Auth is present, use it (Cloud Run SA-to-SA mode).
+      //   - Otherwise fall back to the Authorization bearer (local / direct mode).
+      let token: string | null = null;
+      if (mcpAuthHeader) {
+        token = mcpAuthHeader.trim();
+      } else if (authHeader) {
+        if (!authHeader.startsWith('Bearer ')) {
+          logger.warn('Authentication failed: Invalid Authorization header format', {
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            reason: 'invalid_auth_format',
+          });
+          res.status(401).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized' }, id: null });
+          return;
+        }
+        token = authHeader.slice(7).trim();
+      } else {
+        logger.warn('Authentication failed: Missing Authorization and X-MCP-Auth headers', {
           ip: req.ip,
           userAgent: req.get('user-agent'),
-          reason: 'no_auth_header'
+          reason: 'no_auth_header',
         });
-        res.status(401).json({ 
-          jsonrpc: '2.0',
-          error: {
-            code: -32001,
-            message: 'Unauthorized'
-          },
-          id: null
-        });
+        res.status(401).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized' }, id: null });
         return;
       }
-      
-      // Check if Authorization header has Bearer prefix
-      if (!authHeader.startsWith('Bearer ')) {
-        logger.warn('Authentication failed: Invalid Authorization header format (expected Bearer token)', { 
-          ip: req.ip,
-          userAgent: req.get('user-agent'),
-          reason: 'invalid_auth_format',
-          headerPrefix: authHeader.substring(0, Math.min(authHeader.length, 10)) + '...'  // Log first 10 chars for debugging
-        });
-        res.status(401).json({ 
-          jsonrpc: '2.0',
-          error: {
-            code: -32001,
-            message: 'Unauthorized'
-          },
-          id: null
-        });
-        return;
-      }
-      
-      // Extract token and trim whitespace
-      const token = authHeader.slice(7).trim();
 
       // SECURITY: Use timing-safe comparison to prevent timing attacks
       // See: https://github.com/czlonkowski/n8n-mcp/issues/265 (CRITICAL-02)

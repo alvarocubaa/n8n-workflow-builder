@@ -1,0 +1,62 @@
+{
+  "name": "n8n Workflow Builder",
+  "description": "Conversational AI agent (Claude via Vertex) that builds production-ready n8n workflows for Guesty departments. Phase-gated, department-scoped, knowledge-grounded (specs + skills + n8n-mcp). Embedded as an iframe inside the Innovation Hub; deploys finished workflows to guesty.app.n8n.cloud and links them back to Hub initiatives.",
+  "version": "0.1.0",
+  "url": "https://n8n-chat-ui-fhehssni7q-ew.a.run.app",
+  "provider": {
+    "organization": "Guesty AI Team",
+    "url": "https://thehub.gue5ty.com"
+  },
+  "documentationUrl": "https://github.com/alvarocubaa/n8n-workflow-builder",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false
+  },
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain", "application/json"],
+  "securitySchemes": {
+    "googleIap": {
+      "type": "openIdConnect",
+      "description": "Google Identity-Aware Proxy — @guesty.com accounts only. Locally bypassed via MOCK_USER_EMAIL.",
+      "openIdConnectUrl": "https://accounts.google.com/.well-known/openid-configuration"
+    }
+  },
+  "security": [{ "googleIap": [] }],
+  "skills": [
+    {
+      "id": "build-n8n-workflow",
+      "name": "Build an n8n workflow",
+      "description": "Drive a phased conversation (interview → plan → build → self-check) that produces a validated, deployable n8n workflow JSON scoped to the user's department credentials and data sources.",
+      "tags": ["n8n", "workflow", "automation", "no-code"],
+      "examples": [
+        "Create a daily workflow that posts new Zendesk CSAT scores to #cx-quality",
+        "Build a workflow that syncs Salesforce opportunities to a BigQuery table every hour",
+        "I need a Slack alert when a HubSpot deal over $50k moves to closed-won"
+      ]
+    },
+    {
+      "id": "search-and-validate-nodes",
+      "name": "Search and validate n8n nodes",
+      "description": "Look up n8n node types and validate node configurations against the live n8n schema (via the n8n-mcp server), correcting credential keys and operation parameters.",
+      "tags": ["n8n", "validation", "mcp"],
+      "examples": [
+        "What parameters does the BigQuery node need for a query operation?",
+        "Validate this Slack node config for v2.4"
+      ]
+    },
+    {
+      "id": "deploy-workflow",
+      "name": "Deploy a workflow to n8n",
+      "description": "Create the workflow on guesty.app.n8n.cloud, tag it 'AI Generated', transfer it to the department's project, and emit a workflow_deployed event to the embedding Hub.",
+      "tags": ["n8n", "deploy"],
+      "examples": ["Deploy this workflow to the CS sandbox project"]
+    }
+  ],
+  "x-status": "A2A-ready scaffolding — this app does NOT yet expose an A2A JSON-RPC endpoint at `url`. Today it speaks HTTP+SSE (`/api/chat`, `/api/deploy`) and a browser postMessage protocol to its Hub host. This card documents capabilities for the planned A2A/Hermes integration; see cubaalvaro/claude-workspace-roots → 'AI Innovation Integration'.",
+  "x-channels": {
+    "http": ["POST /api/chat (SSE stream)", "POST /api/deploy"],
+    "postMessage": ["extracted_fields_updated → Hub", "workflow_deployed → Hub", "auth_required ↔ Hub"],
+    "downstream": ["n8n REST API (guesty.app.n8n.cloud)", "n8n-mcp-cloud (node knowledge)", "Hub Edge Functions (n8n-conversation-callback, n8n-builder-callback)"]
+  },
+  "x-deployed-revision-asof-2026-06-11": "n8n-chat-ui-00049-85m"
+}

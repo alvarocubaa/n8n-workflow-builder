@@ -98,9 +98,18 @@ export async function POST(req: Request): Promise<Response> {
         const conv = await getConversation(user.email, body.conversationId!);
         // Direction-3 defense: refuse to write back if this conversation was
         // never tied to the Hub. `source === 'standalone'` should be impossible
-        // when initiativeId is set (paired by the chat-ui server), but reject
-        // explicitly anyway.
-        if (conv?.initiativeId && conv.source && conv.source !== 'standalone') {
+        // when initiativeId or innovationItemId is set (paired by the chat-ui
+        // server), but reject explicitly anyway.
+        //
+        // Gate: fire when EITHER initiativeId or innovationItemId is set.
+        //   - initiativeId only        → original Hub initiative flow.
+        //   - initiativeId + innovationItemId → Initiative-path PoC (Session 10).
+        //   - innovationItemId only    → Idea-path PoC (Session 10). Edge Function
+        //     writes solution_url; skips initiative_workflow_links (no parent FK).
+        const hubLinked = (conv?.initiativeId || conv?.innovationItemId)
+          && conv?.source
+          && conv.source !== 'standalone';
+        if (hubLinked) {
           await fetch(`${process.env.HUB_CALLBACK_URL}/n8n-builder-callback`, {
             method: 'POST',
             headers: {
@@ -115,12 +124,10 @@ export async function POST(req: Request): Promise<Response> {
               deployed_by: user.email,
               deployed_at: new Date().toISOString(),
               source: conv.source,
-              // Phase 2.1: optional PoC linkage. When the chat conversation
-              // was launched from a PoC card (Phase 2.2's poc_context payload,
-              // not yet plumbed end-to-end), pass the innovation_items.id so
-              // n8n-builder-callback auto-populates that row's solution_url.
-              // Stub for now — Phase 2.2 will wire `conv.innovationItemId`.
-              innovation_item_id: (conv as { innovationItemId?: string }).innovationItemId,
+              // Session 10: PoC linkage. innovation_items.id of the PoC card
+              // this conversation was launched from; the Edge Function uses
+              // this to populate innovation_items.solution_url.
+              innovation_item_id: conv.innovationItemId,
             }),
           });
         }

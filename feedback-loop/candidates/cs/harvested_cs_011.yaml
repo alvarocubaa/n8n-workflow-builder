@@ -1,49 +1,37 @@
 - name: harvested_cs_011
-  description: "Harvested from roni.shif@guesty.com - this is the input 
-[
-  {
-    \"Alloggio\": [
-      {
-      ..."
+  description: "Harvested from roni.shif@guesty.com - the analysis: 
+P0 · Bug #1
+Code in JavaScript8
+Deprecated..."
   department: cs
   prompt: >
-    this is the input 
-    [
-      {
-        "Alloggio": [
-          {
-            "ticket_id": "1913722",
-            "status": "Open",
-            "sub_account": "Alloggio",
-            "created_by": "Kylie Redden",
-            "link": "https://guesty3396.zendesk.com/agent/tickets/1913722",
-            "subject": "Booking.com Reservation Display Issues",
-            "bullet_points": [
-              "Alloggio is observing an issue where Booking.com end-of-month reservations are not accurately reflecting within Guesty.",
-              "Our team is...
+    the analysis: 
+    P0 · Bug #1
+    Code in JavaScript8
+    Deprecated $items() — root cause of "no meetings found" email
+    The LLM outputs already exist in $json.data but are never read. Instead, deprecated API is used and fails silently.
+    ▼
+    Root cause
+    The Aggregate node (→ Wait → Code8) collects all loop results into $json.data[]. This array already contains {text: "LLM output..."} items for every processed meeting. Code8 ignores this and instead tries to reach back through execution history using $items(c...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - httpRequest
-    - set
+    - code
   expected_creds:
-    oAuth2Api: B1ksdYFDJ8LJKaTJ
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: j2VM8xPQIuLuUPedHk1b
+    source_conversation: Fmyht95daAJoMR3WbtL3
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "this is the input 
-[
-  {
-    \"Alloggio\": [
-      {
-      ..."
-    node_count: 2
+    workflow_name: "the analysis: 
+P0 · Bug #1
+Code in JavaScript8
+Deprecated..."
+    node_count: 1
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.212Z
+    harvested_at: 2026-04-15T15:43:43.771Z
     confidence: medium
     workflow_json_file: harvested_cs_011_workflow.json

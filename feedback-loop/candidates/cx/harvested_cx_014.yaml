@@ -1,35 +1,45 @@
 - name: harvested_cx_014
-  description: "Harvested from roni.shif@guesty.com - FIXING THE POST ZENDESK TICKET"
+  description: "Harvested from roni.shif@guesty.com - {
+  \"nodes\": [
+    {
+      \"parameters\": {
+        \"authe..."
   department: cx
   prompt: >
     {
-      "ticket": {
-        "subject": "{{ $('Set Core Fields').item.json.subject }}",
-        "comment": {
-          "html_body": "{{ $('Set Core Fields').item.json.message_body }}",
-          "author_id": 16671505749277,
-          "uploads": {{ JSON.stringify([...($json.invoice_tokens || []), ...($json.attachment_tokens || []), ...($json.csv_tokens || [])].filter(t => t && t !== '')) }}
-        },
-        "requester_id": {{ $('Set Core Fields').item.json.requester_id }},
-        "submitter_id": 16671505749277,
-        "group_id":...
+      "nodes": [
+        {
+          "parameters": {
+            "authentication": "oAuth2",
+            "select": "user",
+            "user": {
+              "__rl": true,
+              "value": "={{ '@' + $json.Name.toLowerCase().split(' ').join('.') }}",
+              "mode": "username"
+            },
+            "text": "=Hi, could you please review this account/s {{ $json.account_name }} and close the renewal opportunity and add a churn reason if indeed they are churning (they are currently inactive). Thanks  ",
+            "otherOp...
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - googleSheets
+    - httpRequest
   expected_creds:
-    googleSheetsOAuth2Api: q3XVQiSUNn6QTd3Y
+    slackOAuth2Api: joBl4J0vSs5KClP7
   checks:
     - encoding
     - uuids
     - credentials
   _metadata:
-    source_conversation: k6GQDqxNIGy2ryGFlHN0
+    source_conversation: JSMt3iyziUWXX9eFg6OT
     source_user: roni.shif@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "FIXING THE POST ZENDESK TICKET"
+    workflow_name: "{
+  \"nodes\": [
+    {
+      \"parameters\": {
+        \"authe..."
     node_count: 1
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.213Z
+    harvested_at: 2026-04-15T15:43:43.772Z
     confidence: medium
     workflow_json_file: harvested_cx_014_workflow.json

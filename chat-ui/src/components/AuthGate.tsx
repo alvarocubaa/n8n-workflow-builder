@@ -13,7 +13,13 @@ import Image from 'next/image';
 import { emitToParent, isAllowedParentOrigin, isEmbedMode } from '@/lib/embed';
 
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
-const EMBED_AUTH_TIMEOUT_MS = 5000;
+// 2026-05-19: bumped 5s → 30s. The prior value raced the Hub's GIS overlay:
+// chat-ui's iframe gave up at 5s, ripped down its message listener, then
+// dropped the auth_token postMessage the Hub sent at ~6-10s after the user
+// finally clicked the overlay button. UX surfaced as "Sign-in didn't reach
+// the chat panel". 30s comfortably covers GIS cold-start (~1-2s) + user
+// reaction (~3s) + popup OAuth (~3-5s) on first sign-in.
+const EMBED_AUTH_TIMEOUT_MS = 30000;
 
 interface CredentialResponse {
   credential: string; // the ID token
@@ -122,6 +128,11 @@ const AuthGate: React.FC<{
     setStatus('awaiting_parent_token');
     emitToParent({ type: 'auth_required' });
 
+    // 2026-05-19: listener stays alive PAST the timeout. The timeout only
+    // transitions the UI (spinner → "didn't reach" fallback so the user
+    // doesn't think the panel is hung). If the Hub eventually sends
+    // auth_token (e.g. user took 40s to click the GIS overlay), we still
+    // accept it and complete sign-in transparently.
     const onMessage = (event: MessageEvent) => {
       if (!isAllowedParentOrigin(event.origin)) return;
       const data = event.data as { type?: string; id_token?: string } | null;
@@ -134,7 +145,7 @@ const AuthGate: React.FC<{
     window.addEventListener('message', onMessage);
 
     const timer = window.setTimeout(() => {
-      window.removeEventListener('message', onMessage);
+      // NOTE: NOT removing the listener — see comment above.
       setStatus((prev) => (prev === 'awaiting_parent_token' ? 'embed_timeout' : prev));
     }, EMBED_AUTH_TIMEOUT_MS);
 
@@ -144,8 +155,15 @@ const AuthGate: React.FC<{
   }, [status, handleCredentialResponse]);
 
   useEffect(() => {
-    if (status !== 'unauthed' && status !== 'error') return;
-    if (isEmbedMode()) return; // GIS button is hidden in embed mode.
+    // GIS button renders for:
+    //   - standalone: unauthed / error
+    //   - embed: ONLY after the parent-token handshake times out
+    //     (in-iframe Sign-in-with-Google as user-driven fallback —
+    //      added 2026-05-19 so the user has an option besides
+    //      "Open in a new tab" when the Hub overlay misses its window).
+    const isFallbackState = status === 'unauthed' || status === 'error' || status === 'embed_timeout';
+    if (!isFallbackState) return;
+    if (isEmbedMode() && status !== 'embed_timeout') return;
     if (initialised.current) return;
     if (!clientId) return;
 
@@ -219,14 +237,27 @@ const AuthGate: React.FC<{
       ? `${window.location.pathname}${window.location.search.replace(/[?&]embed=true/, '')}`
       : '/chat';
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-warm-50 px-6 text-center">
-        <p className="text-sm text-gray-700 mb-3">Sign-in didn't reach the chat panel.</p>
+      <div className="flex h-screen flex-col items-center justify-center bg-warm-50 px-6 text-center gap-4">
+        <p className="text-sm text-gray-700">Sign-in didn&rsquo;t reach the chat panel.</p>
+        <p className="text-xs text-gray-500 max-w-sm">
+          Sign in with your Guesty Google account to continue here, or open the chat in a new tab.
+        </p>
+        {/* In-iframe Sign-in-with-Google button. Added 2026-05-19. Triggers a
+            popup OAuth flow from the iframe context (works in most browsers
+            when initiated by user click). On success, /api/auth/exchange sets
+            the cookie and we reload — chat stays inside the Hub drawer. */}
+        <div ref={buttonRef} aria-label="Sign in with Google" />
+        {!clientId && (
+          <p className="text-xs text-rose-600">
+            Sign-in misconfigured: missing GOOGLE_OAUTH_CLIENT_ID. Contact AI Team.
+          </p>
+        )}
         <a
           href={standaloneHref}
           target="_top"
-          className="rounded-lg bg-guesty-300 px-4 py-2 text-sm font-medium text-white hover:bg-guesty-400 transition"
+          className="text-xs text-guesty-300 hover:text-guesty-400 underline"
         >
-          Open in a new tab
+          Open in a new tab instead
         </a>
       </div>
     );

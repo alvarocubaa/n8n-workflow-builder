@@ -7,16 +7,16 @@
   expected_nodes:
     - scheduleTrigger
     - googleBigQuery
-    - googleSheets
     - aggregate
     - @n8n/n8n-nodes-langchain.chainLlm
     - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
     - slack
+    - googleSheets
   expected_creds:
     googleApi: h7fJ82YhtOnUL58u
-    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
     googlePalmApi: LL8fLgZSrUn8oZtV
     slackOAuth2Api: 5Ii5X9IFid1S8rIE
+    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
   checks:
     - encoding
     - uuids
@@ -24,13 +24,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: ru9mLRUNI5m7bjZ9Voua
+    source_conversation: ZNdvfQgfcDdffkT7IpHR
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
     workflow_name: "Build a daily workflow that runs at 8am UTC. Query BigQue..."
     node_count: 7
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.210Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_marketing_004_workflow.json

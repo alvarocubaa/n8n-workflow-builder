@@ -1,34 +1,31 @@
 - name: harvested_cx_002
-  description: "Harvested from alvaro.cuba@guesty.com - Create a daily workflow that reads recent Zendesk tickets..."
+  description: "Harvested from alvaro.cuba@guesty.com - Create a webhook-triggered workflow that receives a JSON ..."
   department: cx
   prompt: >
-    Create a daily workflow that reads recent Zendesk tickets from the past 24 hours using the native Zendesk node. For each ticket, classify whether the customer message contains upsell intent (e.g., asking about upgrades, new features, higher plans). Use an AI/LLM node for the classification — do not use Code nodes. Post tickets with detected upsell intent to #cx-upsell-opportunities in Slack with ticket ID, subject, account name, and the AI confidence score. Run daily at 10am UTC.
+    Create a webhook-triggered workflow that receives a JSON payload with fields: ticket_id, account_id, priority, and subject. Query BigQuery guesty_analytics.dim_accounts for the account plan_name and mrr using the account_id. Use an If node to branch: if mrr is greater than 5000, post to #cx-vip-tickets in Slack. Otherwise post to #cx-standard-tickets. Include account name, plan, MRR, and ticket subject in both messages.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - scheduleTrigger
-    - zendesk
-    - @n8n/n8n-nodes-langchain.lmChatGoogleGemini
-    - @n8n/n8n-nodes-langchain.chainLlm
-    - set
+    - webhook
+    - googleBigQuery
     - if
     - slack
   expected_creds:
-    zendeskApi: OTFp18SnDgGUSn9u
-    googlePalmApi: JrzPwNiVhZibKlAr
+    googleApi: PAAimNTryrvB72dp
     slackApi: RdxjTWVc6DaiNrIY
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: FZIQxmxzGnFPfVVhguMD
+    source_conversation: K649rys7w5jnVRqngELD
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "Create a daily workflow that reads recent Zendesk tickets..."
-    node_count: 7
+    workflow_name: "Create a webhook-triggered workflow that receives a JSON ..."
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_cx_002_workflow.json

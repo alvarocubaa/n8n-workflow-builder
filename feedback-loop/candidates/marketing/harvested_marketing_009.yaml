@@ -1,0 +1,34 @@
+- name: harvested_marketing_009
+  description: "Harvested from assaf.norman@guesty.com - [AI by assaf.norman] Untitled Workflow"
+  department: marketing
+  prompt: >
+    create me a process to export creatives from meta , group by campaign type, country and usp, and asset type (ugc, testimonial, product ad) based on this logic for pages - just for ads https://docs.google.com/document/d/1Xr6WFTpYNGcloD-3jtanhWRKV8YsZlBs7iNNZDycETA/edit?tab=t.p8hamzxkbyhf#heading=h.hyf643yya7we
+  confirm_message: "Looks good, build it"
+  expected_nodes:
+    - scheduleTrigger
+    - facebookGraphApi
+    - code
+    - filter
+    - httpRequest
+    - removeDuplicates
+    - merge
+    - set
+    - googleSheets
+  expected_creds:
+    facebookGraphApi: Ieb5eo9DMkpgO9gU
+    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
+  checks:
+    - encoding
+    - uuids
+    - credentials
+  _metadata:
+    source_conversation: IsI3F1dB4v3tcxkK8VDR
+    source_user: assaf.norman@guesty.com
+    deployed: true
+    deployed_workflow_id: H0efyfUYCMRRqhKU
+    workflow_name: "[AI by assaf.norman] Untitled Workflow"
+    node_count: 14
+    complexity_score: 4
+    harvested_at: 2026-04-15T15:43:43.770Z
+    confidence: high
+    workflow_json_file: harvested_marketing_009_workflow.json

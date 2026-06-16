@@ -1,28 +1,29 @@
 - name: harvested_cx_009
-  description: "Harvested from roni.shif@guesty.com - im building a slack app and I need help in configuring th..."
+  description: "Harvested from kayla.adams@guesty.com - [AI by kayla.adams] Monthly Strategy Reservations - Data Pull"
   department: cx
   prompt: >
-    im building a slack app and I need help in configuring the trigger node 
-    
-    I want the slack app to be triggered only from /commands - which node should I use and what do I need to share with Slack from N8n or the opposite
+    Build and n8n workflow with a monthly trigger (1st of the month) that pulls a big query SQL query and appends the results to a Google Sheet (replaces current data with new data)
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - webhook
-    - switch
-    - executeWorkflow
+    - scheduleTrigger
+    - googleBigQuery
+    - googleSheets
   expected_creds:
+    googleApi: h7fJ82YhtOnUL58u
+    googleSheetsOAuth2Api: 7ORQ8IRh8B5Gh30x
   checks:
     - encoding
     - uuids
     - credentials
+    - bq_projectId
   _metadata:
-    source_conversation: 5zkJht1DU05QlWPg7Tom
-    source_user: roni.shif@guesty.com
-    deployed: false
-    deployed_workflow_id: 
-    workflow_name: "im building a slack app and I need help in configuring th..."
+    source_conversation: g9ceLEeYsHipzWW6cAgz
+    source_user: kayla.adams@guesty.com
+    deployed: true
+    deployed_workflow_id: NiixmaUxUVYb9AdZ
+    workflow_name: "[AI by kayla.adams] Monthly Strategy Reservations - Data Pull"
     node_count: 4
-    complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.212Z
-    confidence: medium
+    complexity_score: 4
+    harvested_at: 2026-04-15T15:43:43.771Z
+    confidence: high
     workflow_json_file: harvested_cx_009_workflow.json

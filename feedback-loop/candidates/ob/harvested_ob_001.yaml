@@ -20,13 +20,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: Aaq2HRQ5vlGq6GVUosBE
+    source_conversation: FYTfcpzqoR3o1g53epMW
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
     workflow_name: "Build a daily workflow that queries BigQuery for Zendesk ..."
-    node_count: 6
+    node_count: 5
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.769Z
     confidence: high
     workflow_json_file: harvested_ob_001_workflow.json

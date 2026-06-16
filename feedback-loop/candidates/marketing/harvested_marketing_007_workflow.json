@@ -1,0 +1,261 @@
+{
+  "name": "Marketing Email Campaign Insights - Daily",
+  "nodes": [
+    {
+      "id": "a3f7c2d1-84b6-4e9a-b3f1-2c7d8e9f0a1b",
+      "name": "Daily 8am UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b1e4d7a2-93c5-4f8b-a2e4-3d8f9a0b1c2d",
+      "name": "Fetch Campaign Metrics",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  campaignName,\n  COUNTIF(event_type = 'DELIVERED') AS emails_sent,\n  COUNTIF(event_type = 'OPEN')      AS opens,\n  COUNTIF(event_type = 'CLICK')     AS clicks,\n  COUNTIF(event_type = 'UNSUBSCRIBE') AS unsubscribes,\n  ROUND(SAFE_DIVIDE(COUNTIF(event_type = 'OPEN'),  COUNTIF(event_type = 'DELIVERED')) * 100, 1) AS open_rate_pct,\n  ROUND(SAFE_DIVIDE(COUNTIF(event_type = 'CLICK'), COUNTIF(event_type = 'DELIVERED')) * 100, 1) AS click_rate_pct\nFROM `guesty-data.marketing_data.hubspot_emails_events`\nWHERE event_created_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)\n  AND campaignName IS NOT NULL\nGROUP BY campaignName\nORDER BY emails_sent DESC",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
+    },
+    {
+      "id": "c2f5e8b3-a4d6-4a9c-b3f5-4e9a0b1c2d3e",
+      "name": "Aggregate Metrics for AI",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "campaigns",
+        "include": "allFields"
+      }
+    },
+    {
+      "id": "d3a6f9c4-b5e7-4b0d-c4a6-5f0b1c2d3e4f",
+      "name": "Generate Gemini Insights",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.campaigns, null, 2) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "You are a marketing analyst. You will receive HubSpot email campaign performance data for the past 7 days. Write exactly 3 bullet points:\n- Bullet 1: Top performing campaign (highest open rate) with key stats\n- Bullet 2: Underperforming campaign (lowest open rate, min 100 emails sent) with key stats\n- Bullet 3: One actionable insight or trend across all campaigns\nBe concise and specific. Use percentages and numbers. No markdown headers, no preamble -- just the 3 bullets starting with a dash (-)."
+            },
+            {
+              "type": "HumanMessagePromptTemplate",
+              "message": "Here is the campaign performance data for the past 7 days:\n\n{{ $json.campaigns | dump }}\n\nProvide the 3-bullet insight summary."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "e4b7a0d5-c6f8-4c1e-d5b7-6a1c2d3e4f5a",
+      "name": "Gemini Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        660,
+        500
+      ],
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LL8fLgZSrUn8oZtV",
+          "name": "Google Gemini Guesty n8n Marketing"
+        }
+      }
+    },
+    {
+      "id": "f5c8b1e6-d7a9-4d2f-e6c8-7b2d3e4f5a6b",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#marketing-insights"
+        },
+        "text": ":bar_chart: *HubSpot Email Campaign Insights -- Last 7 Days*\n\n{{ $json.text }}\n\n_Data refreshed daily at 8am UTC. Full metrics in the <https://docs.google.com/spreadsheets/d/1gwVeUhBKO4WZBjeQODgwePaBpbuJHtD2FjUmKousIdY|Marketing Campaigns Sheet>._"
+      },
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "5Ii5X9IFid1S8rIE",
+          "name": "Assaf's Slack Connection"
+        }
+      }
+    },
+    {
+      "id": "a7d9c2f7-e8b0-4e3a-f7d9-8c3e4f5a6b7c",
+      "name": "Write Raw Metrics to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        480
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "mode": "id",
+          "value": "1gwVeUhBKO4WZBjeQODgwePaBpbuJHtD2FjUmKousIdY"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "MKT"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "matchingColumns": [
+            "campaignName"
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "EDO1bmcTulXX52OG",
+          "name": "Assaf's Gsheet"
+        }
+      }
+    },
+    {
+      "id": "b8e0d3a8-f9c1-4f4b-a8e0-9d4f5a6b7c8d",
+      "name": "Split Out Campaigns",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        660,
+        480
+      ],
+      "parameters": {
+        "fieldToSplitOut": "campaigns",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Daily 8am UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch Campaign Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Campaign Metrics": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Metrics for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Metrics for AI": {
+      "main": [
+        [
+          {
+            "node": "Generate Gemini Insights",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Out Campaigns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Gemini Insights": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gemini Flash",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash": {},
+    "Split Out Campaigns": {
+      "main": [
+        [
+          {
+            "node": "Write Raw Metrics to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

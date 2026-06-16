@@ -1,33 +1,30 @@
 - name: harvested_payments_001
-  description: "Harvested from alvaro.cuba@guesty.com - help me automate based on these requirements"
+  description: "Harvested from alvaro.cuba@guesty.com - Create a workflow triggered when a new row is added to a ..."
   department: payments
   prompt: >
-    help me automate based on these requirements
+    Create a workflow triggered when a new row is added to a Google Sheet using Google Sheets Trigger. The sheet contains payment dispute data with columns: ticket_id, account_name, dispute_amount, and reason. When triggered, create a new Zendesk ticket with the dispute details using the native Zendesk node. Set the ticket group to 'Payments' and priority to 'high'. Post a notification to #payments-disputes in Slack with the account name and dispute amount.
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - scheduleTrigger
-    - googleSheets
-    - filter
-    - code
-    - switch
-    - aggregate
-    - emailSend
+    - googleSheetsTrigger
     - zendesk
+    - slack
   expected_creds:
     googleSheetsTriggerOAuth2Api: W6Zn2BYAkgmc1t8W
     zendeskApi: cFdFPhADfsxMmPFC
+    slackApi: 0l2bJ3SquNB8nyFd
   checks:
     - encoding
     - uuids
     - credentials
+    - slack_config
   _metadata:
-    source_conversation: 7ZXsa2Vn5T0yNT3QlQIZ
+    source_conversation: 8I7hyeqdIVBIqU79gEjj
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "help me automate based on these requirements"
-    node_count: 16
+    workflow_name: "Create a workflow triggered when a new row is added to a ..."
+    node_count: 3
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.209Z
+    harvested_at: 2026-04-15T15:43:43.768Z
     confidence: high
     workflow_json_file: harvested_payments_001_workflow.json

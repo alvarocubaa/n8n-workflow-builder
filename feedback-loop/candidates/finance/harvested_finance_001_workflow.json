@@ -1,8 +1,8 @@
 {
-  "name": "Weekly Invoice Reconciliation",
+  "name": "Weekly Finance Reconciliation - Zuora Invoices vs Items",
   "nodes": [
     {
-      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "id": "a3f1c2d4-8e7b-4a9c-b1d2-3e4f5a6b7c8d",
       "name": "Every Monday 8am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
@@ -22,18 +22,20 @@
       }
     },
     {
-      "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
-      "name": "BQ Invoice Totals",
+      "id": "b4e2d3f5-9f8c-4b0d-c2e3-4f5a6b7c8d9e",
+      "name": "BQ - Invoice Totals",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        500,
-        160
+        480,
+        180
       ],
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  company_code,\n  ROUND(SUM(invoice_amount), 2) AS total_invoice_amount,\n  COUNT(invoice_id)             AS invoice_count\nFROM `guesty-data.zuora_analytics.invoices`\nWHERE invoice_date >= TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH))\n  AND invoice_date <  TIMESTAMP(DATE_TRUNC(CURRENT_DATE(), MONTH))\n  AND status = 'Posted'\nGROUP BY company_code\nORDER BY total_invoice_amount DESC"
+        "sqlQuery": "SELECT\n  company_code,\n  ROUND(SUM(invoice_amount), 2) AS total_invoice_amount,\n  COUNT(invoice_id) AS invoice_count\nFROM `guesty-data.zuora_analytics.invoices`\nWHERE invoice_date >= TIMESTAMP(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH))\n  AND invoice_date <  TIMESTAMP(DATE_TRUNC(CURRENT_DATE(), MONTH))\n  AND status = 'Posted'\nGROUP BY company_code\nORDER BY company_code",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
@@ -43,18 +45,20 @@
       }
     },
     {
-      "id": "3d594a8e-1b2f-4c6d-9e3a-7f8b2c1d5e4f",
-      "name": "BQ Invoice Item Totals",
+      "id": "c5f3e4a6-0a9d-4c1e-d3f4-5a6b7c8d9e0f",
+      "name": "BQ - Invoice Item Totals",
       "type": "n8n-nodes-base.googleBigQuery",
       "typeVersion": 2.1,
       "position": [
-        500,
-        440
+        480,
+        420
       ],
       "parameters": {
+        "authentication": "serviceAccount",
         "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "SELECT\n  company_code,\n  ROUND(SUM(amount), 2)          AS total_items_amount,\n  COUNT(invoice_item_id)         AS item_count\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE invoice_duedate >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH)\n  AND invoice_duedate <  DATE_TRUNC(CURRENT_DATE(), MONTH)\nGROUP BY company_code\nORDER BY total_items_amount DESC"
+        "sqlQuery": "SELECT\n  company_code,\n  ROUND(SUM(amount), 2) AS total_item_amount,\n  COUNT(invoice_item_id) AS item_count\nFROM `guesty-data.zuora_analytics.invoice_items`\nWHERE invoice_item_created_at >= CAST(DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH), MONTH) AS STRING)\n  AND invoice_item_created_at <  CAST(DATE_TRUNC(CURRENT_DATE(), MONTH) AS STRING)\nGROUP BY company_code\nORDER BY company_code",
+        "options": {}
       },
       "credentials": {
         "googleApi": {
@@ -64,74 +68,90 @@
       }
     },
     {
-      "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "id": "d6a4f5b7-1b0e-4d2f-e4a5-6b7c8d9e0f1a",
       "name": "Merge by Company Code",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3.2,
       "position": [
-        760,
+        720,
         300
       ],
       "parameters": {
         "mode": "combine",
         "combineBy": "combineByFields",
         "fieldsToMatchString": "company_code",
-        "joinMode": "keepMatches",
-        "outputDataFrom": "both"
+        "joinMode": "keepEverything",
+        "options": {}
       }
     },
     {
-      "id": "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
-      "name": "Calculate Difference",
+      "id": "e7b5a6c8-2c1f-4e3a-f5b6-7c8d9e0f1a2b",
+      "name": "Set Difference and Status",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1000,
+        960,
         300
       ],
       "parameters": {
         "mode": "manual",
-        "includeOtherFields": true,
         "assignments": {
           "assignments": [
             {
-              "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
-              "name": "difference",
-              "value": "={{ $json.total_invoice_amount - $json.total_items_amount }}",
+              "id": "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+              "name": "company_code",
+              "value": "={{ $json.company_code }}",
+              "type": "string"
+            },
+            {
+              "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+              "name": "total_invoice_amount",
+              "value": "={{ $json.total_invoice_amount ?? 0 }}",
               "type": "number"
             },
             {
-              "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
-              "name": "has_discrepancy",
-              "value": "={{ Math.abs($json.total_invoice_amount - $json.total_items_amount) > 0.01 }}",
-              "type": "boolean"
+              "id": "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+              "name": "invoice_count",
+              "value": "={{ $json.invoice_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+              "name": "total_item_amount",
+              "value": "={{ $json.total_item_amount ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
+              "name": "item_count",
+              "value": "={{ $json.item_count ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
+              "name": "difference",
+              "value": "={{ Math.round((($json.total_invoice_amount ?? 0) - ($json.total_item_amount ?? 0)) * 100) / 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+              "name": "status",
+              "value": "={{ ($json.total_invoice_amount ?? 0) === ($json.total_item_amount ?? 0) ? 'MATCH' : 'MISMATCH' }}",
+              "type": "string"
             }
           ]
-        }
+        },
+        "includeOtherFields": false,
+        "options": {}
       }
     },
     {
-      "id": "e4f5a6b7-c8d9-4e0f-1a2b-3c4d5e6f7a8b",
-      "name": "Aggregate Rows",
-      "type": "n8n-nodes-base.aggregate",
-      "typeVersion": 1,
-      "position": [
-        1240,
-        300
-      ],
-      "parameters": {
-        "aggregate": "aggregateAllItemData",
-        "destinationFieldName": "rows",
-        "include": "allFields"
-      }
-    },
-    {
-      "id": "f5a6b7c8-d9e0-4f1a-2b3c-4d5e6f7a8b9c",
-      "name": "Post to Slack",
+      "id": "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
+      "name": "Slack - Post Reconciliation",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        1480,
+        1200,
         300
       ],
       "parameters": {
@@ -142,7 +162,8 @@
           "mode": "name",
           "value": "#finance-reconciliation"
         },
-        "text": "={{ '*Weekly Invoice Reconciliation -- ' + $now.minus({months:1}).toFormat('MMMM yyyy') + '*\\nComparing invoice totals vs. line-item totals by company code (prior full calendar month).\\n\\n' + $json.rows.map(r => { const diff = r.difference; const flag = r.has_discrepancy ? '  :warning: DISCREPANCY' : '  :white_check_mark:'; return '*' + r.company_code + '*  |  Invoice: $' + r.total_invoice_amount.toFixed(2) + '  |  Items: $' + r.total_items_amount.toFixed(2) + '  |  Diff: $' + diff.toFixed(2) + flag; }).join('\\n') }}"
+        "text": "={{ $json.status === 'MATCH' ? ':white_check_mark:' : ':rotating_light:' }} *{{ $json.company_code }}* | {{ $json.status }}\n>Invoice Total: *${{ $json.total_invoice_amount }}* ({{ $json.invoice_count }} invoices)\n>Item Total:    *${{ $json.total_item_amount }}* ({{ $json.item_count }} items)\n>Difference:    *${{ $json.difference }}*",
+        "options": {}
       },
       "credentials": {
         "slackApi": {
@@ -157,19 +178,19 @@
       "main": [
         [
           {
-            "node": "BQ Invoice Totals",
+            "node": "BQ - Invoice Totals",
             "type": "main",
             "index": 0
           },
           {
-            "node": "BQ Invoice Item Totals",
+            "node": "BQ - Invoice Item Totals",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "BQ Invoice Totals": {
+    "BQ - Invoice Totals": {
       "main": [
         [
           {
@@ -180,7 +201,7 @@
         ]
       ]
     },
-    "BQ Invoice Item Totals": {
+    "BQ - Invoice Item Totals": {
       "main": [
         [
           {
@@ -195,29 +216,18 @@
       "main": [
         [
           {
-            "node": "Calculate Difference",
+            "node": "Set Difference and Status",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Calculate Difference": {
+    "Set Difference and Status": {
       "main": [
         [
           {
-            "node": "Aggregate Rows",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Aggregate Rows": {
-      "main": [
-        [
-          {
-            "node": "Post to Slack",
+            "node": "Slack - Post Reconciliation",
             "type": "main",
             "index": 0
           }

@@ -14,10 +14,10 @@
     - splitOut
     - googleSheets
   expected_creds:
-    googleApi: Cr2rXAGCh1K5pJop
+    googleApi: h7fJ82YhtOnUL58u
     googlePalmApi: LL8fLgZSrUn8oZtV
-    slackOAuth2Api: MkMAiC1ecfpYtIz1
-    googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+    slackOAuth2Api: 5Ii5X9IFid1S8rIE
+    googleSheetsOAuth2Api: EDO1bmcTulXX52OG
   checks:
     - encoding
     - uuids
@@ -25,13 +25,13 @@
     - bq_projectId
     - slack_config
   _metadata:
-    source_conversation: 37uQYSW5gk0KAnmOBN1v
+    source_conversation: Bh4ei1RbIszoWAyCedWa
     source_user: alvaro.cuba@guesty.com
     deployed: false
     deployed_workflow_id: 
     workflow_name: "Build a daily workflow that runs at 8am UTC. Query BigQue..."
     node_count: 8
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.208Z
-    confidence: medium
+    harvested_at: 2026-04-15T15:43:43.769Z
+    confidence: high
     workflow_json_file: harvested_marketing_001_workflow.json

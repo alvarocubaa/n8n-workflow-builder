@@ -1,13 +1,13 @@
 {
-  "name": "SF vs Zuora Contract Comparison (Weekly)",
+  "name": "CX Aging Tickets -- Daily Slack Report",
   "nodes": [
     {
-      "id": "a3f1c2d4-8b5e-4f7a-9c1d-2e3f4a5b6c7d",
-      "name": "Every Monday 9am",
+      "id": "a3f1c2d4-8e7b-4a9f-b6c1-2d3e4f5a6b7c",
+      "name": "Daily 9am UTC",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.1,
+      "typeVersion": 1.3,
       "position": [
-        0,
+        240,
         300
       ],
       "parameters": {
@@ -15,227 +15,140 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 9 * * 1"
+              "expression": "0 9 * * *"
             }
           ]
         }
       }
     },
     {
-      "id": "b4e2d3f5-9c6f-4a8b-0d2e-3f4a5b6c7d8e",
-      "name": "Fetch Active Accounts SF + Zuora",
+      "id": "b4e2d3f5-9f8c-4b0a-c7d2-3e4f5a6b7c8d",
+      "name": "Query Aging Tickets",
       "type": "n8n-nodes-base.googleBigQuery",
-      "typeVersion": 2,
+      "typeVersion": 2.1,
       "position": [
-        220,
+        460,
         300
       ],
       "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "executeQuery",
         "projectId": "guesty-data",
-        "sqlQuery": "WITH zuora_latest AS (\n  SELECT\n    pc.account_id,\n    pc.plan_name                          AS zuora_plan,\n    pc.mrr                                AS zuora_mrr,\n    pc.subscription_status                AS zuora_subscription_status,\n    pc.billing_period                     AS zuora_billing_cycle,\n    pc.quantity                           AS zuora_listing_quantity\n  FROM `guesty-data.zuora_analytics.product_catalog` pc\n  WHERE pc.subscription_status = 'Active'\n    AND pc.account_id IS NOT NULL\n)\n\nSELECT\n  da.account_id,\n  da.account_name,\n  da.account_created_at,\n\n  sf.Package__c                           AS sf_package,\n  sf.Average_MRR__c                       AS sf_mrr,\n  sf.Guesty_Contract_Status__c            AS sf_contract_status,\n  da.billing_cycle                        AS sf_billing_cycle,\n  sf.Number_of_Listings__c               AS sf_listing_count,\n\n  z.zuora_plan,\n  z.zuora_mrr,\n  z.zuora_subscription_status,\n  z.zuora_billing_cycle,\n  z.zuora_listing_quantity\n\nFROM `guesty-data.guesty_analytics.dim_accounts` da\nJOIN `guesty-data.salesforce.sf_account` sf\n  ON da.account_id = sf.Guesty_Admin_ID__c\nLEFT JOIN zuora_latest z\n  ON da.account_id = z.account_id\n\nWHERE IFNULL(da.account_active, FALSE) = TRUE\n  AND IFNULL(da.is_churn, FALSE) = FALSE\n  AND da.account_created_at IS NOT NULL\n\nORDER BY da.account_created_at DESC",
+        "sqlQuery": "SELECT\n  account_name,\n  account_segment,\n  COUNT(ticket_id) AS ticket_count,\n  MIN(created_at) AS oldest_ticket_date,\n  STRING_AGG(DISTINCT assignee_name ORDER BY assignee_name LIMIT 3) AS assignees\nFROM `guesty-data.zendesk_analytics.tickets_clean`\nWHERE ticket_status IN ('open', 'pending')\n  AND created_at <= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)\n  AND IFNULL(deleted, FALSE) = FALSE\n  AND account_name IS NOT NULL\nGROUP BY account_name, account_segment\nORDER BY ticket_count DESC\nLIMIT 100",
         "options": {}
       },
       "credentials": {
         "googleApi": {
-          "id": "PAAimNTryrvB72dp",
-          "name": "Google Service Account - CX translate"
+          "id": "2EJkTXIICSEva3cQ",
+          "name": "Google Service Account account"
         }
       }
     },
     {
-      "id": "c5f3e4a6-0d7a-4b9c-1e3f-4a5b6c7d8e9f",
-      "name": "Read Reviewed Log",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        440,
-        300
-      ],
-      "parameters": {
-        "operation": "read",
-        "documentId": {
-          "mode": "url",
-          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
-        },
-        "sheetName": {
-          "mode": "name",
-          "value": "reviewed_log"
-        },
-        "options": {}
-      },
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "7ORQ8IRh8B5Gh30x",
-          "name": "Google Sheets - cx_automations@guesty.com"
-        }
-      }
-    },
-    {
-      "id": "d6a4f5b7-1e8b-4c0d-2f4a-5b6c7d8e9f0a",
-      "name": "Build Reviewed ID Set",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        660,
-        300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Collect all already-reviewed account_ids from the sheet\nconst sheetRows = $input.all();\nconst reviewedIds = new Set(\n  sheetRows\n    .map(item => item.json.account_id)\n    .filter(id => id && id.trim() !== '')\n);\n\n// Pass the set as a JSON array for the next node\nreturn [{ json: { reviewed_ids: Array.from(reviewedIds) } }];"
-      }
-    },
-    {
-      "id": "e7b5a6c8-2f9c-4d1e-3a5b-6c7d8e9f0a1b",
-      "name": "Filter New Accounts Only",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        880,
-        300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "// Get the reviewed IDs set from the previous node\nconst reviewedIds = new Set($node['Build Reviewed ID Set'].json.reviewed_ids || []);\n\n// Get all accounts from the BQ node\nconst allAccounts = $node['Fetch Active Accounts SF + Zuora'].json;\n\n// allAccounts may be a single item or array -- normalise\nconst accountsArray = Array.isArray(allAccounts) ? allAccounts : [allAccounts];\n\n// Filter to only accounts NOT yet reviewed\nconst newAccounts = accountsArray.filter(acc => !reviewedIds.has(acc.account_id));\n\nif (newAccounts.length === 0) {\n  return [{ json: { no_new_accounts: true } }];\n}\n\nreturn newAccounts.map(acc => ({ json: acc }));"
-      }
-    },
-    {
-      "id": "f8c6b7d9-3a0d-4e2f-4b6c-7d8e9f0a1b2c",
-      "name": "Any New Accounts?",
+      "id": "c5f3e4a6-0a9d-4c1b-d8e3-4f5a6b7c8d9e",
+      "name": "Any Results?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        1100,
+        680,
         300
       ],
       "parameters": {
         "conditions": {
           "options": {
-            "version": 2,
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
+            "version": 2
           },
           "combinator": "and",
           "conditions": [
             {
-              "id": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
-              "leftValue": "={{ $json.no_new_accounts }}",
-              "rightValue": true,
+              "id": "d6a4f5b7-1b0e-4d2c-e9f4-5a6b7c8d9e0f",
+              "leftValue": "={{ $json.ticket_count }}",
               "operator": {
-                "type": "boolean",
-                "operation": "notEquals"
-              }
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
             }
           ]
         }
       }
     },
     {
-      "id": "a9d7c8e0-4b1e-4f3a-5c7d-8e9f0a1b2c3d",
-      "name": "Compare Fields",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "e7b5a6c8-2c1f-4e3d-f0a5-6b7c8d9e0f1a",
+      "name": "Format Report Lines",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
       "position": [
-        1320,
+        900,
         180
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const accounts = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nreturn accounts.map(item => {\n  const a = item.json;\n  const mismatches = [];\n\n  // A: Package / Plan\n  const sfPkg = (a.sf_package || '').toLowerCase().trim();\n  const zuoraPkg = (a.zuora_plan || '').toLowerCase().trim();\n  if (sfPkg && zuoraPkg && sfPkg !== zuoraPkg) {\n    mismatches.push('Package/Plan (SF: ' + a.sf_package + ' | Zuora: ' + a.zuora_plan + ')');\n  }\n\n  // B: MRR\n  const sfMrr = parseFloat(a.sf_mrr) || 0;\n  const zuoraMrr = parseFloat(a.zuora_mrr) || 0;\n  if (Math.abs(sfMrr - zuoraMrr) > 0) {\n    mismatches.push('MRR (SF: $' + sfMrr.toFixed(2) + ' | Zuora: $' + zuoraMrr.toFixed(2) + ')');\n  }\n\n  // C: Contract Status\n  const sfStatus = (a.sf_contract_status || '').toLowerCase().trim();\n  const zuoraStatus = (a.zuora_subscription_status || '').toLowerCase().trim();\n  if (sfStatus && zuoraStatus && sfStatus !== zuoraStatus) {\n    mismatches.push('Status (SF: ' + a.sf_contract_status + ' | Zuora: ' + a.zuora_subscription_status + ')');\n  }\n\n  // D: Billing Cycle\n  const sfCycle = (a.sf_billing_cycle || '').toLowerCase().trim();\n  const zuoraCycle = (a.zuora_billing_cycle || '').toLowerCase().trim();\n  if (sfCycle && zuoraCycle && sfCycle !== zuoraCycle) {\n    mismatches.push('Billing Cycle (SF: ' + a.sf_billing_cycle + ' | Zuora: ' + a.zuora_billing_cycle + ')');\n  }\n\n  // E: Listing Count\n  const sfListings = parseFloat(a.sf_listing_count) || 0;\n  const zuoraListings = parseFloat(a.zuora_listing_quantity) || 0;\n  if (sfListings !== zuoraListings) {\n    mismatches.push('Listings (SF: ' + sfListings + ' | Zuora: ' + zuoraListings + ')');\n  }\n\n  return {\n    json: {\n      account_id: a.account_id,\n      account_name: a.account_name,\n      account_created_at: a.account_created_at,\n      reviewed_date: today,\n      has_mismatch: mismatches.length > 0,\n      mismatch_count: mismatches.length,\n      mismatch_fields: mismatches.join(' | '),\n      sf_package: a.sf_package,\n      sf_mrr: a.sf_mrr,\n      sf_contract_status: a.sf_contract_status,\n      sf_billing_cycle: a.sf_billing_cycle,\n      sf_listing_count: a.sf_listing_count,\n      zuora_plan: a.zuora_plan,\n      zuora_mrr: a.zuora_mrr,\n      zuora_subscription_status: a.zuora_subscription_status,\n      zuora_billing_cycle: a.zuora_billing_cycle,\n      zuora_listing_quantity: a.zuora_listing_quantity\n    }\n  };\n});"
-      }
-    },
-    {
-      "id": "b0e8d9f1-5c2f-4a4b-6d8e-9f0a1b2c3d4e",
-      "name": "Log All Results to Sheet",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [
-        1540,
-        180
-      ],
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "mode": "url",
-          "value": "PASTE_YOUR_GOOGLE_SHEET_URL_HERE"
-        },
-        "sheetName": {
-          "mode": "name",
-          "value": "reviewed_log"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "account_id": "={{ $json.account_id }}",
-            "account_name": "={{ $json.account_name }}",
-            "reviewed_date": "={{ $json.reviewed_date }}",
-            "has_mismatch": "={{ $json.has_mismatch }}",
-            "mismatch_fields": "={{ $json.mismatch_fields }}"
-          }
-        },
-        "options": {}
-      },
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "7ORQ8IRh8B5Gh30x",
-          "name": "Google Sheets - cx_automations@guesty.com"
-        }
-      }
-    },
-    {
-      "id": "c1f9e0a2-6d3a-4b5c-7e9f-0a1b2c3d4e5f",
-      "name": "Has Mismatches?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1760,
-        180
-      ],
-      "parameters": {
-        "conditions": {
-          "options": {
-            "version": 2,
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "combinator": "and",
-          "conditions": [
+        "assignments": {
+          "assignments": [
             {
-              "id": "b2c3d4e5-f6a7-4890-bcde-f01234567890",
-              "leftValue": "={{ $json.has_mismatch }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
+              "id": "f8c6b7d9-3d2a-4f4e-a1b6-7c8d9e0f1a2b",
+              "name": "line",
+              "value": "={{ '*' + $json.account_name + '*' + ($json.account_segment ? ' (' + $json.account_segment + ')' : '') + ' -- ' + $json.ticket_count + ' ticket' + ($json.ticket_count == 1 ? '' : 's') + ' | Oldest: ' + $json.oldest_ticket_date.substring(0, 10) + ($json.assignees ? ' | Agents: ' + $json.assignees : '') }}",
+              "type": "string"
             }
           ]
-        }
+        },
+        "options": {}
       }
     },
     {
-      "id": "d2a0f1b3-7e4b-4c6d-8f0a-1b2c3d4e5f6a",
-      "name": "Build Slack Summary",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+      "id": "a9d7c8e0-4e3b-4a5f-b2c7-8d9e0f1a2b3c",
+      "name": "Aggregate Lines",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
       "position": [
-        1980,
-        60
+        1120,
+        180
       ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const mismatches = $input.all();\nconst today = new Date().toISOString().split('T')[0];\n\nlet lines = mismatches.map(item => {\n  const a = item.json;\n  return '*' + a.account_name + '* (`' + a.account_id + '`)\\n  Issues: ' + a.mismatch_fields;\n});\n\nconst header = ':warning: *SF vs Zuora Contract Mismatch Report -- ' + today + '*\\n' +\n  mismatches.length + ' account(s) with mismatches found this week.\\n\\n';\n\nconst body = lines.join('\\n\\n');\nconst message = header + body;\n\nreturn [{ json: { slack_message: message, mismatch_count: mismatches.length } }];"
+        "aggregate": "aggregateIndividualFields",
+        "fieldsToAggregate": {
+          "fieldToAggregate": [
+            {
+              "fieldToAggregate": "line",
+              "renameField": false
+            }
+          ]
+        },
+        "options": {}
       }
     },
     {
-      "id": "e3b1a2c4-8f5c-4d7e-9a1b-2c3d4e5f6a7b",
-      "name": "Send Slack Alert",
+      "id": "b0e8d9f1-5f4c-4b6a-c3d8-9e0f1a2b3c4d",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1340,
+        180
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1f9e0a2-6a5d-4c7b-d4e9-0f1a2b3c4d5e",
+              "name": "message",
+              "value": "={{ ':clock1: *Aging Tickets Report* -- open/pending > 7 days\\n:calendar: Run: ' + $now.toFormat('yyyy-MM-dd') + '\\n\\n' + $json.line.join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d2a0f1b3-7b6e-4d8c-e5f0-1a2b3c4d5e6f",
+      "name": "Post to Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.4,
       "position": [
-        2200,
-        60
+        1560,
+        180
       ],
       "parameters": {
         "resource": "message",
@@ -243,9 +156,9 @@
         "select": "channel",
         "channelId": {
           "mode": "name",
-          "value": "#finance-contract-mismatches"
+          "value": "#cx-aging-tickets"
         },
-        "text": "={{ $json.slack_message }}",
+        "text": "={{ $json.message }}",
         "otherOptions": {}
       },
       "credentials": {
@@ -253,133 +166,112 @@
           "id": "RdxjTWVc6DaiNrIY",
           "name": "Slack account - BotToken"
         }
-      }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     },
     {
-      "id": "f4c2b3d5-9a6d-4e8f-0b2c-3d4e5f6a7b8c",
-      "name": "No New Accounts - Stop",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
+      "id": "e3b1a2c4-8c7f-4e9d-f6a1-2b3c4d5e6f7a",
+      "name": "Post No Tickets Message",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        1320,
+        900,
         420
       ],
-      "parameters": {}
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "mode": "name",
+          "value": "#cx-aging-tickets"
+        },
+        "text": "=:white_check_mark: *Aging Tickets Report* -- :calendar: {{ $now.toFormat('yyyy-MM-dd') }}\\nNo open or pending tickets older than 7 days. All clear!",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "RdxjTWVc6DaiNrIY",
+          "name": "Slack account - BotToken"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
     }
   ],
   "connections": {
-    "Every Monday 9am": {
+    "Daily 9am UTC": {
       "main": [
         [
           {
-            "node": "Fetch Active Accounts SF + Zuora",
+            "node": "Query Aging Tickets",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Active Accounts SF + Zuora": {
+    "Query Aging Tickets": {
       "main": [
         [
           {
-            "node": "Read Reviewed Log",
+            "node": "Any Results?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Reviewed Log": {
+    "Any Results?": {
       "main": [
         [
           {
-            "node": "Build Reviewed ID Set",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Reviewed ID Set": {
-      "main": [
-        [
-          {
-            "node": "Filter New Accounts Only",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Filter New Accounts Only": {
-      "main": [
-        [
-          {
-            "node": "Any New Accounts?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Any New Accounts?": {
-      "main": [
-        [
-          {
-            "node": "Compare Fields",
+            "node": "Format Report Lines",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "No New Accounts - Stop",
+            "node": "Post No Tickets Message",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Compare Fields": {
+    "Format Report Lines": {
       "main": [
         [
           {
-            "node": "Log All Results to Sheet",
+            "node": "Aggregate Lines",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Log All Results to Sheet": {
+    "Aggregate Lines": {
       "main": [
         [
           {
-            "node": "Has Mismatches?",
+            "node": "Build Slack Message",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Mismatches?": {
+    "Build Slack Message": {
       "main": [
         [
           {
-            "node": "Build Slack Summary",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Build Slack Summary": {
-      "main": [
-        [
-          {
-            "node": "Send Slack Alert",
+            "node": "Post to Slack",
             "type": "main",
             "index": 0
           }

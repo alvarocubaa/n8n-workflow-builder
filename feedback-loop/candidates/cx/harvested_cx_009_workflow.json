@@ -1,166 +1,144 @@
 {
+  "name": "Monthly Strategy Reservations - Data Pull",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "dgfsdgsgfgfdgdfg",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
+      "id": "a3f1c2d4-8e5b-4a7c-9f0d-1b2e3c4d5e6f",
+      "name": "1st of Month Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
       "position": [
-        -400,
-        0
+        240,
+        300
       ],
-      "id": "a3f1c2e4-8b7d-4e9a-b6c5-1d2e3f4a5b6c",
-      "name": "Slack Slash Command Webhook",
-      "webhookId": "dgfsdgsgfgfdgdfg"
-    },
-    {
       "parameters": {
-        "mode": "rules",
-        "rules": {
-          "values": [
+        "rule": {
+          "interval": [
             {
-              "conditions": {
-                "options": {
-                  "version": 2
-                },
-                "combinator": "and",
-                "conditions": [
-                  {
-                    "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
-                    "leftValue": "={{ $json.body.command }}",
-                    "rightValue": "/hq-support-report",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "HQ Report"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "version": 2
-                },
-                "combinator": "and",
-                "conditions": [
-                  {
-                    "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
-                    "leftValue": "={{ $json.body.command }}",
-                    "rightValue": "/support-report",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
-                ]
-              },
-              "renameOutput": true,
-              "outputKey": "Support Report"
+              "field": "cronExpression",
+              "expression": "0 0 1 * *"
             }
           ]
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
-      "position": [
-        -160,
-        0
-      ],
-      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
-      "name": "Route Command"
+        }
+      }
     },
     {
+      "id": "b7e2d3f5-9a6c-4b8d-0e1f-2c3d4e5f6a7b",
+      "name": "BigQuery - Reservations",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "TR5GR6ww7bToAh4S",
-          "mode": "id"
-        },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
-        },
+        "projectId": "guesty-data",
+        "sqlQuery": "SELECT\n  month,\n  country,\n  package,\n  \"All Channels\" AS channel,\n  SUM(gbv)                          AS GBV,\n  SUM(gbv) / SUM(nights)            AS ADR,\n  COUNT(DISTINCT reservation_id)    AS Reservations,\n  COUNT(DISTINCT paid_listing_id)   AS Paid_Listings,\n  AVG(avg_lead_time)                AS AVG_Lead_Time,\n  SUM(nights)                       AS Nights,\n  AVG(nights)                       AS AVG_LOS,\n  SUM(bedrooms)                     AS Bedrooms\n\nFROM `guesty-data.strategy.reservations`\n\nWHERE\n  month BETWEEN DATE_SUB(DATE_TRUNC(CURRENT_DATE, MONTH), INTERVAL 12 MONTH)\n            AND DATE_SUB(DATE_TRUNC(CURRENT_DATE, MONTH), INTERVAL 1 MONTH)\n\n  AND country IN (\n    'United Kingdom',\n    'Australia',\n    'New Zealand',\n    'France',\n    'Canada',\n    'Mexico',\n    'Italy',\n    'Spain',\n    'United Arab Emirates',\n    'Germany',\n    'Greece',\n    'Brazil',\n    'Portugal',\n    'Croatia',\n    'India',\n    'Colombia',\n    'Thailand',\n    'Argentina',\n    'South Africa'\n  )\n\nGROUP BY ALL\nORDER BY 1 DESC",
         "options": {}
       },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
-      "position": [
-        120,
-        -120
-      ],
-      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
-      "name": "Run HQ Report"
+      "credentials": {
+        "googleApi": {
+          "id": "h7fJ82YhtOnUL58u",
+          "name": "Google BigQuery - N8N Service Account"
+        }
+      }
     },
     {
+      "id": "c8f3e4a6-0b7d-4c9e-1f2a-3d4e5f6a7b8c",
+      "name": "Clear Sheet Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
       "parameters": {
-        "workflowId": {
-          "__rl": true,
-          "value": "REPLACE_WITH_SUPPORT_REPORT_WORKFLOW_ID",
-          "mode": "id"
+        "operation": "clear",
+        "documentId": {
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1SGmRXmS0K9437fI_5rzl8zIoIVRkNtTiskZAk9Zy_Ac/edit"
         },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {},
-          "matchingColumns": [],
-          "schema": [],
-          "attemptToConvertTypes": false,
-          "convertFieldsToString": true
+        "sheetName": {
+          "mode": "name",
+          "value": "Data pull"
         },
+        "clearType": "sheet",
         "options": {}
       },
-      "type": "n8n-nodes-base.executeWorkflow",
-      "typeVersion": 1.3,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
+    },
+    {
+      "id": "d9a4f5b7-1c8e-4d0f-2a3b-4e5f6a7b8c9d",
+      "name": "Write to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
       "position": [
-        120,
-        120
+        960,
+        300
       ],
-      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
-      "name": "Run Support Report"
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1SGmRXmS0K9437fI_5rzl8zIoIVRkNtTiskZAk9Zy_Ac/edit"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Data pull"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {
+          "headerRow": true
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "7ORQ8IRh8B5Gh30x",
+          "name": "Google Sheets - cx_automations@guesty.com"
+        }
+      }
     }
   ],
   "connections": {
-    "Slack Slash Command Webhook": {
+    "1st of Month Trigger": {
       "main": [
         [
           {
-            "node": "Route Command",
+            "node": "BigQuery - Reservations",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Route Command": {
+    "BigQuery - Reservations": {
       "main": [
         [
           {
-            "node": "Run HQ Report",
+            "node": "Clear Sheet Data",
             "type": "main",
             "index": 0
           }
-        ],
+        ]
+      ]
+    },
+    "Clear Sheet Data": {
+      "main": [
         [
           {
-            "node": "Run Support Report",
+            "node": "Write to Sheet",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "pinData": {},
-  "meta": {}
+  }
 }

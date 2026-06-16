@@ -1,25 +1,26 @@
 - name: harvested_cx_007
-  description: "Harvested from roni.shif@guesty.com - From the following GSheet I want to create an automation ..."
+  description: "Harvested from dor.adam@guesty.com - triggered by a slack message and add a reaction to the me..."
   department: cx
   prompt: >
-    "id":8665992190493,"type":"tagger","title":"All brands: Issue type","raw_title":"All brands: Issue type","description":"","raw_description":"","position":9999,"active":true,"required":true,"collapsed_for_agents":false,"regexp_for_validation":null,"title_in_portal":"All brands: Issue type","raw_title_in_portal":"All brands: Issue type","visible_in_portal":false,"editable_in_portal":false,"required_in_portal":false,"agent_can_edit":true,"tag":null,"created_at":"2023-01-08T16:57:19Z","updated_at...
+    triggered by a slack message and add a reaction to the message
   confirm_message: "Looks good, build it"
   expected_nodes:
-    - httpRequest
+    - slack
   expected_creds:
-    zendeskApi: 4zfIc5d8uJMBSFo2
+    slackApi: g3NQlNzyjFofD87l
   checks:
     - encoding
     - uuids
     - credentials
+    - slack_config
   _metadata:
-    source_conversation: 0EBrXZgaP3evDcTJZytG
-    source_user: roni.shif@guesty.com
+    source_conversation: qxb2UrRnHO0Q1O6bfbLd
+    source_user: dor.adam@guesty.com
     deployed: false
     deployed_workflow_id: 
-    workflow_name: "From the following GSheet I want to create an automation ..."
+    workflow_name: "triggered by a slack message and add a reaction to the me..."
     node_count: 1
     complexity_score: 1
-    harvested_at: 2026-04-01T09:38:06.211Z
+    harvested_at: 2026-04-15T15:43:43.770Z
     confidence: medium
     workflow_json_file: harvested_cx_007_workflow.json

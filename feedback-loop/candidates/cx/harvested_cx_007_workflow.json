@@ -1,25 +1,28 @@
 {
   "nodes": [
     {
-      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-      "name": "Search ZD User by Email",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "name": "Add Reaction",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.4,
       "position": [
-        2400,
-        -464
+        500,
+        300
       ],
       "parameters": {
-        "method": "GET",
-        "url": "=https://guesty3396.zendesk.com/api/v2/users/search.json?query=email:{{ $json.requester_email }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "zendeskApi",
-        "options": {}
+        "resource": "reaction",
+        "operation": "add",
+        "channel": {
+          "mode": "id",
+          "value": "={{ $json.channel }}"
+        },
+        "timestamp": "={{ $json.ts }}",
+        "name": "thinking_face"
       },
       "credentials": {
-        "zendeskApi": {
-          "id": "4zfIc5d8uJMBSFo2",
-          "name": "Zendesk account 5"
+        "slackApi": {
+          "id": "g3NQlNzyjFofD87l",
+          "name": "bot_user_oauth_token_slack_app_workflows_builder"
         }
       }
     }

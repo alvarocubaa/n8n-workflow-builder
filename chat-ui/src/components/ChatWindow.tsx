@@ -6,7 +6,7 @@ import ChatInput, { type AttachedFile } from './ChatInput';
 import MessageBubble, { type Message } from './MessageBubble';
 import DepartmentSelector from './DepartmentSelector';
 import ModeSelector from './ModeSelector';
-import type { AssistantMode, InitiativePrefill, PromoteContext } from '@/lib/types';
+import type { AssistantMode, InitiativePrefill, PocContext, PromoteContext } from '@/lib/types';
 import { emitToParent, isAllowedParentOrigin, isEmbedMode } from '@/lib/embed';
 
 const STUCK_TIMEOUT_MS = 180_000; // 3 minutes of silence → abort with "stuck" error
@@ -62,7 +62,19 @@ function decodePrefill(b64: string | null): InitiativePrefill | null {
     // Mirror the encoder's UTF-8 round-trip (Hub encodes via unescape(encodeURIComponent(json))).
     const json = decodeURIComponent(escape(utf8));
     const parsed = JSON.parse(json) as InitiativePrefill;
-    if (!parsed.initiative_id || !parsed.mode || !parsed.initiative_metadata?.title) {
+    // 2026-05-19: title is a property-existence check, NOT a non-empty check.
+    // The "Plan with AI on a new initiative" flow legitimately sends title=""
+    // (that's the whole point — the user hasn't typed it yet, they're using AI
+    // to draft it). The prior `!parsed.initiative_metadata?.title` test
+    // silently dropped every new-initiative-from-scratch session, which made
+    // the planning_turn observability + entire server-write path dead-gated
+    // upstream and invisible to Cloud Run logs.
+    if (
+      !parsed.initiative_id ||
+      !parsed.mode ||
+      typeof parsed.initiative_metadata?.title !== 'string' ||
+      typeof parsed.initiative_metadata?.hub_url !== 'string'
+    ) {
       console.warn('Prefill payload is missing required fields, ignoring:', parsed);
       return null;
     }
@@ -90,6 +102,37 @@ function decodePromoteContext(b64: string | null): PromoteContext | null {
   }
 }
 
+function decodePocContext(b64: string | null): PocContext | null {
+  if (!b64) return null;
+  try {
+    const utf8 = atob(b64);
+    const json = decodeURIComponent(escape(utf8));
+    const parsed = JSON.parse(json) as PocContext;
+    // 2026-05-19: poc_title is property-existence, not non-empty (same fix as
+    // decodePrefill — a brand-new PoC could legitimately have title="" if the
+    // Hub ever skips its own title requirement). poc_id + department_id stay
+    // strict because they're always present at PoC creation per the schema.
+    if (
+      !parsed.poc_id ||
+      typeof parsed.poc_title !== 'string' ||
+      !parsed.department_id
+    ) {
+      console.warn('PoC payload is missing required fields, ignoring:', parsed);
+      return null;
+    }
+    // At-least-one invariant: a PoC must either be forked from an Initiative
+    // (initiative_id set) or originate as a Team Idea (idea_id set, = poc_id).
+    if (!parsed.initiative_id && !parsed.idea_id) {
+      console.warn('PoC payload has neither initiative_id nor idea_id, ignoring:', parsed);
+      return null;
+    }
+    return parsed;
+  } catch (err) {
+    console.warn('Failed to decode poc param, ignoring:', err);
+    return null;
+  }
+}
+
 export default function ChatWindow({
   conversationId,
   initialMessages = [],
@@ -109,27 +152,64 @@ export default function ChatWindow({
     if (conversationId) return null;
     return decodePromoteContext(searchParams?.get('promote') ?? null);
   });
+  // Precedence: `prefill=` / `promote=` / `poc=` URL params are mutually
+  // exclusive. If `poc=` is present, it wins (leaf scope); we discard any
+  // co-present prefill/promote rather than letting both fire.
+  const [pocContext] = useState<PocContext | null>(() => {
+    if (conversationId) return null;
+    const poc = decodePocContext(searchParams?.get('poc') ?? null);
+    if (poc && (searchParams?.get('prefill') || searchParams?.get('promote'))) {
+      console.warn('Both poc and prefill/promote params present — poc wins (leaf scope); discarding others.');
+    }
+    return poc;
+  });
+  // 2026-05-19: when a Hub deep-link param was present in the URL but the
+  // decoder rejected it (silent failure root cause we hit on 2026-05-18 —
+  // empty-string title on the "new initiative" flow), surface it to the user
+  // so they can stop, fix the entry point, and try again. Without this, the
+  // chat appears to work normally but the entire server-write path is
+  // dead-gated and nothing ever lands in the Hub.
+  const [contextDecodeFailed] = useState<'prefill' | 'promote' | 'poc' | null>(() => {
+    if (conversationId) return null;
+    if (searchParams?.get('prefill') && !decodePrefill(searchParams.get('prefill'))) return 'prefill';
+    if (searchParams?.get('promote') && !decodePromoteContext(searchParams.get('promote'))) return 'promote';
+    if (searchParams?.get('poc') && !decodePocContext(searchParams.get('poc'))) return 'poc';
+    return null;
+  });
   const prefillSentRef = useRef(false);
   const promoteContextSentRef = useRef(false);
+  const pocContextSentRef = useRef(false);
 
   // Strip the URL params after decode so a refresh doesn't double-seed.
   useEffect(() => {
-    if ((prefill && searchParams?.get('prefill')) || (promoteContext && searchParams?.get('promote'))) {
+    if (
+      (prefill && searchParams?.get('prefill')) ||
+      (promoteContext && searchParams?.get('promote')) ||
+      (pocContext && searchParams?.get('poc'))
+    ) {
       router.replace('/chat');
     }
-  }, [prefill, promoteContext, searchParams, router]);
+  }, [prefill, promoteContext, pocContext, searchParams, router]);
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [departmentId, setDepartmentId] = useState(
-    initialDepartmentId ?? promoteContext?.department_id ?? prefill?.initiative_metadata?.department_id ?? 'cx',
+    initialDepartmentId
+      ?? pocContext?.department_id
+      ?? promoteContext?.department_id
+      ?? prefill?.initiative_metadata?.department_id
+      ?? 'cx',
   );
   const [mode, setMode] = useState<AssistantMode>(initialMode ?? 'builder');
   const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
   const [retryable, setRetryable] = useState(false);
   const departmentLocked = useRef(
-    !!conversationId || initialMessages.length > 0 || !!prefill?.initiative_metadata?.department_id || !!promoteContext?.department_id,
+    !!conversationId
+      || initialMessages.length > 0
+      || !!prefill?.initiative_metadata?.department_id
+      || !!promoteContext?.department_id
+      || !!pocContext?.department_id,
   );
   const modeLocked = useRef(!!conversationId || initialMessages.length > 0);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -168,6 +248,20 @@ export default function ChatWindow({
     // We intentionally only depend on promoteContext + conversationId; runRequest is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promoteContext, conversationId]);
+
+  // PoC mode (Session 10): same auto-fire pattern as promote. The system
+  // prompt's <poc_mode> rule activates on the presence of <poc_context>;
+  // the synthetic first message kicks off Builder mode against the PoC spec.
+  const pocAutoFiredRef = useRef(false);
+  useEffect(() => {
+    if (!pocContext) return;
+    if (conversationId) return;
+    if (pocAutoFiredRef.current) return;
+    if (streaming) return;
+    pocAutoFiredRef.current = true;
+    void runRequest('Build the workflow for this PoC.', null, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pocContext, conversationId]);
 
   // Direction-3 Phase 3 handoff (parent → iframe): listen for the Hub's
   // `initiative_saved` postMessage. Cache the new id; the next /api/chat
@@ -271,6 +365,11 @@ export default function ChatWindow({
       if (promoteContext && !promoteContextSentRef.current && !currentConvId.current) {
         requestBody.promote_context = promoteContext;
         promoteContextSentRef.current = true;
+      }
+      // Same one-shot semantics for the PoC poc_context payload (Session 10).
+      if (pocContext && !pocContextSentRef.current && !currentConvId.current) {
+        requestBody.poc_context = pocContext;
+        pocContextSentRef.current = true;
       }
       // Direction-3: the /chat/* page route's middleware sets x-embed:1, but
       // that header doesn't propagate to /api/chat XHRs. Signal embed mode
@@ -613,6 +712,24 @@ export default function ChatWindow({
             </svg>
             Retry last message
           </button>
+        </div>
+      )}
+
+      {/* Decode-failure warning — Hub deep-link arrived with a context param
+          (prefill/promote/poc) but the decoder rejected it. Without this banner
+          the chat appears to work normally but the server-write path is
+          dead-gated (root cause of 2026-05-18 silent failure). User should
+          close + reopen from the Hub. */}
+      {contextDecodeFailed && (
+        <div className="mx-auto max-w-3xl px-4 pb-2">
+          <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <span className="font-semibold">⚠ Hub context didn't load.</span>
+            <span>
+              The chat received a <code className="rounded bg-amber-100 px-1">{contextDecodeFailed}=…</code> URL parameter from the Hub
+              but couldn't decode it. This chat will run in standalone mode — anything you build here will NOT auto-link back to a Hub
+              initiative / PoC. Close this and re-open from the Hub if you intended otherwise.
+            </span>
+          </div>
         </div>
       )}
 
