@@ -4,7 +4,7 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** Session 13 (Ron feedback alignment, MTD aggregation + measurement table + UI fallback) **SHIPPED 2026-05-21** as Hub PR #57 (squash `927f6fd` → rev `ai-innovation-hub-00107-9ks`) + n8n-ops rev `n8n-ops-00009-j6p`. **HEAD = Session 12 (integration walkthrough)** — re-promoted; now validates Session 13's measurement table behaviour in addition to Sessions 9-11.
+**Current focus track:** **Repo split SHIPPED + merged 2026-06-16** — the tangle is now 3 clean repos (builder `alvarocubaa/n8n-workflow-builder` PR #3 squash `eda3691`; **n8n-ops `alvarocubaa/n8n-ops` at `~/Code/n8n-ops`**; Hub unchanged) + cross-cutting home `cubaalvaro/claude-workspace-roots → AI Innovation Integration/`. **IH 2.0 "unified pipeline cutover" incident fixed** (n8n-ops re-aligned to `innovation_items`, rev `n8n-ops-00029`; OAuth origin for `thehub.gue5ty.com` verified). **HEAD = Builder relocation (Phase 8) + post-cutover verification.** Session 12 (integration walkthrough) is **blocked on the CloudFront 502** (DevOps). See memory `repo-split-2026-06-11` + `ih2-cutover-incident-2026-06-16`.
 
 ---
 
@@ -45,7 +45,19 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD] Session 12 — End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
+### 1. [HEAD] Builder relocation (Phase 8) + post-cutover verification
+
+**Full brief:** [`.claude/next-session.md`](next-session.md). In order:
+1. **Phase 8 (first, from a fresh session):** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; delete Drive copy after web-UI confirm; repoint `~/.claude/settings.json` roots. (Unsafe to do from a session rooted in the Drive copy — that's why it's first in a fresh one.)
+2. **Once DevOps clears the CloudFront 502:** run the integration walkthrough (item #2 below) to validate the full chain post-cutover in the browser.
+3. **React to Kurt:** confirm compat-shim dropped; answer `/suggest-links` semantics (we kept `origin_type='roadmap'`).
+4. Confirm old `Agentic Workflows/services/n8n-ops/` deletion propagated in Drive web UI.
+
+---
+
+### 2. [BLOCKED on CloudFront 502 — DevOps] Session 12 — End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
+
+> **Blocked:** `thehub.gue5ty.com` returns 502 (CloudFront→origin; Cloud Run origin healthy). Can't run the browser walkthrough until DevOps fixes it. Plan + `docs/innovation-hub/` refs now live in `claude-workspace-roots → AI Innovation Integration/`. Also now must validate **post-IH-2.0-cutover** behaviour (innovation_items schema, the 3 KPI badge states).
 
 **Goal:** First human-driven validation of the complete journey from "I have an idea" → "the KPI rolled up my workflow's time saved", now extended to validate Session 13's new measurement-table behaviour. Surface any gap between the architecture doc and the live system. Not a build session — verification + state-snapshot.
 
@@ -77,6 +89,16 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 - **Modal-count reduction (Hub Option B or C)** — gated on user-feedback signal.
 - **Feedback-loop harvest** — Apr 15 last run, overdue ~36 days. `cd chat-ui && NODE_PATH=./node_modules npx tsx ../tools/harvest_test_cases.ts`.
 - **Information Systems prod project ID** (`UCEMQoFhrGZ3FChz`) — awaiting IS manager confirmation.
+
+---
+
+### ✅ SHIPPED 2026-06-16 — IH 2.0 "unified pipeline cutover" incident response
+
+Kurt deployed IH 2.0 (the Hub's unified-pipeline cutover, ADR-001→016) on `ai-innovation-hub`. It archived `strategic_ideas`→`innovation_items` + renamed `source_strategic_idea_id`→`parent_item_id`, silently breaking n8n-ops's Time-Saved KPI sync (PGRST200) + `/suggest-links` (404). Fixed: migrated all n8n-ops queries to `innovation_items` (validated each 200 live), audit → `parent_item_id`; deployed `n8n-ops-00029`; verified measurement rows writing again. Hardened `/production-audit` CORS to both Hub origins. Diagnosed `origin_mismatch` → user added `thehub.gue5ty.com` to the shared OAuth client; **verified** via live GIS from the real origin. Verified n8n execution counter fresh. Triaged "GCP deploy on publish" = Apps-Deployment Deploy Runner (not ours). **Open (DevOps): CloudFront 502** on the custom domain (origin healthy). Detail: `~/Code/n8n-ops/docs/decision-log.md` + integration decision-log + memory `ih2-cutover-incident-2026-06-16`.
+
+### ✅ SHIPPED 2026-06-11 → merged 2026-06-16 — Repo split (1 tangled project → 3 clean repos + cross-cutting home)
+
+Split per the approved plan (`~/.claude/plans/i-want-this-session-cuddly-spring.md`). **n8n-ops** extracted from Drive `Agentic Workflows/services/` → `alvarocubaa/n8n-ops` at `~/Code/n8n-ops` (deploy proven identical, Drive original deleted, Cloud Build deploy-on-push wired). **Builder** cleaned (Hub-integration docs + `hub-ui-demo/` + QA screenshots stripped; `agent-card.json` added; decision-log carved → redirect) — merged to `main` via **PR #3** (squash `eda3691`); main tree verified identical to branch; recovery tag `pre-split-2026-06-11`. **Cross-cutting home** `cubaalvaro/claude-workspace-roots → AI Innovation Integration/` (A2A cards, registry, contract, roles matrix, integration decision-log, relocated design-docs/plans). **Hub** unchanged. Deferred: **Phase 8** (relocate builder Drive→`~/Code`, see HEAD). Detail: memory `repo-split-2026-06-11`.
 
 ---
 
