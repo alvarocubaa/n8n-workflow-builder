@@ -45,13 +45,36 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD] Builder relocation (Phase 8) + post-cutover verification
+### 1. [HEAD] Ron + Kurt async response handling + Builder relocation (Phase 8)
 
 **Full brief:** [`.claude/next-session.md`](next-session.md). In order:
-1. **Phase 8 (first, from a fresh session):** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; delete Drive copy after web-UI confirm; repoint `~/.claude/settings.json` roots. (Unsafe to do from a session rooted in the Drive copy — that's why it's first in a fresh one.)
-2. **Once DevOps clears the CloudFront 502:** run the integration walkthrough (item #2 below) to validate the full chain post-cutover in the browser.
-3. **React to Kurt:** confirm compat-shim dropped; answer `/suggest-links` semantics (we kept `origin_type='roadmap'`).
-4. Confirm old `Agentic Workflows/services/n8n-ops/` deletion propagated in Drive web UI.
+1. **First — check Slack drafts status.** Two DM drafts prepared 2026-06-18 awaiting user review/send (Ron full PRD V1 status; Kurt FYI). Ask if user wants help finalizing.
+2. **React to Ron's reply:** if pro-rated MTD, 1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`; if full-monthly fine, close question; if asks about 220h unassigned row, explain the sentinel.
+3. **React to Kurt's reply:** note S-B was chosen and shipped (not the S-A from initial design doc); confirm Phase 2 destructive stays deferred.
+4. **Phase 8 (Claude autonomous, deferred from 2026-06-16):** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; delete Drive copy after web-UI confirm; repoint `~/.claude/settings.json` roots. Unsafe from a session rooted in the Drive copy — fresh-session-only.
+5. **Once DevOps clears the CloudFront 502:** run integration walkthrough (item #2 below) — now also validate today's new breakdown modal.
+
+---
+
+### ✅ SHIPPED 2026-06-18 — PRD V1 Time Saved KPI revision (Ron, end-to-end, 26 of 26 acceptance criteria)
+
+Ron Madar-Hallevi shared "Time Saved KPI Monthly Locking, Push, Reset, and Breakdown Logic — Revisions V1" on 2026-06-16. Closed all 26 acceptance criteria in a single day. **11 PRs merged** (6 n8n-ops + 5 Hub) + **3 Supabase migrations applied** + **3 edge-fn redeploys** + **2 architecture decisions documented** (S-B over S-A for breakdown persistence; keep `initiative_kpi_measurements` as MTD-store per #9).
+
+What shipped:
+- §1-§2 — Hub migration 20260618120000 added CHECK lock on `kpis.category` + renamed `'Time Savings'` → `'Time Saved / n8n'` (15 KPIs). n8n-ops PR #4 made the cron filter strict; name-regex fallback retired.
+- §3, §10-§12 — n8n-ops PR #3 made `/initiative-kpi-sync` write daily MTD rows with `source='user_estimate'` for workflow-less initiatives; PR #2 made `/kpi-rollup` sum measured + manual into the locked total. Marketing May moved 220.07h → 950.64h.
+- §13-§15 — Webhook idempotency verified (2 pushes → 1 row); supabase/config.toml committed so edge-fn deploys are idempotent on `verify_jwt=false`.
+- §16-§24 — Hub PR #112 added `breakdown jsonb` column + `MonthlyBreakdownModal.tsx` + button on `KpiLinkedInitiativesTable`. n8n-ops PR #5 emits per-initiative breakdown alongside the total. Modal shows 5 locked months + current MTD column + Total row + source badge per row.
+- §23 (the last and hardest one) — PR #6 (n8n-ops) + PR #113 (Hub) introduced the "Department-level workflows (unassigned)" sentinel breakdown row (`initiative_id=null`) carrying the unattributed dept-centric hours so the breakdown sum exactly matches the locked total. Marketing May verification: locked 950.64h, breakdown sum 950.64h, diff 0.00h, 14 rows.
+- Hardening — Hub PR #110 widened `InitiativeKpiMeasurement.source` to include `'user_estimate'` + badge logic; PR #111 widened `initiative_kpi_measurements.source` CHECK to allow it.
+- Token rotation runbook shipped (`~/Code/n8n-ops/docs/kpi-webhook-token-rotation-runbook.md`).
+- Heartbeat in weekly-digest (#13).
+
+Open semantic question (low-priority, default works): pro-rated vs full-monthly MTD. ~1-line patch either way.
+
+Live revs: n8n-ops `n8n-ops-00043-f2m`, Hub `ai-innovation-hub-00172-gjx`. Detail: [`~/Code/n8n-ops/docs/decision-log.md`](file:///Users/alvaro.cuba/Code/n8n-ops/docs/decision-log.md) (2026-06-18 entries) + memory `prd-v1-time-saved-2026-06-18.md`.
+
+---
 
 ---
 
