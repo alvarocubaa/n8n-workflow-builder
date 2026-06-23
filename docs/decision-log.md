@@ -22,6 +22,22 @@ workflow builder. New entries on top.
 
 ---
 
+## 2026-06-23 — Builder modernization session (MCP re-vendor, telemetry fix, agent-infra, Hermes skills)
+
+**Decision 1 — Disabled MCP telemetry (security).** The deployed `n8n-mcp-cloud` is a *pristine vendored copy of czlonkowski/n8n-mcp* (not home-grown); its telemetry pipeline (→ czlonkowski's Supabase) was **ON by default** in production. Disabled immediately on the live service (`N8N_MCP_TELEMETRY_DISABLED=true`, rev `n8n-mcp-cloud-00011-zn6`) and durably in the Dockerfile via the re-vendor. *Context:* anonymized workflow-mutation metadata was leaving our infra. *Outcome:* leak stopped; must stay off across all future re-vendors.
+
+**Decision 2 — Re-vendored MCP v2.33.5 → v2.59.3.** Strategy doc: [`docs/mcp-strategy-2026-06.md`](mcp-strategy-2026-06.md). Kept our vendored copy (rejected hosted service = data egress, and official n8n MCP = bypasses our credential scoping). Both copies verified pristine, so it was a clean overlay + re-apply of 4 Guesty deltas (no-BuildKit Dockerfile, Cloud Run ports, telemetry-off, our `cloudbuild.yaml`/`deploy-cloudrun.sh`). Prebuilt node DB shipped in the tag → no rebuild. *Outcome:* node DB **1,084 → 1,845 nodes** (n8n 2.4.4 → 2.26.2), now aware of `dataTable`/`evaluation`/`mcpClient`/`mcpTrigger` etc. PR `alvarocubaa/n8n-mcp-cloud#1`. Live on rev `n8n-mcp-cloud-00017-paq` (100% traffic); old `00011-zn6` retained for rollback.
+
+**Finding — merge does NOT auto-shift traffic.** Merging to `main` on `n8n-mcp-cloud` triggered a Cloud Build that succeeded but did **not** create a new serving revision / shift traffic; go-live required an explicit `update-traffic`. Corrects the earlier "merge == deploy" assumption (this is *safer*). **Verification queue:** investigate why the trigger build didn't produce a serving revision; reconcile the repo `cloudbuild.yaml` (defaults to service `n8n-mcp`/`us-central1`, `gcr.io` path) vs the actual auto-generated source-deploy trigger (`n8n-mcp-cloud`/`europe-west1`/`cloud-run-source-deploy`).
+
+**Decision 3 — Agent infra: keep the custom loop.** Assessment: [`docs/agent-infra-assessment.md`](agent-infra-assessment.md). No ADK/LangChain — a hand-rolled Vertex tool-use loop, kept deliberately. Top improvement = expose diff-based editing (already in the MCP, unexposed).
+
+**Decision 4 — Two autonomous Hermes skills authored** (`wb-feedback-harvest`, `wb-mcp-watchdog`) in `[HERMES] Orchestrator/skills/`, **report+PR mode**, audit-tightened gates. VM install + cron deferred (gated on VM readiness + wb-ci/branch-protection/wb-pr-review activation).
+
+**Deferred (verification queue):** A2/A3 expose `n8n_update_partial_workflow`/`n8n_autofix_workflow` — needs server-side sandbox-project allowlist + credential-strip extension + regression net first (instance-wide n8n API key = the risk). Re-verify chat-ui node-config overrides (BigQuery/Slack/Merge/Salesforce) against new typeVersions. Consolidate redundant monorepo `n8n-mcp/` copy. Finance BI pilot (Track D, queued).
+
+---
+
 ## Older entries
 
 (Decision log started 2026-05-08; older decisions live in MEMORY.md until extracted. The 2026-05-08 → 2026-05-24 entries were carved to the n8n-ops and integration logs on 2026-06-11 — see the split notice above.)
