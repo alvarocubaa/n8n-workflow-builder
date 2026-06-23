@@ -56,6 +56,24 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ---
 
+### 2. [IN PROGRESS 2026-06-23] Builder modernization — MCP re-sync + autonomous feedback loop + agent-infra + BI
+
+**Plan:** [`~/.claude/plans/the-feedback-loop-has-hashed-micali.md`](../../../../.claude/plans/the-feedback-loop-has-hashed-micali.md) (promote into repo `plans/` if it outlives the session).
+
+Shipped this session: S1 telemetry leak disabled live (MCP rev `n8n-mcp-cloud-00011-zn6`); `docs/mcp-strategy-2026-06.md` (A4); `docs/agent-infra-assessment.md` (C); two Hermes skills authored (`wb-feedback-harvest`, `wb-mcp-watchdog` in `[HERMES] Orchestrator/skills/`, report+PR mode); BI-team query-request message drafted (awaiting send).
+
+Remaining:
+- **A1 re-vendor** `alvarocubaa/n8n-mcp-cloud` v2.33.5 → v2.59.x + consolidate the duplicate monorepo `n8n-mcp/` copy. PROD (merge==deploy). Needs ADC re-auth + npm rebuild + manual before/after regression + canary. **Checkpoint with user before deploy.**
+- **A2/A3** expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts` behind a server-side sandbox-project allowlist + extend credential stripping. After A1 + regression net.
+- **CI safety net:** merge wb-ci PR #5 (lint/typecheck); full e2e regression-in-CI is a follow-up (needs deployed app + Vertex creds).
+- **Track B/A5 wiring:** install the two skills on the Hermes `workflow-builder` VM + cron. Gated on VM readiness + wb-ci/branch-protection/wb-pr-review activation.
+
+### 3. [QUEUED] Finance BI spec pilot — `payments_processing.guesty_churn`
+
+First step in the "feed BI dashboard queries per department" track. **Verify access first:** confirm full path (`guesty-data.payments_processing.guesty_churn`?) + that shared BQ SA `h7fJ82YhtOnUL58u` can read the `payments_processing` dataset (payments data likely restricted — may need admin grant). Then: query schema → write `specs/02_SRC_FinanceBI_Spec.md` (AdminData template, verified SQL with **placeholders, no real PII**) → 3-location sync (`knowledge.ts`, `claude.ts`, `system-prompt.ts`) + scope to `finance` in `departments.ts`. Add a payments-PII prompt rule (mirror People). Broader BI-corpus harvest gated on the BI-team reply.
+
+---
+
 ### ✅ SHIPPED 2026-06-18 — PRD V1 Time Saved KPI revision (Ron, end-to-end, 26 of 26 acceptance criteria)
 
 Ron Madar-Hallevi shared "Time Saved KPI Monthly Locking, Push, Reset, and Breakdown Logic — Revisions V1" on 2026-06-16. Closed all 26 acceptance criteria in a single day. **11 PRs merged** (6 n8n-ops + 5 Hub) + **3 Supabase migrations applied** + **3 edge-fn redeploys** + **2 architecture decisions documented** (S-B over S-A for breakdown persistence; keep `initiative_kpi_measurements` as MTD-store per #9).
