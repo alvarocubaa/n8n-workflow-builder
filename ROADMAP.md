@@ -11,6 +11,12 @@
 
 ---
 
+## Ops automation — Hermes `workflow-builder` profile (cross-project, from Apps Deployment / Hermes)
+
+As of **2026-06-22**, the Hermes agent has a `workflow-builder` profile that **reviews PRs** on this repo (`alvarocubaa/n8n-workflow-builder`) + the satellites. Currently **dry-run + paused** — it posts a `🤖 Hermes WB review` comment, no merges. When flipped to act (gated on a checkpoint): auto-merge is **deterministic + narrow** — docs/markdown only with the `wb-ci` typecheck green; **`chat-ui/src/lib/departments.ts` (credentials SSOT), `system-prompt.ts`, auth, and CI/deploy files are always NEEDS_HUMAN**; code → approving review, human merges. CI gate = **PR #5** (`.github/workflows/wb-ci.yml`). Full design: `Apps Deployment/docs/decision-log.md` (2026-06-22) + `Hermes Agent Learning/architecture/profiles.md`.
+
+---
+
 ## OKRs -- 3-Month Horizon
 
 ### Objective 1: Expand Data Source Coverage *(from STRATEGY.md)*
