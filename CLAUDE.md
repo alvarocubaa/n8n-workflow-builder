@@ -1,7 +1,7 @@
 # n8n Workflow Builder -- Claude Code Instructions
 
-@../WAT_FRAMEWORK.md
-@../WAT_N8N.md
+@/Users/alvaro.cuba/Library/CloudStorage/GoogleDrive-alvaro.cuba@guesty.com/My Drive/WAT_FRAMEWORK.md
+@/Users/alvaro.cuba/Library/CloudStorage/GoogleDrive-alvaro.cuba@guesty.com/My Drive/WAT_N8N.md
 
 ## Project overview
 AI-powered chat UI for building production-ready n8n workflows at Guesty. Claude-only (Vertex AI), phase-gated, department-scoped.

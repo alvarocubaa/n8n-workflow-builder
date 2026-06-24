@@ -22,6 +22,16 @@ workflow builder. New entries on top.
 
 ---
 
+## 2026-06-23 — Phase 8: relocated builder repo out of Drive to `~/Code`
+
+**Decision.** The builder repo's working copy moved from `…/My Drive/n8n-builder-cloud-claude` to **`~/Code/n8n-workflow-builder`** (fresh `gh repo clone`, NOT `mv` — avoids `.git/objects` corruption under Drive sync). This completes the 2026-06-11 repo split (n8n-ops and the Hub already relocated). **Context:** working a git repo from a 4.9 G Drive-synced folder is slow and risks index corruption. **Outcome:** clone at `2be8a31` (= origin/main, PR #6), `chat-ui` builds clean (`next build` exit 0, "Compiled successfully").
+
+Carried over (not in git): top-level `.env`, `chat-ui/credentials.json`, and two not-yet-committed docs (`docs/agent-infra-assessment.md`, `docs/mcp-strategy-2026-06.md`). Config repointed: `~/.claude/settings.json` `additionalDirectories` (+`~/Code/n8n-workflow-builder`); workspace router `…/My Drive/CLAUDE.md` project path; project CLAUDE.md WAT imports switched from `@../WAT_*.md` to absolute Drive paths (the shared WAT files stay in the Drive workspace). Project auto-memory copied to the new cwd namespace `-Users-alvaro-cuba-Code-n8n-workflow-builder`.
+
+**Not done (per decision):** the old Drive copy is **left in place** — user deletes it manually via the Drive web UI once confident.
+
+**Verification queue:** confirm a *new* Claude Code session started from `~/Code/n8n-workflow-builder` (a) loads the migrated memory, (b) resolves the absolute WAT imports, (c) sees the repointed `additionalDirectories`.
+
 ## 2026-06-23 — Builder modernization session (MCP re-vendor, telemetry fix, agent-infra, Hermes skills)
 
 **Decision 1 — Disabled MCP telemetry (security).** The deployed `n8n-mcp-cloud` is a *pristine vendored copy of czlonkowski/n8n-mcp* (not home-grown); its telemetry pipeline (→ czlonkowski's Supabase) was **ON by default** in production. Disabled immediately on the live service (`N8N_MCP_TELEMETRY_DISABLED=true`, rev `n8n-mcp-cloud-00011-zn6`) and durably in the Dockerfile via the re-vendor. *Context:* anonymized workflow-mutation metadata was leaving our infra. *Outcome:* leak stopped; must stay off across all future re-vendors.
