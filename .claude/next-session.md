@@ -1,56 +1,41 @@
-# Next session brief — Ron + Kurt follow-ups + Builder relocation (Phase 8)
+# Next session brief — Builder modernization (continuation) + carried-over threads
 
-**Date:** 2026-06-19 or later
-**Style:** mix of async Ron/Kurt response handling + Phase 8 (Claude autonomous, deferred from 2026-06-16)
+**Derived from the 2026-06-23 modernization session gap audit.** Plan file: `~/.claude/plans/the-feedback-loop-has-hashed-micali.md`. Decisions: `docs/decision-log.md` (2026-06-23), `docs/mcp-strategy-2026-06.md`, `docs/agent-infra-assessment.md`.
 
-## State snapshot (what shipped 2026-06-18 — full day)
+## What shipped 2026-06-23 (context)
+- MCP **re-vendored v2.33.5 → v2.59.3**, LIVE 100% (rev `n8n-mcp-cloud-00017-paq`); node DB 1,084 → 1,845 (n8n 2.26). PR `n8n-mcp-cloud#1`. Old `00011-zn6` retained for rollback.
+- 🔒 MCP telemetry leak disabled (live + durable in Dockerfile).
+- Builder docs PR #6 merged. Hermes skills committed to apps-deployment.
+- Two Hermes skills installed on the `workflow-builder` VM profile: **`wb-mcp-watchdog` ACTIVE** (monthly), **`wb-feedback-harvest` PAUSED**.
 
-**PRD V1 Time Saved KPI revision (Ron) — fully closed end-to-end in one day.** All 26 of 26 acceptance criteria shipped, deployed, and audited live. Full detail in [`~/Code/n8n-ops/docs/decision-log.md`](file:///Users/alvaro.cuba/Code/n8n-ops/docs/decision-log.md) (2026-06-18 entries) and memory file `prd-v1-time-saved-2026-06-18.md`.
+## Pending — do in priority order
 
-Highlights:
-- 11 PRs merged (6 n8n-ops + 5 Hub) + 3 Supabase migrations applied + 3 edge-fn redeploys
-- Marketing May 2026 locked total moved 220.07h → 950.64h (spec-compliant: now includes 644h manual estimates)
-- Breakdown sum == locked total verified live (Δ=0.00); 14 rows including 1 "Department-level workflows (unassigned)" sentinel @ 220.06h
-- Live revs: n8n-ops `n8n-ops-00043-f2m`, Hub `ai-innovation-hub-00172-gjx`
+### 1. A2/A3 — expose diff-edit + autofix (the real agent-quality win) — HIGH, but gated
+Expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts`. **Do NOT just whitelist** — the audit gates require, FIRST:
+- **Server-side sandbox-project allowlist in the bridge** (instance-wide n8n API key = can write any dept/prod). Edit tools target sandbox project IDs only. (Audit S2)
+- **Extend `stripCredentialsFromResult`** to edit/management tool results + define write-back so it doesn't null creds. (Audit S3)
+- **Regression safety net must exist first** (item 2). (Audit R1/R2)
+Then add a `system-prompt.ts` rule to edit-via-diff instead of full-JSON regen.
 
-## Do these, in order
+### 2. Regression safety net — HIGH (unblocks 1 + 4)
+- Merge **wb-ci PR #5** (lint/typecheck) for the basic gate.
+- Wire `tools/run_regression.py` into CI — needs a deployed chat-ui + Vertex creds (it's an end-to-end HTTP test), so this is its own setup. Gate = **"no new failures vs pinned baseline"** (suite is ~27/32, not green). (Audit R1)
 
-### 1. First — check Slack drafts status
+### 3. Un-pause `wb-feedback-harvest` — MEDIUM
+- Provision on the VM: `gh repo clone alvarocubaa/n8n-workflow-builder` + `cd chat-ui && npm ci` (+ confirm Firestore ADC). Then `hermes --profile workflow-builder cron resume <id>`.
+- First run = **backlog catch-up** (51 candidates since 2026-04-15). First 2-3 PRs human-merged.
 
-Two DM drafts prepared 2026-06-18, awaiting user review/send:
-- **Ron Madar-Hallevi** — full PRD V1 status (26/26 closed) with the one open semantics question (pro-rated vs full-month MTD).
-- **Kurt Pabiloña** — FYI of what landed in his repo + reminder to NOT apply Phase 2 destructive migration.
+### 4. Override re-verification — MEDIUM (R4 follow-up of the re-vendor)
+- With n8n now 2.26, re-check chat-ui node-config overrides (BigQuery `googleApi`/projectId, Slack v2.4, Merge v3, Salesforce SOQL) against new typeVersions via a regression run. The re-vendor shipped without the before/after regression (deferred).
 
-If user hasn't sent them yet, ask if they want help finalizing.
+### 5. MCP deploy-pipeline cleanup — LOW
+- Investigate why the merge-triggered Cloud Build **succeeded but created no serving revision** (go-live needed an explicit `update-traffic`). Reconcile repo `cloudbuild.yaml` (defaults: service `n8n-mcp`/`us-central1`/`gcr.io`) vs the actual source-deploy trigger (`n8n-mcp-cloud`/`europe-west1`/`cloud-run-source-deploy`).
+- **Consolidate** the redundant monorepo `n8n-mcp/` copy (make `n8n-mcp-cloud` the single source).
+- Delete the stray no-traffic canary revision if not auto-cleaned.
 
-### 2. React to Ron's reply
+### 6. Finance BI pilot (Track D) — MEDIUM, needs access
+- Verify shared BQ SA `h7fJ82YhtOnUL58u` can read `payments_processing` (likely restricted → admin grant). Then build `specs/02_SRC_FinanceBI_Spec.md` from `guesty_churn` (placeholders, no real PII; add payments-PII prompt rule). 3-location sync + scope to `finance`.
+- Broader BI-corpus harvest gated on the BI-team reply (message drafted 2026-06-23, awaiting send).
 
-- **Pro-rated MTD?** ~1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`: replace `capped = Math.min(estimate, …)` with `Math.min(estimate * daysSoFar / daysInMonth, …)`. PR + merge + verify.
-- **Full monthly is fine?** Close the question; nothing to do.
-- **Asks about 220h "unassigned" row?** Explain: workflows in Marketing's n8n projects (Wordpress publishing etc.) not linked to a specific initiative; the amber "(link these to track them)" nudge in the modal points to this.
-
-### 3. React to Kurt's reply
-
-- **Architecture sync request?** Note: I chose S-B (jsonb on `kpi_measurements`) rather than the initial S-A recommendation in the design doc, and shipped it. Design doc at `~/Code/claude-workspace-roots/AI Innovation Integration/design-docs/locked-breakdown-persistence-2026-06-18.md` is historical reference.
-- **Phase 2 destructive migration?** Deferred indefinitely per #9 decision (keep `initiative_kpi_measurements` as MTD-snapshot store; new `kpi_measurements.breakdown` jsonb is locked-monthly).
-
-### 4. Builder relocation Phase 8 (autonomous, deferred from 2026-06-16)
-
-Was prior HEAD; got bumped because PRD V1 took the whole day. Steps:
-- `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT `mv` — avoids `.git` corruption under Drive). `main` already has everything (PR #3 squash `eda3691`).
-- Verify the clone builds; optionally delete the Drive copy after confirming via Drive web UI.
-- Repoint `~/.claude/settings.json` `additionalDirectories` + any CLAUDE.md path roots from the Drive builder path to `~/Code/n8n-workflow-builder`.
-
-### 5. CloudFront 502 follow-up — when DevOps clears it
-
-`thehub.gue5ty.com` returns 502. Cloud Run origin is healthy. Once DevOps fixes CloudFront, run the integration walkthrough (`~/Code/claude-workspace-roots/AI Innovation Integration/plans/2026-05-20-integration-walkthrough.md`) — now also validate today's new breakdown modal in the browser.
-
-## Pre-flight checks (Claude, ~5 min)
-- `gcloud auth status --active` == `alvarocubaa`. Re-auth interactively if `application-default` is stale.
-- Confirm n8n-ops rev ≥ `n8n-ops-00043` and Hub ≥ `ai-innovation-hub-00172`.
-- `git status` clean in `~/Code/n8n-ops`, `~/Code/AI-Innovation-Hub-Vertex`, and `~/Code/claude-workspace-roots`.
-
-## Optional / deferred (do NOT start unprompted)
-- **#12 admin override audit log** in Hub — purely hardening; trigger or service-side log entry when `kpi_measurements` UPDATE happens via admin UI. Kurt's scope.
-- **Backfill April 2026 Marketing breakdown** — April locked before today's work has `breakdown=null`. PRD §26 doesn't require backfill, but if Ron wants the trend chart to render older months, easy re-push.
-- **First token rotation** per `~/Code/n8n-ops/docs/kpi-webhook-token-rotation-runbook.md` — first one due ~90 days from secret creation.
+## Carried-over (from the pre-empted 2026-06-19 HEAD — still open)
+- **Ron PRD V1 reply** (pro-rated vs full-month MTD), **Kurt reply**, **Builder relocation Phase 8** (clone to `~/Code`), **CloudFront 502** integration walkthrough. Detail in `docs/decision-log.md` + memory `prd-v1-time-saved-2026-06-18`.
