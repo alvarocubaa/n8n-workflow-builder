@@ -149,8 +149,8 @@ cases:
       - slack
     expected_creds:
       salesforceOAuth2Api: fCB6gfK7EaGpMnZy
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -176,7 +176,7 @@ cases:
     expected_creds:
       googleApi: h7fJ82YhtOnUL58u
       googlePalmApi: LL8fLgZSrUn8oZtV
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
       slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
@@ -200,7 +200,7 @@ cases:
       - slack
     expected_creds:
       googleAdsOAuth2Api: 7zPWAntoXHKpq6l7
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -222,9 +222,9 @@ cases:
       - slack
     expected_creds:
       googleSheetsTriggerOAuth2Api: D8pj4nOG0SuFxj5h
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
       googlePalmApi: LL8fLgZSrUn8oZtV
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -247,7 +247,7 @@ cases:
     expected_creds:
       googleDocsOAuth2Api: sgzXeonPZK1apIGE
       googlePalmApi: LL8fLgZSrUn8oZtV
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -274,7 +274,7 @@ cases:
       salesforceOAuth2Api: fCB6gfK7EaGpMnZy
       googleApi: h7fJ82YhtOnUL58u
       googlePalmApi: LL8fLgZSrUn8oZtV
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
       slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
@@ -310,8 +310,8 @@ cases:
       - googleSheets
     expected_creds:
       googlePalmApi: LL8fLgZSrUn8oZtV
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
       httpBearerAuth: ngaBlIhFMFTZFajQ
     checks:
       - encoding
@@ -339,7 +339,7 @@ cases:
     expected_creds:
       googlePalmApi: LL8fLgZSrUn8oZtV
       googleDocsOAuth2Api: sgzXeonPZK1apIGE
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -368,8 +368,8 @@ cases:
       - slack
     expected_creds:
       googlePalmApi: LL8fLgZSrUn8oZtV
-      mondayComApi: XsKPBAGItELeiJ8S
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      mondayComApi: WNVVcnekSFyRZwnW
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -404,8 +404,8 @@ cases:
       - googleSheets
       - slack
     expected_creds:
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -435,8 +435,8 @@ cases:
     expected_creds:
       googleDocsOAuth2Api: sgzXeonPZK1apIGE
       googlePalmApi: LL8fLgZSrUn8oZtV
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -470,8 +470,8 @@ cases:
     expected_creds:
       googleDocsOAuth2Api: sgzXeonPZK1apIGE
       googlePalmApi: LL8fLgZSrUn8oZtV
-      googleSheetsOAuth2Api: LaWDjKMsqe74XASy
-      slackOAuth2Api: MkMAiC1ecfpYtIz1
+      googleSheetsOAuth2Api: 4jA8N85DnTpkvyeV
+      slackOAuth2Api: 5Ii5X9IFid1S8rIE
     checks:
       - encoding
       - uuids
@@ -857,7 +857,7 @@ cases:
       - slack
     expected_creds:
       googleApi: 2EJkTXIICSEva3cQ
-      zendeskApi: I0sSUZvS0LVHjO2J
+      zendeskApi: OTFp18SnDgGUSn9u
       slackApi: RdxjTWVc6DaiNrIY
     checks:
       - encoding
