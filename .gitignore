@@ -46,5 +46,8 @@ docker-compose.override.yml
 # Ephemeral MCP / browser-automation artifacts
 .playwright-mcp/
 
+# Scratch / regression run outputs (tools/run_regression.py --save-dir)
+.tmp/
+
 # Old output dir (replaced by feedback-loop/)
 output/

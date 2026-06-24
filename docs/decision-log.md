@@ -22,6 +22,18 @@ workflow builder. New entries on top.
 
 ---
 
+## 2026-06-24 — Regression safety net (audit R1): baseline-diff gate + Hermes skill, not GitHub Actions
+
+**Decision 1 — typecheck gate landed.** Merged wb-ci PR #5 → `.github/workflows/wb-ci.yml` runs `npm ci` + `tsc --noEmit` on every PR (secret-free; `next lint` is misconfigured so `tsc` is the reliable signal). Verified green on current `main` before merging. This is the cheap per-PR gate.
+
+**Decision 2 — `run_regression.py` gets a differential gate.** Added `--baseline <json>` / `--update-baseline <json>`. The suite is intentionally ~27/32 (not all-green), so an absolute exit-1-on-any-fail gate is wrong. New semantics: exit 1 ONLY on a **regression** (a case that was PASS in the baseline now failing, or a brand-new failing case); known/pinned failures are tolerated. Default (no `--baseline`) keeps the old strict all-green behavior. Logic unit-verified offline against 5 scenarios. **Context:** unblocks audit R1 (the gate the diff-edit/autofix work needs) and R4 (re-vendor override re-verification).
+
+**Decision 3 — the live suite runs as a Hermes skill, NOT GitHub Actions.** The suite drives a *local, unauthenticated* chat-ui (`localhost:3004` + `MOCK_USER_EMAIL`) and needs Vertex creds — a GitHub-hosted runner would mean an SA key in repo secrets + network reach to n8n/MCP. Instead, authored **`wb-regression`** on the `workflow-builder` Hermes profile (alongside `wb-mcp-watchdog`/`wb-feedback-harvest`), files in apps-deployment `[HERMES] Orchestrator/{skills/wb-regression/SKILL.md, scripts/wb-regression.sh}`. The VM already has ADC + n8n/MCP reachability. **Trigger:** manual + nightly (NOT per-PR — 32 live LLM convos = slow/costly/flaky). **Gate:** the skill takes its verdict from the script exit code; a regression → NEEDS_HUMAN + NOTIFY (never auto-fixes, never re-pins the baseline, never merges). First run self-bootstraps `tools/regression_baseline.json` via `--update-baseline`.
+
+**Verification queue:**
+- **VM provisioning (shared with item #3 / `wb-feedback-harvest`):** `gh repo clone alvarocubaa/n8n-workflow-builder` + `cd chat-ui && npm ci` + `pip install pyyaml` on the VM; a local chat-ui reachable on :3004; then `hermes --profile workflow-builder cron` register `wb-regression` (nightly) — currently PAUSED until the prereq is met.
+- **First bootstrap run** seeds `tools/regression_baseline.json` (~27/32) — confirm the pinned counts look right before arming the gate.
+
 ## 2026-06-23 — Phase 8: relocated builder repo out of Drive to `~/Code`
 
 **Decision.** The builder repo's working copy moved from `…/My Drive/n8n-builder-cloud-claude` to **`~/Code/n8n-workflow-builder`** (fresh `gh repo clone`, NOT `mv` — avoids `.git/objects` corruption under Drive sync). This completes the 2026-06-11 repo split (n8n-ops and the Hub already relocated). **Context:** working a git repo from a 4.9 G Drive-synced folder is slow and risks index corruption. **Outcome:** clone at `2be8a31` (= origin/main, PR #6), `chat-ui` builds clean (`next build` exit 0, "Compiled successfully").

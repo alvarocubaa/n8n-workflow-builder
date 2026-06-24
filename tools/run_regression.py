@@ -59,6 +59,12 @@ def main():
     parser.add_argument("--cases-file", type=str,
                         default=str(Path(__file__).parent / "test_cases.yaml"),
                         help="Path to test cases YAML")
+    parser.add_argument("--baseline", type=str, default=None,
+                        help="Path to a pinned baseline JSON ({name: PASS|FAIL|ERROR}). "
+                             "When set, the gate is 'no NEW failures vs baseline' "
+                             "(known failures are tolerated); exit 1 only on a regression.")
+    parser.add_argument("--update-baseline", type=str, default=None,
+                        help="Write this run's results to the given path as a new baseline, then exit 0.")
     args = parser.parse_args()
 
     cases = load_cases(args.cases_file)
@@ -129,6 +135,12 @@ def main():
     print(f"\n  Total: {pass_count} passed, {fail_count} failed, {error_count} errors")
     print(f"  Elapsed: {total_elapsed:.0f}s")
 
+    # Normalize each result to one of PASS / FAIL / ERROR (drop the ERROR message tail).
+    def _norm(v: str) -> str:
+        return "ERROR" if v.startswith("ERROR") else v
+
+    norm_results = {name: _norm(v) for name, v in results.items()}
+
     if args.save_dir:
         # Save summary
         summary_path = os.path.join(args.save_dir, "summary.json")
@@ -140,6 +152,44 @@ def main():
             }, f, indent=2)
         print(f"  Summary saved to: {summary_path}")
 
+    # --- Pin a new baseline and exit (used to (re)establish the gate's reference point) ---
+    if args.update_baseline:
+        with open(args.update_baseline, "w") as f:
+            json.dump(norm_results, f, indent=2, sort_keys=True)
+        print(f"\n  Baseline written to: {args.update_baseline} "
+              f"({pass_count} PASS / {fail_count} FAIL / {error_count} ERROR)")
+        sys.exit(0)
+
+    # --- Baseline gate: fail ONLY on a regression (a case that passed in the baseline now failing,
+    #     or a brand-new case that fails). Known/pinned failures are tolerated. ---
+    if args.baseline:
+        with open(args.baseline) as f:
+            baseline = json.load(f)
+
+        regressions = []   # was PASS (or new) and is now not-PASS
+        fixed = []         # was not-PASS and is now PASS
+        for name, status in norm_results.items():
+            prior = baseline.get(name)
+            if status != "PASS" and (prior == "PASS" or prior is None):
+                regressions.append((name, prior or "NEW", status))
+            elif status == "PASS" and prior is not None and prior != "PASS":
+                fixed.append(name)
+
+        print(f"\n{'#'*60}\nBASELINE GATE  (baseline: {args.baseline})\n{'#'*60}")
+        if fixed:
+            print(f"  Fixed since baseline ({len(fixed)}): {', '.join(sorted(fixed))}")
+            print("  -> consider re-pinning the baseline with --update-baseline.")
+        if regressions:
+            print(f"  REGRESSIONS ({len(regressions)}):")
+            for name, prior, now in regressions:
+                print(f"    [REGRESSION] {name}: baseline={prior} now={now}")
+            print("\n  GATE: FAIL — new failures vs baseline.")
+            sys.exit(1)
+        print(f"  GATE: PASS — no new failures vs baseline "
+              f"({pass_count}/{len(norm_results)} passing).")
+        sys.exit(0)
+
+    # --- Default (no baseline): strict all-green gate, unchanged. ---
     all_pass = fail_count == 0 and error_count == 0
     sys.exit(0 if all_pass else 1)
 
