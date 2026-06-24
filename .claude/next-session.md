@@ -37,5 +37,7 @@ Then add a `system-prompt.ts` rule to edit-via-diff instead of full-JSON regen.
 - Verify shared BQ SA `h7fJ82YhtOnUL58u` can read `payments_processing` (likely restricted → admin grant). Then build `specs/02_SRC_FinanceBI_Spec.md` from `guesty_churn` (placeholders, no real PII; add payments-PII prompt rule). 3-location sync + scope to `finance`.
 - Broader BI-corpus harvest gated on the BI-team reply (message drafted 2026-06-23, awaiting send).
 
-## Carried-over (from the pre-empted 2026-06-19 HEAD — still open)
-- **Ron PRD V1 reply** (pro-rated vs full-month MTD), **Kurt reply**, **Builder relocation Phase 8** (clone to `~/Code`), **CloudFront 502** integration walkthrough. Detail in `docs/decision-log.md` + memory `prd-v1-time-saved-2026-06-18`.
+## Carried-over (from the pre-empted 2026-06-19 HEAD)
+- ✅ **Builder relocation Phase 8 — DONE 2026-06-24.** Canonical working copy now at `~/Code/n8n-workflow-builder` (clone, not `mv`); build verified; `settings.json`/router CLAUDE.md/WAT imports/auto-memory all repointed. Old Drive copy left for manual deletion. See `docs/decision-log.md` (2026-06-23 Phase 8 entry) + memory `builder-relocated-to-code-2026-06-23`.
+- ✅ **CloudFront 502 — cleared.** `thehub.gue5ty.com` now returns 403 (auth-gate), origin healthy. Integration walkthrough remains user-driven.
+- ⏳ Still open: **Ron PRD V1 reply** (pro-rated vs full-month MTD) + **Kurt reply** — both blocked on unsent drafts / no replies. Detail in `docs/decision-log.md` + memory `prd-v1-time-saved-2026-06-18`.
