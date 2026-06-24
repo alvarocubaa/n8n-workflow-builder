@@ -45,28 +45,30 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD] Ron + Kurt async response handling + Builder relocation (Phase 8)
+### 1. [HEAD 2026-06-23] Builder modernization (continuation) — A2/A3, regression net, harvest un-pause, BI
 
-**Full brief:** [`.claude/next-session.md`](next-session.md). In order:
-1. **First — check Slack drafts status.** Two DM drafts prepared 2026-06-18 awaiting user review/send (Ron full PRD V1 status; Kurt FYI). Ask if user wants help finalizing.
-2. **React to Ron's reply:** if pro-rated MTD, 1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`; if full-monthly fine, close question; if asks about 220h unassigned row, explain the sentinel.
-3. **React to Kurt's reply:** note S-B was chosen and shipped (not the S-A from initial design doc); confirm Phase 2 destructive stays deferred.
-4. **Phase 8 (Claude autonomous, deferred from 2026-06-16):** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; delete Drive copy after web-UI confirm; repoint `~/.claude/settings.json` roots. Unsafe from a session rooted in the Drive copy — fresh-session-only.
-5. **Once DevOps clears the CloudFront 502:** run integration walkthrough (item #2 below) — now also validate today's new breakdown modal.
+**Full brief:** [`.claude/next-session.md`](next-session.md). Plan: [`~/.claude/plans/the-feedback-loop-has-hashed-micali.md`](../../../../.claude/plans/the-feedback-loop-has-hashed-micali.md). Decisions: `docs/decision-log.md` (2026-06-23) + `docs/mcp-strategy-2026-06.md` + `docs/agent-infra-assessment.md`.
+
+✅ **Shipped 2026-06-23:** MCP **re-vendored v2.33.5 → v2.59.3 LIVE** (rev `n8n-mcp-cloud-00017-paq`, node DB 1,084→1,845, n8n 2.26; old `00011-zn6` retained); 🔒 telemetry leak disabled (live + durable); builder docs **PR #6 merged**; both Hermes skills installed on the `workflow-builder` VM (**`wb-mcp-watchdog` active**, **`wb-feedback-harvest` paused**); BI message drafted (awaiting send).
+
+**Pending (priority order — full detail in next-session.md):**
+1. **A2/A3** — expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts` behind a **server-side sandbox-project allowlist** + cred-strip extension (gated on the regression net).
+2. **Regression safety net** — merge wb-ci #5; wire `tools/run_regression.py` into CI (needs deployed app + Vertex); gate = "no new failures vs baseline" (~27/32).
+3. **Un-pause `wb-feedback-harvest`** — provision builder repo + `npm ci` on the VM, resume, run backlog catch-up (51 candidates).
+4. **Override re-verify** vs n8n 2.26 typeVersions (R4 — re-vendor shipped without before/after regression).
+5. **MCP pipeline cleanup** — why the merge built but didn't serve; consolidate dup monorepo `n8n-mcp/`; delete stray canary.
+6. **Finance BI (item #3)** + BI-corpus after the BI-team reply.
 
 ---
 
-### 2. [IN PROGRESS 2026-06-23] Builder modernization — MCP re-sync + autonomous feedback loop + agent-infra + BI
+### 2. [CARRIED-OVER] Ron + Kurt async response handling + Builder relocation (Phase 8)
 
-**Plan:** [`~/.claude/plans/the-feedback-loop-has-hashed-micali.md`](../../../../.claude/plans/the-feedback-loop-has-hashed-micali.md) (promote into repo `plans/` if it outlives the session).
-
-Shipped this session: S1 telemetry leak disabled live (MCP rev `n8n-mcp-cloud-00011-zn6`); `docs/mcp-strategy-2026-06.md` (A4); `docs/agent-infra-assessment.md` (C); two Hermes skills authored (`wb-feedback-harvest`, `wb-mcp-watchdog` in `[HERMES] Orchestrator/skills/`, report+PR mode); BI-team query-request message drafted (awaiting send).
-
-Remaining:
-- **A1 re-vendor** `alvarocubaa/n8n-mcp-cloud` v2.33.5 → v2.59.x + consolidate the duplicate monorepo `n8n-mcp/` copy. PROD (merge==deploy). Needs ADC re-auth + npm rebuild + manual before/after regression + canary. **Checkpoint with user before deploy.**
-- **A2/A3** expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts` behind a server-side sandbox-project allowlist + extend credential stripping. After A1 + regression net.
-- **CI safety net:** merge wb-ci PR #5 (lint/typecheck); full e2e regression-in-CI is a follow-up (needs deployed app + Vertex creds).
-- **Track B/A5 wiring:** install the two skills on the Hermes `workflow-builder` VM + cron. Gated on VM readiness + wb-ci/branch-protection/wb-pr-review activation.
+> Was HEAD until 2026-06-23; pre-empted by the modernization session. Still open. Full prior brief in this file's git history.
+1. **Check Slack drafts status** (Ron full PRD V1 status; Kurt FYI) — 2026-06-18 drafts awaiting send.
+2. **React to Ron's reply:** pro-rated vs full-monthly MTD (1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`); explain 220h unassigned-row sentinel if asked.
+3. **React to Kurt's reply:** S-B chosen/shipped (not S-A); Phase 2 destructive stays deferred.
+4. **Phase 8:** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; repoint `~/.claude/settings.json` roots. Fresh-session-only.
+5. **CloudFront 502 cleared →** integration walkthrough (item #4 below).
 
 ### 3. [QUEUED] Finance BI spec pilot — `payments_processing.guesty_churn`
 
@@ -96,7 +98,7 @@ Live revs: n8n-ops `n8n-ops-00043-f2m`, Hub `ai-innovation-hub-00172-gjx`. Detai
 
 ---
 
-### 2. [BLOCKED on CloudFront 502 — DevOps] Session 12 — End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
+### 4. [BLOCKED on CloudFront 502 — DevOps] Session 12 — End-to-end integration walkthrough (Hub × chat-ui × n8n-ops)
 
 > **Blocked:** `thehub.gue5ty.com` returns 502 (CloudFront→origin; Cloud Run origin healthy). Can't run the browser walkthrough until DevOps fixes it. Plan + `docs/innovation-hub/` refs now live in `claude-workspace-roots → AI Innovation Integration/`. Also now must validate **post-IH-2.0-cutover** behaviour (innovation_items schema, the 3 KPI badge states).
 
