@@ -4,7 +4,7 @@ Multi-session pipeline. The **HEAD** (first entry) is the next session to execut
 
 `.claude/next-session.md` always reflects the HEAD session brief; update both files together when promoting.
 
-**Current focus track:** **Repo split SHIPPED + merged 2026-06-16** — the tangle is now 3 clean repos (builder `alvarocubaa/n8n-workflow-builder` PR #3 squash `eda3691`; **n8n-ops `alvarocubaa/n8n-ops` at `~/Code/n8n-ops`**; Hub unchanged) + cross-cutting home `cubaalvaro/claude-workspace-roots → AI Innovation Integration/`. **IH 2.0 "unified pipeline cutover" incident fixed** (n8n-ops re-aligned to `innovation_items`, rev `n8n-ops-00029`; OAuth origin for `thehub.gue5ty.com` verified). **HEAD = Builder relocation (Phase 8) + post-cutover verification.** Session 12 (integration walkthrough) is **blocked on the CloudFront 502** (DevOps). See memory `repo-split-2026-06-11` + `ih2-cutover-incident-2026-06-16`.
+**Current focus track:** **Quality infrastructure.** Builder relocated to `~/Code/n8n-workflow-builder` (Phase 8 ✅ 2026-06-24, PR #7). **Regression safety net built** (2026-06-24): per-PR typecheck gate live (PR #5); baseline-diff gate in `run_regression.py` (PR #8); `wb-regression` Hermes skill deployed to the `workflow-builder` VM + nightly cron registered (PAUSED pending first armed baseline); VM fully provisioned (builder clone + deps + linger + chat-ui as a `systemd --user` unit). **The net already caught a real builder bug on its first run** — payments/CX workflows attach the wrong `googleApi` cred to BigQuery nodes (Drive/Translate SA instead of the BQ SA; `departments.ts` itself flags `aLlYQkLWrmANkfFZ` as WRONG). **CloudFront 502 cleared** (now 403/auth-gate). **HEAD = weekly n8n workspace inventory skill + finish arming the regression net + fix the caught cred bugs.** See memory `builder-relocated-to-code-2026-06-23` + `docs/decision-log.md` (2026-06-24).
 
 ---
 
@@ -45,36 +45,56 @@ Architecture history + every design decision is captured in [`docs/decision-log.
 
 ## Queue
 
-### 1. [HEAD 2026-06-23] Builder modernization (continuation) — A2/A3, regression net, harvest un-pause, BI
+### 1. [HEAD 2026-06-24] Weekly n8n workspace inventory skill + finish arming the regression net + fix caught cred bugs
 
-**Full brief:** [`.claude/next-session.md`](next-session.md). Plan: [`~/.claude/plans/the-feedback-loop-has-hashed-micali.md`](../../../../.claude/plans/the-feedback-loop-has-hashed-micali.md). Decisions: `docs/decision-log.md` (2026-06-23) + `docs/mcp-strategy-2026-06.md` + `docs/agent-infra-assessment.md`.
+**Full brief:** [`.claude/next-session.md`](next-session.md). Decisions: `docs/decision-log.md` (2026-06-24).
 
-✅ **Shipped 2026-06-23:** MCP **re-vendored v2.33.5 → v2.59.3 LIVE** (rev `n8n-mcp-cloud-00017-paq`, node DB 1,084→1,845, n8n 2.26; old `00011-zn6` retained); 🔒 telemetry leak disabled (live + durable); builder docs **PR #6 merged**; both Hermes skills installed on the `workflow-builder` VM (**`wb-mcp-watchdog` active**, **`wb-feedback-harvest` paused**); BI message drafted (awaiting send).
+**1a. NEW — build `wb-workspace-inventory` weekly skill (USER PRIORITY).**
+Weekly, walk the entire Guesty n8n workspace across **all department projects/folders**, gather every workflow and the **credentials each references**, and keep an updated inventory so `chat-ui/src/lib/departments.ts` (the credential single-source-of-truth) and `tools/test_cases.yaml` fixtures stay current. **Why:** this session's 16/32 first baseline was dominated by *stale credential fixtures* (e.g. Slack `MkMAiC1ecfpYtIz1` removed from the workspace) — drift between the live n8n workspace and our cred table is the root cause. An auto-inventory closes that loop.
+- **Form:** Hermes skill on the `workflow-builder` profile (mirror `wb-mcp-watchdog`: `[HERMES] Orchestrator/{skills/wb-workspace-inventory/SKILL.md, scripts/wb-workspace-inventory.sh}`), `--no-agent` cron, weekly.
+- **Mechanism:** n8n API — list projects (`/api/v1/projects`) → list workflows per project → per workflow extract `nodes[].credentials` (type + id + name). Build a per-department inventory: `{ project_id, project_env, workflows:[{id,name,active,nodes,creds[]}], credentials:[{type,id,name,used_by[]}] }`.
+- **Output:** versioned snapshot committed to the repo (e.g. `reference/n8n-workspace-inventory.json` + a human `reference/n8n-workspace-inventory.md`). **Diff against `departments.ts`** → NOTIFY / open a PR when creds are NEW / CHANGED / REMOVED (so the SoT and fixtures get refreshed before they rot).
+- Reuses the n8n API patterns already in `~/Code/n8n-ops` and `tools/`. Coordinate with `wb-feedback-harvest` (both touch the workspace) — they can share the VM repo + a list-workflows helper.
 
-**Pending (priority order — full detail in next-session.md):**
-1. **A2/A3** — expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts` behind a **server-side sandbox-project allowlist** + cred-strip extension (gated on the regression net).
-2. **Regression safety net** — merge wb-ci #5; wire `tools/run_regression.py` into CI (needs deployed app + Vertex); gate = "no new failures vs baseline" (~27/32).
-3. **Un-pause `wb-feedback-harvest`** — provision builder repo + `npm ci` on the VM, resume, run backlog catch-up (51 candidates).
-4. **Override re-verify** vs n8n 2.26 typeVersions (R4 — re-vendor shipped without before/after regression).
-5. **MCP pipeline cleanup** — why the merge built but didn't serve; consolidate dup monorepo `n8n-mcp/`; delete stray canary.
-6. **Finance BI (item #3)** + BI-corpus after the BI-team reply.
+**1b. Finish arming the regression net (quick — picks up where 2026-06-24 stopped).**
+- The refreshed-fixture re-run was launched on the VM (`systemd --user` unit `wb-bootstrap`, writing `~/n8n-workflow-builder/tools/regression_baseline.json`); chat-ui is up as `wb-chatui.service`. **Pull the finished baseline from the VM, eyeball the counts** (should be well above 16/32 after the 4 fixture fixes), `scp` it down, commit `tools/regression_baseline.json` (+ already-staged `tools/test_cases.yaml` if not yet merged).
+- `hermes --profile workflow-builder cron resume 629abe52bfab` to arm the nightly gate.
+- **Finalize the chat-ui lifecycle on the VM:** decide persistent `wb-chatui.service` (dev) vs `next build && next start` vs cron-managed bring-up. Current state = a dev-mode `systemd --user` unit (fine short-term; wasteful 24/7).
+
+**1c. Fix the real cred bugs the net caught (= part of audit R4 / override re-verify).**
+- **payments + CX BigQuery cred confusion:** builder attaches a Google **Drive** SA (`aLlYQkLWrmANkfFZ` "n8n-payments") / CX **Translate** SA (`PAAimNTryrvB72dp`) to **BigQuery** nodes instead of the BQ SA (`h7fJ82YhtOnUL58u`). `departments.ts` already flags `aLl…` as the WRONG example — the guardrail isn't holding for these depts. Cases: `pay_invoice_aging`, `pay_zuora_sf_reconcile`, `uc2_cx`.
+- **marketing Docs-node gaps:** content cases (`hack_case_study_engine`, `hack_mtc_content`, `hack_localization`, `hack_webinar_creation`) expect Google **Docs** nodes the builder doesn't produce (`cred_missing:googleDocsOAuth2Api`). Decide: is Docs the intended output, or update the fixtures? (Don't auto-paper-over — these are real behavior questions.)
+
+**Then (priority order, from the prior modernization brief — still open):**
+2. **A2/A3** — expose `n8n_update_partial_workflow` + `n8n_autofix_workflow` in `chat-ui/src/lib/mcp-bridge.ts` behind a **server-side sandbox-project allowlist** + cred-strip extension. **Now unblocked** — the regression net exists (arm it first via 1b).
+3. **Un-pause `wb-feedback-harvest`** — VM repo + deps are now provisioned (done 2026-06-24), so just `hermes --profile workflow-builder cron resume` + backlog catch-up (51 candidates). Shares infra with 1a.
+4. **MCP pipeline cleanup** — why the merge built but didn't serve; consolidate dup monorepo `n8n-mcp/`; delete stray canary.
+5. **Finance BI (item #4 below)** + BI-corpus after the BI-team reply.
 
 ---
 
-### 2. [CARRIED-OVER] Ron + Kurt async response handling + Builder relocation (Phase 8)
+### 2. [OPEN — blocked on user] Ron + Kurt async response handling
 
-> Was HEAD until 2026-06-23; pre-empted by the modernization session. Still open. Full prior brief in this file's git history.
-1. **Check Slack drafts status** (Ron full PRD V1 status; Kurt FYI) — 2026-06-18 drafts awaiting send.
-2. **React to Ron's reply:** pro-rated vs full-monthly MTD (1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`); explain 220h unassigned-row sentinel if asked.
-3. **React to Kurt's reply:** S-B chosen/shipped (not S-A); Phase 2 destructive stays deferred.
-4. **Phase 8:** `gh repo clone alvarocubaa/n8n-workflow-builder ~/Code/n8n-workflow-builder` (NOT mv); verify; repoint `~/.claude/settings.json` roots. Fresh-session-only.
-5. **CloudFront 502 cleared →** integration walkthrough (item #4 below).
+> Phase 8 (relocation) ✅ done 2026-06-24. CloudFront 502 ✅ cleared. These remain, blocked on unsent drafts / replies.
+1. **Ron PRD V1 reply:** pro-rated vs full-monthly MTD (1-line patch in `~/Code/n8n-ops/src/routes/initiative-kpi-sync.ts`); explain 220h unassigned-row sentinel if asked.
+2. **Kurt reply:** S-B chosen/shipped (not S-A); Phase 2 destructive stays deferred.
+3. Drafts (Ron full PRD V1 status; Kurt FYI; BI-team) — 2026-06-18 drafts awaiting send.
 
 ### 3. [QUEUED] Finance BI spec pilot — `payments_processing.guesty_churn`
 
 First step in the "feed BI dashboard queries per department" track. **Verify access first:** confirm full path (`guesty-data.payments_processing.guesty_churn`?) + that shared BQ SA `h7fJ82YhtOnUL58u` can read the `payments_processing` dataset (payments data likely restricted — may need admin grant). Then: query schema → write `specs/02_SRC_FinanceBI_Spec.md` (AdminData template, verified SQL with **placeholders, no real PII**) → 3-location sync (`knowledge.ts`, `claude.ts`, `system-prompt.ts`) + scope to `finance` in `departments.ts`. Add a payments-PII prompt rule (mirror People). Broader BI-corpus harvest gated on the BI-team reply.
 
 ---
+
+### ✅ SHIPPED 2026-06-24 — Phase 8 relocation + regression safety net (audit R1) + VM provisioning
+
+Closed Phase 8 and built the regression net end-to-end; the net caught a real cred bug on its first run.
+- **Phase 8 (PR #7):** builder cloned Drive → `~/Code/n8n-workflow-builder`; settings.json/router/WAT imports/auto-memory repointed; old Drive copy left for manual delete. Memory `builder-relocated-to-code-2026-06-23`.
+- **Regression net:** wb-ci typecheck gate live (**PR #5**); `run_regression.py` baseline-diff gate "no new failures vs pinned baseline" (**PR #8**); `wb-regression` Hermes skill authored (`[HERMES] Orchestrator/`) + deployed to VM (3 mirror locations); nightly cron `629abe52bfab` registered + **PAUSED**.
+- **VM provisioning (`hermes-agent`):** builder cloned + `npm ci` + pyyaml; **`loginctl enable-linger`** (sudo) so detached user processes persist; chat-ui runs as `systemd --user` unit `wb-chatui.service` on :3002 (dev). Feasibility verified (VM SA = prod chat-ui SA; secrets readable; MCP `run.invoker`; Vertex ADC).
+- **First baseline 16/32** → diagnosed: failures dominated by **stale cred fixtures** (Slack `MkMAiC1ecfpYtIz1` removed, Sheets/Monday/Zendesk drift). Refreshed 4 from the cred table (PR pending in session-close). **Re-run with refreshed fixtures launched** (writing `regression_baseline.json` on the VM) — pull + commit + arm next session.
+- **Real bug caught (→ audit R4):** payments/CX workflows put the wrong `googleApi` cred on BigQuery nodes (Drive/Translate SA vs the BQ SA). `departments.ts` already flags `aLlYQkLWrmANkfFZ` as WRONG — guardrail not holding for those depts.
+- Live merges to `main`: PR #5, #7, #8, #9 (+ session-close PR). Detail: `docs/decision-log.md` (2026-06-24).
 
 ### ✅ SHIPPED 2026-06-18 — PRD V1 Time Saved KPI revision (Ron, end-to-end, 26 of 26 acceptance criteria)
 
