@@ -30,9 +30,21 @@ workflow builder. New entries on top.
 
 **Decision 3 — the live suite runs as a Hermes skill, NOT GitHub Actions.** The suite drives a *local, unauthenticated* chat-ui (`localhost:3004` + `MOCK_USER_EMAIL`) and needs Vertex creds — a GitHub-hosted runner would mean an SA key in repo secrets + network reach to n8n/MCP. Instead, authored **`wb-regression`** on the `workflow-builder` Hermes profile (alongside `wb-mcp-watchdog`/`wb-feedback-harvest`), files in apps-deployment `[HERMES] Orchestrator/{skills/wb-regression/SKILL.md, scripts/wb-regression.sh}`. The VM already has ADC + n8n/MCP reachability. **Trigger:** manual + nightly (NOT per-PR — 32 live LLM convos = slow/costly/flaky). **Gate:** the skill takes its verdict from the script exit code; a regression → NEEDS_HUMAN + NOTIFY (never auto-fixes, never re-pins the baseline, never merges). First run self-bootstraps `tools/regression_baseline.json` via `--update-baseline`.
 
-**Verification queue:**
-- **VM provisioning (shared with item #3 / `wb-feedback-harvest`):** `gh repo clone alvarocubaa/n8n-workflow-builder` + `cd chat-ui && npm ci` + `pip install pyyaml` on the VM; a local chat-ui reachable on :3004; then `hermes --profile workflow-builder cron` register `wb-regression` (nightly) — currently PAUSED until the prereq is met.
-- **First bootstrap run** seeds `tools/regression_baseline.json` (~27/32) — confirm the pinned counts look right before arming the gate.
+**VM provisioning — done 2026-06-24 on `hermes-agent` (`europe-west1-b`):**
+- Builder repo cloned to `~/n8n-workflow-builder` (HEAD = `main` incl. the baseline gate); `chat-ui && npm ci` clean; `pyyaml` present.
+- `wb-regression` skill deployed to all 3 mirror locations (`~/.hermes/scripts/wb-regression.sh`, `~/.hermes/skills/wb-regression/SKILL.md`, `~/.hermes/profiles/workflow-builder/skills/wb-regression/SKILL.md`).
+- Cron registered under the `workflow-builder` profile (`629abe52bfab`, nightly `0 3 * * *`) and **PAUSED** (held like `wb-feedback-harvest` until the first baseline is pinned).
+- Feasibility verified: VM SA `n8n-workflow-builder@…` (= the prod chat-ui SA) reads secrets `AUTH_TOKEN`/`N8N_API_KEY`/`N8N_URL` and has `run.invoker` on `n8n-mcp-cloud` (`https://n8n-mcp-cloud-fhehssni7q-ew.a.run.app`); Vertex via metadata ADC (`us-east5`).
+- A ready-to-run bring-up script `~/wb-chatui-up.sh` was placed on the VM (exports the full chat-ui env — MCP_SERVICE_URL→deployed MCP, secrets, `MOCK_USER_EMAIL`, `GCP_PROJECT_ID`; `npm run dev` on :3002).
+- **System change (sudo):** `loginctl enable-linger alvaro.cuba` (was `Linger=no`) — needed so detached user processes survive.
+
+**Blocker — chat-ui won't stay up via non-interactive `gcloud compute ssh`.** Every launch mechanism (`nohup &`, `setsid`, `setsid --fork`, foreground-over-SSH, `systemd-run --user`) returns SSH 255 and leaves no persistent server — the user systemd manager/pty isn't fully wired in non-interactive SSH, so the dev server is reaped. This is the natural interactive "first observed run" checkpoint.
+
+**Remaining (interactive VM session, ~10 min):**
+1. SSH in interactively (or tmux): `bash ~/wb-chatui-up.sh` → confirm `curl localhost:3002/api/departments` = 200.
+2. `cd ~/n8n-workflow-builder && python3 tools/run_regression.py --update-baseline tools/regression_baseline.json --base-url http://localhost:3002` (~32 live cases, several min).
+3. Eyeball the pinned counts (~27/32), commit `tools/regression_baseline.json` to the repo.
+4. `hermes --profile workflow-builder cron resume 629abe52bfab` to arm the nightly gate.
 
 ## 2026-06-23 — Phase 8: relocated builder repo out of Drive to `~/Code`
 
