@@ -11,6 +11,7 @@ import type {
 import { callMcpTool, type RawMcpTool } from './mcp-bridge';
 import { getSystemPrompt } from './system-prompt';
 import { readSkill, readCompanySpec } from './knowledge';
+import { getBiTableKeys, readBiTable } from './bi-dictionary';
 import { getDepartment, getDepartmentSpecKeys } from './departments';
 import { getWorkflowJson } from './n8n-deploy';
 import type { AssistantMode, ChatEvent, TokenUsage } from './types';
@@ -100,6 +101,30 @@ function getKnowledgeTools(departmentId?: string, mode: AssistantMode = 'builder
     },
   });
 
+  // get_bi_table — BI-blessed analytics marts. Only exposed once the BI dictionary
+  // has been synced (tools/sync_bi_dictionary.ts); absent otherwise, so there is no
+  // production impact until the first sync. These carry BI's verified build queries —
+  // the strongest anti-hallucination guardrail for the covered tables.
+  const biKeys = getBiTableKeys();
+  if (biKeys.length > 0) {
+    tools.push({
+      name: 'get_bi_table',
+      description:
+        'Load the BI-blessed data dictionary for a curated analytics mart — its verified build query, grain, lineage, and documented columns. Prefer this SQL over hand-writing for any of these tables. Pass "index" to list what is available.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          table: {
+            type: 'string',
+            description: 'BI table key (e.g. "performance__ndr"), or "index" to list all.',
+            enum: ['index', ...biKeys],
+          },
+        },
+        required: ['table'],
+      },
+    });
+  }
+
   // Promote-to-Production tool — only in builder mode. The system prompt's
   // <promote_to_production> rule instructs the AI to call this on the FIRST turn of any
   // promote_context conversation so it can inspect the live workflow JSON before running
@@ -137,6 +162,7 @@ function filterMcpToolsForMode(tools: Tool[], mode: AssistantMode): Tool[] {
 async function handleKnowledgeTool(name: string, args: Record<string, unknown>, departmentId?: string): Promise<string | null> {
   if (name === 'get_n8n_skill') return readSkill(args.skill as string, args.file as string | undefined);
   if (name === 'get_company_spec') return readCompanySpec(args.system as string, departmentId);
+  if (name === 'get_bi_table') return readBiTable(args.table as string);
   if (name === 'get_workflow_for_promotion') {
     const id = String(args.workflow_id ?? '').trim();
     if (!id) return 'Error: workflow_id is required';
@@ -266,6 +292,8 @@ function buildToolSummary(calls: ToolCallRecord[]): string {
   for (const c of calls) {
     if (c.name === 'get_company_spec') {
       lines.push(`[Loaded ${c.args.system} spec]`);
+    } else if (c.name === 'get_bi_table') {
+      lines.push(`[Loaded BI mart ${c.args.table}]`);
     } else if (c.name === 'get_n8n_skill') {
       const file = c.args.file ? ` (file: ${c.args.file})` : '';
       lines.push(`[Loaded ${c.args.skill} skill${file}]`);

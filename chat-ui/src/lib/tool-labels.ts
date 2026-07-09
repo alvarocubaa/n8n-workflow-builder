@@ -6,6 +6,7 @@ const TOOL_LABELS: Record<string, string> = {
   n8n_validate_workflow: 'Validating workflow',
   n8n_autofix_workflow: 'Autofixing workflow',
   get_company_spec: 'Reading data source spec',
+  get_bi_table: 'Reading BI mart dictionary',
   get_n8n_skill: 'Loading skill',
   search_templates: 'Searching templates',
   get_template: 'Loading template',
