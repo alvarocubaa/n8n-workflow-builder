@@ -58,3 +58,15 @@ CLUSTER BY department, user_email;
 - Immutable append-only (+ separate feedback events) vs. mutable row with feedback UPDATE?
 - Dataset/project + retention policy for prompt/email?
 - Any fields to add for their side (cost attribution, team rollups)?
+
+## Writer status — implemented, dormant
+
+The builder-side writer is **already built and shipped inert** (`chat-ui/src/lib/agent-logs.ts`, wired into the chat route). It emits one row per turn — on success, truncation, and error — reusing the existing analytics data (email, department, mode, tools, tokens, latency) plus `prompt`, `status`, `workflow_built`, and `bi_tables_used`.
+
+It is a **no-op until `AGENT_LOGS_TABLE` is set**. To turn it on once the table exists:
+
+1. BI creates the table (DDL above).
+2. Grant the builder SA `n8n-workflow-builder@agentic-workflows-485210` `roles/bigquery.dataEditor` on the target dataset.
+3. Add to the chat-ui Cloud Run env: `AGENT_LOGS_TABLE=guesty-data.guesty_analytics.agent_logs` (in `deploy-cloudrun.sh`), redeploy.
+
+Not yet populated (follow-ups): `deployed` / `workflow_id` (instrument the `/api/deploy` endpoint) and `feedback` (async update from the 👍/👎 UI). `workflow_built` is inferred from the reply containing n8n workflow markers.

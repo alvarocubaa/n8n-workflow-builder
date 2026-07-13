@@ -9,7 +9,8 @@ import {
   logAnalyticsEvent,
   type DisplayMessage,
 } from '@/lib/firestore';
-import type { AnalyticsEvent, AssistantMode, InitiativePrefill, PocContext, PromoteContext } from '@/lib/types';
+import type { AnalyticsEvent, AssistantMode, InitiativePrefill, PocContext, PromoteContext, TokenUsage } from '@/lib/types';
+import { logAgentTurn } from '@/lib/agent-logs';
 import {
   getDepartment,
   getDepartmentCredentialsMarkdown,
@@ -568,6 +569,32 @@ export async function POST(req: Request): Promise<Response> {
       // Analytics tracking
       const startTime = Date.now();
       const toolCallNames: string[] = [];
+      const biTablesUsed: string[] = [];
+
+      // Best-effort agent_logs row (dormant unless AGENT_LOGS_TABLE is set). Reuses the
+      // same per-turn data as the Firestore analytics event. See lib/agent-logs.ts.
+      const emitAgentLog = (status: 'success' | 'error' | 'truncated', usage?: TokenUsage) => {
+        const fullReply = modelChunks.join('');
+        void logAgentTurn({
+          conversation_id: convId,
+          user_email: user.email,
+          department: departmentId,
+          assistant_mode: mode,
+          prompt: message,
+          status,
+          workflow_built: /"nodes"\s*:/.test(fullReply) && /"connections"\s*:/.test(fullReply),
+          deployed: null,      // populated when the deploy endpoint is instrumented
+          workflow_id: null,
+          tools_used: toolCallNames,
+          bi_tables_used: biTablesUsed,
+          feedback: null,      // filled async via a later feedback update
+          feedback_comment: null,
+          input_tokens: usage?.inputTokens ?? null,
+          output_tokens: usage?.outputTokens ?? null,
+          model: process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6',
+          latency_ms: Date.now() - startTime,
+        });
+      };
 
       try {
         for await (const event of eventStream) {
@@ -576,6 +603,9 @@ export async function POST(req: Request): Promise<Response> {
             enqueue(event);
           } else if (event.type === 'tool_call') {
             toolCallNames.push(event.name);
+            if (event.name === 'get_bi_table' && typeof event.args?.table === 'string') {
+              biTablesUsed.push(event.args.table);
+            }
             enqueue(event);
           } else if (event.type === 'done') {
             // Persist the user turn + model response
@@ -767,17 +797,20 @@ export async function POST(req: Request): Promise<Response> {
               createdAt: new Date().toISOString(),
             };
             logAnalyticsEvent(analyticsEvent).catch(console.error);
+            emitAgentLog(event.truncated ? 'truncated' : 'success', event.usage);
 
             enqueue({ type: 'done', conversationId: convId });
             controller.close();
             return;
           } else if (event.type === 'error') {
+            emitAgentLog('error');
             enqueue(event);
             controller.close();
             return;
           }
         }
       } catch (err) {
+        emitAgentLog('error');
         enqueue({ type: 'error', message: String(err) });
         controller.close();
       }
