@@ -30,8 +30,6 @@ const COLUMN_DICT = `\`${SRC_PROJECT}.${DATASET}.agent_column_dictionary\``;
 
 const OUT_DIR = process.env.BI_OUT_DIR ?? path.resolve(process.cwd(), '..', 'specs', 'bi');
 
-const STALE_WEEKS = 2; // warn if a table's last_updated is older than this
-
 // ─── Row shapes ───────────────────────────────────────────────────────────────
 
 interface TableRow {
@@ -75,14 +73,12 @@ function findDateLiterals(...texts: (string | null | undefined)[]): string[] {
   return [...found].sort();
 }
 
+// Absolute date only — no computed "weeks ago". A relative age would change on
+// every run purely from the passage of time, producing weekly no-op refresh PRs.
+// The reader (or reviewer) judges staleness against this date at read time.
 function stalenessNote(lastUpdatedIso: string | null): string {
-  if (!lastUpdatedIso) return '⚠️ last_updated unknown — treat freshness as unverified.';
-  const ageMs = Date.now() - new Date(lastUpdatedIso).getTime();
-  const weeks = ageMs / (1000 * 60 * 60 * 24 * 7);
-  const stamp = lastUpdatedIso.slice(0, 10);
-  return weeks > STALE_WEEKS
-    ? `⚠️ Source last refreshed ${stamp} (~${Math.round(weeks)} weeks ago) — verify logic hasn't drifted before relying on it.`
-    : `Source last refreshed ${stamp}.`;
+  if (!lastUpdatedIso) return 'Source last_updated unknown — treat freshness as unverified before relying on critical logic.';
+  return `Source last refreshed ${lastUpdatedIso.slice(0, 10)} (BI-owned) — verify it hasn't drifted before relying on critical logic.`;
 }
 
 // ─── Markdown rendering ───────────────────────────────────────────────────────

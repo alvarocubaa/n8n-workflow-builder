@@ -1,7 +1,7 @@
 # BI mart — `guesty-data.zendesk_analytics.incoming_outgoing`
 
 > **Source of truth:** BI data dictionary (Dataplex-generated, BI-owned).
-> ⚠️ Source last refreshed 2026-05-20 (~7 weeks ago) — verify logic hasn't drifted before relying on it.
+> Source last refreshed 2026-05-20 (BI-owned) — verify it hasn't drifted before relying on critical logic.
 > Prefer this SQL over hand-written queries for this table. On conflict with a source-system spec, this wins for the mart's own columns.
 >
 > ⚠️ **Hardcoded date literal(s) detected:** '2024-01-01'. These will age out — surface them to the user for confirmation instead of copying blindly.

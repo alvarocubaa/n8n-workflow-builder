@@ -1,7 +1,7 @@
 # BI mart — `guesty-data.product_gpo.performance_ranking_score_agg`
 
 > **Source of truth:** BI data dictionary (Dataplex-generated, BI-owned).
-> ⚠️ last_updated unknown — treat freshness as unverified.
+> Source last_updated unknown — treat freshness as unverified before relying on critical logic.
 > Prefer this SQL over hand-written queries for this table. On conflict with a source-system spec, this wins for the mart's own columns.
 
 _No table-level build query available; column-level docs only._
