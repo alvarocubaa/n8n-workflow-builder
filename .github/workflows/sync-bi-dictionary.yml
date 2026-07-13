@@ -1,0 +1,64 @@
+name: sync-bi-dictionary
+
+# Weekly refresh of the BI data dictionary (specs/bi/) from BigQuery, opened as a PR.
+# Reads guesty-data.guesty_analytics.agent_{table,column}_dictionary and regenerates the
+# materialized marts the builder loads via get_bi_table. See docs/bi-dictionary-integration.md.
+#
+# Auth is Workload Identity Federation (no SA keys — repo security policy). The job stays
+# DORMANT until WIF is configured: set repo variable GCP_WIF_PROVIDER (the full provider
+# resource name). The service account defaults to the builder SA that already has
+# dataViewer on guesty_analytics; override with GCP_SYNC_SA if needed.
+#
+# One-time setup (outside this repo):
+#   1. Create/point a WIF pool+provider trusting this GitHub repo.
+#   2. Grant the SA roles/iam.workloadIdentityUser for this repo's principal.
+#   3. Set repo variable GCP_WIF_PROVIDER=projects/<n>/locations/global/workloadIdentityPools/<pool>/providers/<prov>
+#   (dataViewer on guesty-data.guesty_analytics is already granted to the builder SA.)
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:        # manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write           # required for WIF
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Skip cleanly (not fail) until WIF is wired — avoids recurring failed-cron noise.
+    if: ${{ vars.GCP_WIF_PROVIDER != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SYNC_SA || 'n8n-workflow-builder@agentic-workflows-485210.iam.gserviceaccount.com' }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        working-directory: chat-ui
+        run: npm ci
+
+      - name: Sync BI dictionary → specs/bi/
+        working-directory: chat-ui
+        run: npm run sync:bi
+
+      - name: Open PR with refreshed marts
+        uses: peter-evans/create-pull-request@v6
+        with:
+          add-paths: specs/bi
+          branch: chore/bi-dictionary-refresh
+          commit-message: "chore(bi): weekly refresh of BI dictionary marts"
+          title: "chore(bi): weekly refresh of BI dictionary marts"
+          body: |
+            Automated refresh of `specs/bi/` from BI's `agent_table_dictionary` +
+            `agent_column_dictionary`. Review the diff for logic/coverage drift
+            (watch flagged hardcoded date literals) before merging.
+          labels: automated, bi-dictionary

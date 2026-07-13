@@ -85,12 +85,18 @@ Each generated `specs/bi/*.md` carries a **provenance header** (source table, `l
 
 ---
 
-## Activation steps (blocked on access)
+## Activation status
 
-1. **IAM (ask BI):** grant `roles/bigquery.dataViewer` on `guesty-data.guesty_analytics` (or just the 2 tables) to the builder SA `n8n-workflow-builder@agentic-workflows-485210.iam.gserviceaccount.com`. Needed for the deployed sync.
-2. **First local sync (unblocks now):** `gcloud auth application-default login` as `alvaro.cuba@guesty.com` (already has read on the dicts), then `cd chat-ui && npx tsx ../tools/sync_bi_dictionary.ts`.
-3. Review generated `specs/bi/*.md`, commit, deploy. The `get_bi_table` tool auto-appears once files exist.
-4. **(Optional prompt tweak)** add a Phase 2 line pointing Claude at `get_bi_table` for BI marts. Deferred until sync output is reviewed.
+1. ~~**IAM:** grant `roles/bigquery.dataViewer` on `guesty-data.guesty_analytics` to the builder SA `n8n-workflow-builder@agentic-workflows-485210`.~~ ✅ **Done 2026-07-13** (enables unattended sync via WIF).
+2. ~~**First sync** → 12 marts materialized into `specs/bi/`, committed.~~ ✅ **Done** (`get_bi_table` now auto-appears).
+3. ~~**Prompt tweak** — Phase 2 line pointing Claude at BI marts.~~ ✅ **Done.**
+4. **Deploy** — rebuild `chat-ui`; Dockerfile already bakes `specs/` (incl. `specs/bi/`). ⬜ Pending.
+
+### Keeping it fresh
+
+- **On demand:** `cd chat-ui && npm run sync:bi` (regenerates `specs/bi/` from BQ).
+- **Automated:** `.github/workflows/sync-bi-dictionary.yml` — weekly cron that re-syncs and opens a PR. **Dormant until** repo variable `GCP_WIF_PROVIDER` is set (WIF, no SA keys per security policy). The builder SA it uses already has the dataViewer grant.
+- Each mart doc carries a staleness warning + hardcoded-date-literal guard so drift is visible in the PR diff.
 
 ---
 

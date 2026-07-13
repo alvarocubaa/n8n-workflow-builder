@@ -6,7 +6,8 @@
     "dev": "next dev --port 3002",
     "build": "next build",
     "start": "next start --port 3002",
-    "lint": "next lint"
+    "lint": "next lint",
+    "sync:bi": "NODE_PATH=./node_modules npx tsx ../tools/sync_bi_dictionary.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
