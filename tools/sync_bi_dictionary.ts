@@ -170,6 +170,9 @@ async function main() {
   const bq = new BigQuery({ projectId: SRC_PROJECT });
 
   console.log(`Reading BI dictionaries from ${SRC_PROJECT}.${DATASET} …`);
+  // TODO(bi-roadmap): when BI ships `is_bi_verified` + curated join-key/grain metadata
+  // (confirmed 2026-07-13), add them to these SELECTs and surface a "BI-verified" badge +
+  // join map in the rendered marts. Column doesn't exist yet — do not SELECT until it lands.
   const [tableRows] = await bq.query({
     query: `SELECT dataset_id, table_name, full_query, query_explanation, table_grain, upstream_sources, last_updated FROM ${TABLE_DICT}`,
     location: LOCATION,
