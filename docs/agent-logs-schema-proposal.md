@@ -21,7 +21,10 @@ The builder already holds, per interaction, everything BI wants — no snippet i
 
 ```sql
 -- One row per completed builder chat turn. Written by the chat-ui backend.
-CREATE TABLE IF NOT EXISTS `guesty-data.guesty_analytics.agent_logs` (
+-- NOTE: a DEDICATED dataset (e.g. genbi_logs), NOT guesty_analytics — the builder SA
+-- needs dataEditor (write) on this dataset, and we must not give it write access to
+-- BI's curated marts. Keep logs physically separate from the dictionary/marts.
+CREATE TABLE IF NOT EXISTS `guesty-data.genbi_logs.agent_logs` (
   log_id           STRING    NOT NULL,  -- uuid per turn (feedback updates key on this)
   ts               TIMESTAMP NOT NULL,  -- turn completion (UTC)
   conversation_id  STRING,              -- Firestore conversation id (groups turns)
@@ -50,7 +53,7 @@ CLUSTER BY department, user_email;
 
 1. **`bi_tables_used` closes the ROI loop.** It records exactly which BI marts the builder loaded, so BI can measure how often the dictionary is actually used — direct evidence for the GenBI ROI story, and it tells BI which tables to prioritize documenting next.
 2. **Feedback is asynchronous.** 👍/👎 arrives after the turn, so `feedback`/`feedback_comment` land via an UPDATE keyed on `log_id` (or a separate append-only `agent_feedback` table if BI prefers immutable logs — open question).
-3. **Location/project.** Proposed in `guesty-data.guesty_analytics` beside the dictionaries; open to a dedicated `genbi` dataset if BI wants logs separated from marts. The builder SA needs `dataEditor` on whichever dataset.
+3. **Location/project — use a dedicated dataset.** Put `agent_logs` in its own dataset (e.g. `guesty-data.genbi_logs`), NOT in `guesty_analytics`. The builder SA needs `dataEditor` (write) on the logs dataset; scoping it to a dedicated dataset keeps that write grant away from BI's curated marts. (dataViewer on `guesty_analytics` for reads stays as-is.)
 4. **PII.** `user_email` + `prompt` are personal data — confirm retention/access policy (partition expiry? row-level access?) before we start writing.
 5. **Write path.** Builder backend does a single streaming insert per turn (BQ `insertAll`), non-blocking, best-effort (a logging failure must never fail a build).
 
@@ -65,8 +68,8 @@ The builder-side writer is **already built and shipped inert** (`chat-ui/src/lib
 
 It is a **no-op until `AGENT_LOGS_TABLE` is set**. To turn it on once the table exists:
 
-1. BI creates the table (DDL above).
-2. Grant the builder SA `n8n-workflow-builder@agentic-workflows-485210` `roles/bigquery.dataEditor` on the target dataset.
-3. Add to the chat-ui Cloud Run env: `AGENT_LOGS_TABLE=guesty-data.guesty_analytics.agent_logs` (in `deploy-cloudrun.sh`), redeploy.
+1. BI creates the table in a dedicated dataset (DDL above; e.g. `genbi_logs`).
+2. Grant the builder SA `n8n-workflow-builder@agentic-workflows-485210` `roles/bigquery.dataEditor` on that **logs** dataset (not `guesty_analytics`).
+3. Add to the chat-ui Cloud Run env: `AGENT_LOGS_TABLE=guesty-data.genbi_logs.agent_logs`, redeploy.
 
 Not yet populated (follow-ups): `deployed` / `workflow_id` (instrument the `/api/deploy` endpoint) and `feedback` (async update from the 👍/👎 UI). `workflow_built` is inferred from the reply containing n8n workflow markers.
