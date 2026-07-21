@@ -18,10 +18,11 @@ const AGENT_LOGS_TABLE = process.env.AGENT_LOGS_TABLE; // "project.dataset.table
 export interface AgentLogRow {
   log_id: string;
   ts: string;                              // ISO 8601 (BQ TIMESTAMP)
+  agent_source: string;                    // system discriminator; this app is always 'workflow_builder'
   conversation_id: string;
   user_email: string;
   department: string;
-  assistant_mode: string;                  // 'builder' | 'data'
+  agent_mode: string;                      // producer-internal sub-mode; builder: 'builder' | 'data'
   prompt: string;
   status: 'success' | 'error' | 'truncated';
   workflow_built: boolean;
@@ -29,12 +30,13 @@ export interface AgentLogRow {
   workflow_id: string | null;
   tools_used: string[];
   bi_tables_used: string[];                // BI marts loaded via get_bi_table (dictionary ROI)
-  feedback: string | null;                 // filled async via a later update
+  feedback: string | null;                 // filled async via a later append (same log_id)
   feedback_comment: string | null;
   input_tokens: number | null;
   output_tokens: number | null;
   model: string | null;
   latency_ms: number | null;
+  metadata: Record<string, unknown> | null; // producer-specific extras (JSON column)
 }
 
 /** Everything except the fields this module stamps (log_id, ts). */
@@ -65,7 +67,14 @@ export async function logAgentTurn(input: AgentLogInput): Promise<void> {
   if (!t) return; // inert until configured
   try {
     if (!client) client = new BigQuery({ projectId: t.project });
-    const row: AgentLogRow = { log_id: randomUUID(), ts: new Date().toISOString(), ...input };
+    // BQ JSON columns take a JSON string on streaming insert; everything else passes through.
+    const { metadata, ...rest } = input;
+    const row = {
+      log_id: randomUUID(),
+      ts: new Date().toISOString(),
+      ...rest,
+      metadata: metadata == null ? null : JSON.stringify(metadata),
+    };
     await client.dataset(t.dataset).table(t.table).insert([row]);
   } catch (err) {
     // Best-effort: log and move on. A telemetry failure must never affect the user.

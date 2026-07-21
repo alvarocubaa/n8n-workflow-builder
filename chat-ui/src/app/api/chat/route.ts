@@ -576,10 +576,11 @@ export async function POST(req: Request): Promise<Response> {
       const emitAgentLog = (status: 'success' | 'error' | 'truncated', usage?: TokenUsage) => {
         const fullReply = modelChunks.join('');
         void logAgentTurn({
+          agent_source: 'workflow_builder',
           conversation_id: convId,
           user_email: user.email,
           department: departmentId,
-          assistant_mode: mode,
+          agent_mode: mode,
           prompt: message,
           status,
           workflow_built: /"nodes"\s*:/.test(fullReply) && /"connections"\s*:/.test(fullReply),
@@ -593,6 +594,7 @@ export async function POST(req: Request): Promise<Response> {
           output_tokens: usage?.outputTokens ?? null,
           model: process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6',
           latency_ms: Date.now() - startTime,
+          metadata: null,   // builder has no producer-specific extras (yet); Slack agents populate this
         });
       };
 
