@@ -25,29 +25,39 @@ The builder already holds, per interaction, everything BI wants — no snippet i
 -- needs dataEditor (write) on this dataset, and we must not give it write access to
 -- BI's curated marts. Keep logs physically separate from the dictionary/marts.
 CREATE TABLE IF NOT EXISTS `guesty-data.genbi_logs.agent_logs` (
-  log_id           STRING    NOT NULL,  -- uuid per turn (feedback updates key on this)
+  log_id           STRING    NOT NULL,  -- uuid per turn (feedback appends key on this)
   ts               TIMESTAMP NOT NULL,  -- turn completion (UTC)
-  conversation_id  STRING,              -- Firestore conversation id (groups turns)
-  user_email       STRING,              -- IAP SSO identity
+  agent_source     STRING    NOT NULL,  -- SYSTEM discriminator: 'workflow_builder' | 'genbi_slack' (per-agent granularity as needed)
+  conversation_id  STRING,              -- groups turns in a session
+  user_email       STRING,              -- SSO identity
   department       STRING,              -- 'cs' | 'finance' | ...
-  assistant_mode   STRING,              -- 'builder' | 'data'
+  agent_mode       STRING,              -- producer-internal sub-mode; builder: 'builder'|'data'; Slack agents: their own or NULL
   prompt           STRING,              -- user request text
   status           STRING,              -- 'success' | 'error' | 'truncated'
-  workflow_built   BOOL,                -- produced workflow JSON?
-  deployed         BOOL,                -- deployed to n8n?
-  workflow_id      STRING,              -- n8n workflow id, if deployed
-  tools_used       ARRAY<STRING>,       -- tool calls this turn
-  bi_tables_used   ARRAY<STRING>,       -- BI marts loaded via get_bi_table  ← measures dictionary ROI
-  feedback         STRING,              -- 'up' | 'down' | NULL (filled async)
+  workflow_built   BOOL,                -- builder-only (NULL for Slack agents)
+  deployed         BOOL,                -- builder-only (phase 2: from deploy endpoint)
+  workflow_id      STRING,              -- builder-only
+  tools_used       ARRAY<STRING>,       -- builder-only
+  bi_tables_used   ARRAY<STRING>,       -- builder: BI marts loaded = dictionary ROI (NULL for Slack agents)
+  feedback         STRING,              -- 'up' | 'down' | NULL (async append)
   feedback_comment STRING,              -- optional free text
   input_tokens     INT64,
   output_tokens    INT64,
   model            STRING,
-  latency_ms       INT64
+  latency_ms       INT64,
+  metadata         JSON                 -- producer-specific extras (Slack agent: SQL run, source tables, channel; builder: future fields)
 )
 PARTITION BY DATE(ts)
 CLUSTER BY department, user_email;
 ```
+
+## Two producers, one table (2026-07-21 — BI wants a shared GenBI table)
+
+BI (Shimon) will also log **GenBI Slack agents** (separate n8n workflows) into this table for a single unified ROI dashboard. To make that clean:
+
+- **`agent_source` is the system discriminator** — `'workflow_builder'` (this app) vs `'genbi_slack'` (BI's agents). **Do not overload `assistant_mode` for this**: in the builder, `'builder'`/`'data'` are two modes of the *same* app (build vs. data-consultant) — they do NOT represent BI's Slack agents, which never touch the builder. Conflating them would silently mix the two systems in the dashboard. Renamed to `agent_mode` and made producer-internal.
+- **Builder-only columns** (`workflow_built`, `workflow_id`, `tools_used`, `bi_tables_used`) are NULL for Slack-agent rows; `metadata JSON` carries each producer's own extras.
+- **BI's write path:** their agents call a shared n8n sub-workflow that does the BQ append — good, and it lets us pin one canonical row shape. Both producers must set `agent_source` and use the same append/feedback convention.
 
 ## Design notes to align on
 
