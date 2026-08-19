@@ -1,0 +1,321 @@
+<title>Builder &amp; Bundle</title>
+<style>
+  :root{
+    --paper:#F7F7FA; --panel:#FFFFFF; --ink:#15161F; --ink2:#575A6D; --faint:#888CA1;
+    --rule:#D9DAE4; --hair:rgba(21,22,31,.10);
+    --accent:#3D3A8C; --accent-soft:rgba(61,58,140,.10); --accent-line:rgba(61,58,140,.35);
+    --ok:#2E7D57; --warn:#98680F; --risk:#B0453C;
+    --ok-bg:rgba(46,125,87,.11); --warn-bg:rgba(152,104,15,.12); --risk-bg:rgba(176,69,60,.10);
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#0F1016; --panel:#171922; --ink:#ECEDF3; --ink2:#A4A8BC; --faint:#71758A;
+      --rule:#262936; --hair:rgba(255,255,255,.10);
+      --accent:#9490EC; --accent-soft:rgba(148,144,236,.14); --accent-line:rgba(148,144,236,.45);
+      --ok:#5FBD8C; --warn:#D2A33A; --risk:#E0716A;
+      --ok-bg:rgba(95,189,140,.13); --warn-bg:rgba(210,163,58,.13); --risk-bg:rgba(224,113,106,.12);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0F1016; --panel:#171922; --ink:#ECEDF3; --ink2:#A4A8BC; --faint:#71758A;
+    --rule:#262936; --hair:rgba(255,255,255,.10);
+    --accent:#9490EC; --accent-soft:rgba(148,144,236,.14); --accent-line:rgba(148,144,236,.45);
+    --ok:#5FBD8C; --warn:#D2A33A; --risk:#E0716A;
+    --ok-bg:rgba(95,189,140,.13); --warn-bg:rgba(210,163,58,.13); --risk-bg:rgba(224,113,106,.12);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0; background:var(--paper); color:var(--ink);
+       font-family:var(--sans); line-height:1.55; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1020px; margin:0 auto; padding:56px 28px 96px}
+
+  .eyebrow{font-family:var(--mono); font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+           color:var(--accent); margin:0 0 14px}
+  h1{font-size:clamp(30px,4.4vw,44px); line-height:1.05; letter-spacing:-.022em; font-weight:660;
+     margin:0 0 16px; text-wrap:balance}
+  .lede{font-size:17.5px; color:var(--ink2); max-width:64ch; margin:0}
+  .lede b{color:var(--ink); font-weight:620}
+
+  .meta{display:flex; flex-wrap:wrap; margin-top:32px; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule)}
+  .meta div{flex:1; min-width:140px; padding:14px 18px 14px 0; border-right:1px solid var(--hair)}
+  .meta div:last-child{border-right:0}
+  .meta .k{font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint)}
+  .meta .v{font-family:var(--mono); font-size:14px; margin-top:5px; color:var(--ink); font-variant-numeric:tabular-nums}
+
+  h2{font-size:12px; font-family:var(--mono); letter-spacing:.15em; text-transform:uppercase; color:var(--faint);
+     margin:58px 0 6px; padding-bottom:10px; border-bottom:1px solid var(--rule); font-weight:600}
+  .sub{font-size:20px; font-weight:640; letter-spacing:-.012em; margin:16px 0 10px; text-wrap:balance}
+  p{margin:0 0 14px; color:var(--ink2); max-width:68ch}
+  p b, li b, td b{color:var(--ink); font-weight:620}
+  li{color:var(--ink2); margin-bottom:7px}
+  code{font-family:var(--mono); font-size:.9em; background:var(--accent-soft); color:var(--ink);
+       padding:1px 5px; border-radius:2px}
+
+  figure{margin:26px 0 8px; padding:0}
+  .scroll{overflow-x:auto; padding-bottom:6px}
+  svg{max-width:100%; height:auto; display:block}
+  figcaption{font-size:13px; color:var(--faint); margin-top:14px; max-width:72ch}
+  figcaption b{color:var(--ink2)}
+
+  .callout{border-left:2px solid var(--accent); background:var(--accent-soft);
+           padding:14px 18px; margin:22px 0; font-size:15px; color:var(--ink)}
+  .callout.risk{border-left-color:var(--risk); background:var(--risk-bg)}
+  .callout b{font-weight:640}
+
+  table{width:100%; border-collapse:collapse; margin:18px 0; font-size:14.5px}
+  th{text-align:left; font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+     color:var(--faint); font-weight:600; padding:0 14px 9px 0; border-bottom:1px solid var(--rule)}
+  td{padding:13px 14px 13px 0; border-bottom:1px solid var(--hair); color:var(--ink2); vertical-align:top}
+  td:first-child{color:var(--ink); font-weight:600}
+  .tbl-mono td:first-child{font-family:var(--mono); font-size:13.5px; white-space:nowrap; font-weight:400}
+
+  .pill{font-family:var(--mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+        padding:2px 7px; white-space:nowrap; font-weight:600; border-radius:2px}
+  .p-ok{background:var(--ok-bg); color:var(--ok)}
+  .p-warn{background:var(--warn-bg); color:var(--warn)}
+  .p-risk{background:var(--risk-bg); color:var(--risk)}
+
+  .agenda{list-style:none; padding:0; margin:18px 0 0}
+  .agenda li{display:flex; gap:16px; padding:13px 0; border-bottom:1px solid var(--hair); margin:0}
+  .agenda .t{font-family:var(--mono); font-size:12.5px; color:var(--accent); min-width:62px;
+             font-variant-numeric:tabular-nums; padding-top:2px}
+  .agenda .b{flex:1}
+  .agenda .b b{display:block; color:var(--ink); font-weight:620; margin-bottom:2px}
+  .agenda .b span{font-size:14px}
+
+  svg text{font-family:var(--mono); fill:var(--ink)}
+  .lbl{font-size:12px}
+  .lbl-s{font-size:10.5px; fill:var(--faint); letter-spacing:.07em}
+  .lbl-t{font-size:11px; fill:var(--ink2)}
+  .box{fill:var(--panel); stroke:var(--rule); stroke-width:1}
+  .box-a{fill:var(--accent-soft); stroke:var(--accent-line); stroke-width:1}
+  .box-r{fill:var(--risk-bg); stroke:var(--risk); stroke-width:1}
+  .grp{fill:none; stroke:var(--hair); stroke-width:1; stroke-dasharray:3 3}
+  .ln{stroke:var(--accent-line); stroke-width:1.4; fill:none}
+  .ln-f{stroke:var(--faint); stroke-width:1.2; fill:none; stroke-dasharray:4 3}
+  .ln-r{stroke:var(--risk); stroke-width:1.6; fill:none}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Guesty · operator orientation · 2026-08-19</p>
+  <h1>Builder &amp; Bundle</h1>
+  <p class="lede">Two systems that work together: a <b>chat product</b> that builds n8n workflows from plain English, and the <b>measurement layer</b> that records every automation run at Guesty and produces the Time-Saved number the Innovation Hub reports.</p>
+  <p class="lede" style="margin-top:14px">This page is the map — what runs where, how work is scheduled, and how a change reaches production.</p>
+
+  <div class="meta">
+    <div><div class="k">Owner</div><div class="v">Kurt Pabilona</div></div>
+    <div><div class="k">Secondary</div><div class="v">Ron · Gil</div></div>
+    <div><div class="k">Services</div><div class="v">4 Cloud Run</div></div>
+    <div><div class="k">Schedulers</div><div class="v">7 + 1 BQ query</div></div>
+    <div><div class="k">Executions</div><div class="v">313,115</div></div>
+    <div><div class="k">Verified</div><div class="v">2026-08-19</div></div>
+  </div>
+
+  <h2>1 · The territory</h2>
+  <p class="sub">What sits where</p>
+  <p>The Hub is <b>already Kurt's</b>. The two systems below it are the ones being handed over — the Builder, which people use directly, and the bundle, which produces the numbers the Hub displays.</p>
+
+  <figure>
+   <div class="scroll">
+    <svg viewBox="0 0 960 500" role="img" aria-label="Architecture map of the Builder and the n8n bundle">
+      <rect class="box-a" x="330" y="14" width="300" height="52" rx="2"/>
+      <text class="lbl" x="480" y="38" text-anchor="middle">AI Innovation Hub</text>
+      <text class="lbl-s" x="480" y="54" text-anchor="middle">ALREADY KURT'S · ai-innovation-484111</text>
+
+      <rect class="grp" x="24" y="108" width="418" height="176" rx="3"/>
+      <text class="lbl-s" x="40" y="128">THE BUILDER — REQUEST / RESPONSE</text>
+      <rect class="grp" x="518" y="108" width="418" height="176" rx="3"/>
+      <text class="lbl-s" x="534" y="128">THE BUNDLE — SCHEDULED</text>
+
+      <rect class="box" x="44" y="146" width="180" height="54" rx="2"/>
+      <text class="lbl" x="134" y="169" text-anchor="middle">n8n-chat-ui</text>
+      <text class="lbl-s" x="134" y="185" text-anchor="middle">IAP · NEXT.JS</text>
+      <rect class="box" x="248" y="146" width="174" height="54" rx="2"/>
+      <text class="lbl" x="335" y="169" text-anchor="middle">n8n-mcp-cloud</text>
+      <text class="lbl-s" x="335" y="185" text-anchor="middle">INTERNAL · v2.59.3</text>
+      <path class="ln" d="M224 173 H246"/>
+      <rect class="box" x="44" y="222" width="378" height="42" rx="2"/>
+      <text class="lbl-t" x="233" y="248" text-anchor="middle">11 company specs · 7 skills · node overrides</text>
+
+      <rect class="box" x="538" y="146" width="150" height="54" rx="2"/>
+      <text class="lbl" x="613" y="169" text-anchor="middle">6 schedulers</text>
+      <text class="lbl-s" x="613" y="185" text-anchor="middle">10 MIN → MONTHLY</text>
+      <rect class="box-a" x="734" y="146" width="182" height="54" rx="2"/>
+      <text class="lbl" x="825" y="169" text-anchor="middle">n8n-ops</text>
+      <text class="lbl-s" x="825" y="185" text-anchor="middle">THE MEASUREMENT LAYER</text>
+      <path class="ln" d="M688 173 H732"/>
+      <rect class="box" x="538" y="222" width="378" height="42" rx="2"/>
+      <text class="lbl-t" x="727" y="248" text-anchor="middle">ingest · alerts · digest · KPI rollup · zombie sweep</text>
+
+      <path class="ln" d="M134 146 V90 H420"/>
+      <path class="ln" d="M420 90 V66"/>
+      <path class="ln" d="M825 146 V90 H540 V66"/>
+      <text class="lbl-s" x="366" y="84">EMBED</text>
+      <text class="lbl-s" x="556" y="84">WRITES KPIs</text>
+
+      <rect class="box" x="538" y="306" width="378" height="46" rx="2"/>
+      <text class="lbl" x="727" y="326" text-anchor="middle">Hermes VM — weekly report + watchdog</text>
+      <text class="lbl-s" x="727" y="342" text-anchor="middle">ERIK OPERATES · YOU RECEIVE THE OUTPUT</text>
+      <path class="ln-f" d="M727 306 V284"/>
+
+      <text class="lbl-s" x="24" y="392">SHARED SUBSTRATE — agentic-workflows-485210 · europe-west1</text>
+      <rect class="box" x="24" y="406" width="220" height="52" rx="2"/>
+      <text class="lbl" x="134" y="428" text-anchor="middle">BigQuery n8n_ops</text>
+      <text class="lbl-s" x="134" y="444" text-anchor="middle">EVERY n8n RUN, COMPANY-WIDE</text>
+      <rect class="box" x="260" y="406" width="200" height="52" rx="2"/>
+      <text class="lbl" x="360" y="428" text-anchor="middle">Secret Manager</text>
+      <text class="lbl-s" x="360" y="444" text-anchor="middle">8 SECRETS</text>
+      <rect class="box" x="476" y="406" width="240" height="52" rx="2"/>
+      <text class="lbl" x="596" y="428" text-anchor="middle">shared service account</text>
+      <text class="lbl-s" x="596" y="444" text-anchor="middle">RUNS ~8 SERVICES</text>
+      <rect class="box" x="732" y="406" width="204" height="52" rx="2"/>
+      <text class="lbl" x="834" y="428" text-anchor="middle">n8n Cloud</text>
+      <text class="lbl-s" x="834" y="444" text-anchor="middle">guesty.app.n8n.cloud</text>
+    </svg>
+   </div>
+   <figcaption><b>The seam worth knowing:</b> n8n-ops <b>writes</b> the KPI measurements and the Hub <b>reads</b> and renders them — one writer, one reader. That boundary is why the two have never fought over the same data. The dashed line is the Hermes VM: it produces a weekly report and a daily watchdog about this bundle, and Erik operates it.</figcaption>
+  </figure>
+
+  <div class="callout">The service account named <code>n8n-workflow-builder@</code> is <b>shared</b> — it runs the chat UI, the MCP server, <b>n8n-ops</b> and the Hermes VM, around eight services in all. You need <code>iam.serviceAccountUser</code> on it to deploy, and it's worth checking who else is attached before changing anything about it.</div>
+
+  <h2>2 · How a number reaches the Hub</h2>
+  <p class="sub">The data path, end to end</p>
+
+  <figure>
+   <div class="scroll">
+    <svg viewBox="0 0 960 250" role="img" aria-label="Data path from n8n Cloud through BigQuery to the Hub">
+      <rect class="box" x="10" y="70" width="140" height="50" rx="2"/>
+      <text class="lbl" x="80" y="94" text-anchor="middle">n8n Cloud</text>
+      <text class="lbl-s" x="80" y="109" text-anchor="middle">ALL EXECUTIONS</text>
+
+      <path class="ln" d="M150 95 H210"/>
+      <rect class="box" x="210" y="70" width="128" height="50" rx="2"/>
+      <text class="lbl" x="274" y="94" text-anchor="middle">/ingest</text>
+      <text class="lbl-s" x="274" y="109" text-anchor="middle">EVERY 15 MIN</text>
+
+      <path class="ln" d="M338 95 H392"/>
+      <rect class="box" x="392" y="70" width="140" height="50" rx="2"/>
+      <text class="lbl" x="462" y="94" text-anchor="middle">executions</text>
+      <text class="lbl-s" x="462" y="109" text-anchor="middle">BIGQUERY</text>
+
+      <path class="ln" d="M532 95 H586"/>
+      <rect class="box-a" x="586" y="62" width="164" height="66" rx="2"/>
+      <text class="lbl" x="668" y="86" text-anchor="middle">daily_rollup</text>
+      <text class="lbl-s" x="668" y="101" text-anchor="middle">08:30 ASIA/JERUSALEM</text>
+      <text class="lbl-s" x="668" y="116" text-anchor="middle" style="fill:var(--accent)">A BIGQUERY QUERY</text>
+
+      <path class="ln" d="M750 95 H806"/>
+      <rect class="box" x="806" y="70" width="144" height="50" rx="2"/>
+      <text class="lbl" x="878" y="94" text-anchor="middle">/kpi-rollup</text>
+      <text class="lbl-s" x="878" y="109" text-anchor="middle">1st OF MONTH</text>
+
+      <path class="ln" d="M878 120 V180 H530"/>
+      <rect class="box-a" x="340" y="180" width="190" height="46" rx="2"/>
+      <text class="lbl" x="435" y="201" text-anchor="middle">Hub renders the KPI</text>
+      <text class="lbl-s" x="435" y="217" text-anchor="middle">READS, NEVER WRITES</text>
+
+      <path class="ln-f" d="M462 120 V180 H320"/>
+      <rect class="box" x="10" y="180" width="310" height="46" rx="2" style="stroke:var(--ok)"/>
+      <text class="lbl" x="165" y="200" text-anchor="middle" style="fill:var(--ok)">freshness alarm</text>
+      <text class="lbl-s" x="165" y="216" text-anchor="middle">EVERY 15 MIN · 45-MIN THRESHOLD · #n8n-ops</text>
+    </svg>
+   </div>
+   <figcaption><b>Two things this diagram is here to teach.</b> <code>daily_rollup</code> is a <b>BigQuery scheduled query</b>, not a Cloud Scheduler job — so it won't appear in any <code>gcloud scheduler</code> listing, and it's the step that feeds the monthly rollup. And the green box is the watchdog: it checks BigQuery freshness every 15 minutes against a 45-minute threshold and posts to <code>#n8n-ops</code>, so a stalled ingest surfaces in the channel rather than going unnoticed.</figcaption>
+  </figure>
+
+  <h2>3 · How work is scheduled</h2>
+  <p>Six Cloud Scheduler jobs are defined in <code>deploy.sh</code> and re-applied every time it runs. Two more schedules exist outside it — knowing they're there is most of the value of this section.</p>
+
+  <table class="tbl-mono">
+    <thead><tr><th>Job</th><th>Cadence</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td>n8n-ops-ingest</td><td>every 15 min</td><td>pull executions into BigQuery</td></tr>
+      <tr><td>n8n-ops-loop-alerts</td><td>every 10 min</td><td>stuck-running and trigger-loop alerts → Slack</td></tr>
+      <tr><td>n8n-ops-sweep-zombies</td><td>every 30 min</td><td>reconcile executions that ended outside the ingest window</td></tr>
+      <tr><td>n8n-ops-sync-hub</td><td>daily 06:15 UTC</td><td>per-initiative workflow stats → Hub</td></tr>
+      <tr><td>n8n-ops-weekly-digest</td><td>Mon 09:00</td><td>the digest in <code>#n8n-ops</code></td></tr>
+      <tr><td>n8n-ops-kpi-rollup</td><td>1st of month</td><td>previous month's Time Saved → Hub</td></tr>
+      <tr><td>n8n-kpi-freshness-cron</td><td>every 15 min</td><td><b>not owned by deploy.sh</b> — drives the freshness alarm</td></tr>
+      <tr><td>daily_rollup</td><td>08:30 daily</td><td><b>a BigQuery scheduled query</b>, not Cloud Scheduler — populates <code>daily_workflow_stats</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>4 · How a change reaches production</h2>
+  <p>The three services deploy differently. This is the thing most worth memorising, because it isn't what people assume.</p>
+
+  <figure>
+   <div class="scroll">
+    <svg viewBox="0 0 960 230" role="img" aria-label="Deployment paths for the three services">
+      <text class="lbl-s" x="10" y="20">SERVICE</text>
+      <text class="lbl-s" x="320" y="20">PATH TO PRODUCTION</text>
+      <text class="lbl-s" x="740" y="20">TRIGGER ON MERGE?</text>
+      <line x1="10" y1="30" x2="950" y2="30" stroke="var(--rule)" stroke-width="1"/>
+
+      <rect class="box" x="10" y="46" width="280" height="46" rx="2"/>
+      <text class="lbl" x="26" y="66">n8n-chat-ui</text>
+      <text class="lbl-s" x="26" y="82">THE BUILDER UI</text>
+      <path class="ln" d="M290 69 H320"/>
+      <text class="lbl-t" x="330" y="66">./deploy-cloudrun.sh --ui-only</text>
+      <text class="lbl-s" x="330" y="82">RUN IT YOURSELF</text>
+      <rect class="box" x="740" y="52" width="120" height="34" rx="2"/>
+      <text class="lbl" x="800" y="74" text-anchor="middle">manual</text>
+
+      <rect class="box-a" x="10" y="110" width="280" height="46" rx="2"/>
+      <text class="lbl" x="26" y="130">n8n-mcp-cloud</text>
+      <text class="lbl-s" x="26" y="146">THE MCP SERVER</text>
+      <path class="ln" d="M290 133 H320"/>
+      <text class="lbl-t" x="330" y="130">Cloud Build trigger on ^main$</text>
+      <text class="lbl-s" x="330" y="146">SHIPS WHEN YOU MERGE</text>
+      <rect class="box-a" x="740" y="116" width="120" height="34" rx="2"/>
+      <text class="lbl" x="800" y="138" text-anchor="middle" style="fill:var(--accent)">automatic</text>
+
+      <rect class="box" x="10" y="174" width="280" height="46" rx="2"/>
+      <text class="lbl" x="26" y="194">n8n-ops</text>
+      <text class="lbl-s" x="26" y="210">THE MEASUREMENT LAYER</text>
+      <path class="ln" d="M290 197 H320"/>
+      <text class="lbl-t" x="330" y="194">./deploy.sh — also re-applies the 6 crons</text>
+      <text class="lbl-s" x="330" y="210">RUN IT YOURSELF</text>
+      <rect class="box" x="740" y="180" width="120" height="34" rx="2"/>
+      <text class="lbl" x="800" y="202" text-anchor="middle">manual</text>
+    </svg>
+   </div>
+   <figcaption>Merging to <code>main</code> ships the MCP server and leaves the other two waiting for someone to run a script. <code>n8n-ops/deploy.sh</code> is also the <b>only</b> thing that creates or updates the six Cloud Schedulers, so any cron change has to go through it. Rollback for any of the three is a Cloud Run traffic split back to the previous revision.</figcaption>
+  </figure>
+
+  <h2>5 · How the Time-Saved KPI is computed</h2>
+  <p>This is the part that gets questioned in reviews, so it's worth knowing precisely.</p>
+  <ul>
+    <li><b>Primary source</b> — each linked workflow's native <code>timeSavedPerExecution</code> (minutes), set by the workflow owner in n8n's settings panel. Per workflow: <code>success_runs × value / 60</code>.</li>
+    <li><b>Fallback</b> — when no workflow on an initiative has a fixed value, <code>expected_impact</code> is used instead, normalised against the KPI's unit and period.</li>
+    <li><b>Fixed vs dynamic mode matters.</b> n8n lets owners set time-saved either as a fixed number or dynamically via canvas nodes. The public REST API doesn't expose dynamic values, so <b>dynamic-mode workflows contribute zero</b> to our KPI while still showing a value in n8n's own Insights view. Recommend fixed mode to anyone whose workflow feeds a KPI.</li>
+    <li><b>Onboarding is gated on a secret.</b> A KPI reports through this path once a per-KPI token exists at <code>kpi-webhook-token-&lt;id&gt;</code> in Secret Manager. Exactly one exists today, so exactly one KPI currently reports this way.</li>
+  </ul>
+
+  <h2>6 · Getting set up</h2>
+  <table>
+    <thead><tr><th>What</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>GitHub — the three repos</td><td><span class="pill p-ok">invites sent</span> admin on <code>n8n-workflow-builder</code>, <code>n8n-ops</code>, <code>n8n-mcp-cloud</code></td></tr>
+      <tr><td>GitHub — the Hub</td><td><span class="pill p-ok">already yours</span></td></tr>
+      <tr><td>GCP <code>agentic-workflows-485210</code></td><td><span class="pill p-warn">to request</span> <code>roles/editor</code> — Roni Shif can grant it directly</td></tr>
+      <tr><td>GCP <code>ai-innovation-484111</code></td><td><span class="pill p-ok">you already have editor</span></td></tr>
+      <tr><td>n8n Cloud instance</td><td><span class="pill p-warn">to confirm</span> admin on <code>guesty.app.n8n.cloud</code></td></tr>
+    </tbody>
+  </table>
+  <p>Run <code>./docs/handover/verify-access.sh</code> from the Builder repo — it's read-only, takes a minute, and checks every repo, service, scheduler, secret and dataset in one pass. Its output is the list of anything still to grant.</p>
+
+  <h2>7 · Where to go next</h2>
+  <table>
+    <thead><tr><th>Doc</th><th>Covers</th></tr></thead>
+    <tbody>
+      <tr><td><a href="https://github.com/alvarocubaa/n8n-ops/blob/main/docs/handover/HANDOVER.md">n8n-ops — operator guide</a></td><td>the schedulers, the KPI computation, deploying, the ownership seams, how to pause it safely</td></tr>
+      <tr><td><a href="https://github.com/alvarocubaa/n8n-workflow-builder/blob/main/docs/handover/HANDOVER.md">Builder — operator guide</a></td><td>the knowledge layers, the deliberate node overrides, the three-location spec sync, local dev</td></tr>
+      <tr><td><a href="https://github.com/alvarocubaa/n8n-workflow-builder/blob/main/docs/handover/INVENTORY.yml">INVENTORY.yml</a></td><td>every resource across both systems, machine-readable</td></tr>
+      <tr><td><a href="https://github.com/alvarocubaa/n8n-workflow-builder/blob/main/docs/handover/verify-access.sh">verify-access.sh</a></td><td>one-command check that you can reach everything</td></tr>
+    </tbody>
+  </table>
+
+</div>

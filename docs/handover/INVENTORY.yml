@@ -1,0 +1,136 @@
+# n8n Workflow Builder + n8n bundle — resource inventory
+# FULLY VERIFIED LIVE 2026-08-19: IAM, Cloud Run, schedulers, build triggers, secrets,
+# BigQuery ingest freshness. GitHub collaborators verified 2026-08-18.
+
+group: n8n-builder-and-bundle
+owner_primary: Kurt Pabilona
+owner_secondary: [Ron Madar Hallevi, Gil Almog]
+assigned_by: "Gil Almog, Slack 2026-08-10; consolidated to Kurt 2026-08-18"
+verified: 2026-08-19
+
+repos:
+  - name: n8n-workflow-builder
+    remote: https://github.com/alvarocubaa/n8n-workflow-builder
+    namespace: USER                 # not guestyorg — see risks.repo_namespace
+    collaborators: [alvarocubaa, cubaalvaro]   # NOBODY ELSE — verified 2026-08-18
+    default_branch: main
+    unmerged_branches:
+      - name: session/2026-06-26-repo-standardization
+        commits: 11
+        last: 2026-07-21
+        contains: "BI data-dictionary context layer; dormant agent_logs writer (table shared with a GenBI Slack agent)"
+        action: DECIDE              # land or abandon-and-notify
+      - name: session/2026-05-08-jira-integration
+        commits: 45
+        last: 2026-06-16
+        contains: "the June repo-split work; superseded, history tagged pre-split-2026-06-11"
+        action: SKIM_THEN_DELETE
+  - name: n8n-ops
+    remote: https://github.com/alvarocubaa/n8n-ops
+    namespace: USER
+    collaborators: [alvarocubaa, cubaalvaro]
+    default_branch: main
+    unmerged_branches: []           # clean — verified 2026-08-18
+  - name: n8n-mcp-cloud
+    remote: https://github.com/alvarocubaa/n8n-mcp-cloud
+    namespace: USER
+    collaborators: [alvarocubaa, cubaalvaro]
+    default_branch: main            # at v2.59.3 revendor (PR #1) — clean
+    unmerged_branches: []
+  - name: AI-Innovation-Hub-Vertex
+    remote: https://github.com/kurtpabilona-code/AI-Innovation-Hub-Vertex
+    namespace: KURT                 # already the receiving owner's — nothing to transfer
+
+gcp:
+  project: agentic-workflows-485210
+  region: europe-west1
+  hub_project: ai-innovation-484111     # us-central1; Kurt/Ron/Gil already editors
+  iam_unblock: "roni.shif@guesty.com holds resourcemanager.projectIamAdmin — VERIFIED 2026-08-19. Can grant directly, no IT ticket; already did so for erik.cohen."
+  human_editors_today: [alvaro.cuba, denis, diego.peco, erik.cohen, gil.almog, roni.shif]
+  access_needed:
+    kurt.pabilona: "roles/editor — request from roni.shif"
+    ron.madar.hallevi: "roles/viewer — request from roni.shif"
+
+cloud_run:                              # all verified present 2026-08-18
+  - name: n8n-chat-ui
+    system: builder
+    auth: Google IAP
+    deploy: "./deploy-cloudrun.sh --ui-only   # MANUAL, no trigger"
+  - name: n8n-mcp-cloud
+    system: builder
+    auth: internal-only (SA-to-SA)
+    deploy: "AUTOMATIC on push to main — Cloud Build trigger rmgpgab-n8n-mcp-cloud-... (verified 2026-08-19)"
+    note: "the only piece in this family that auto-deploys, and the one nobody thinks about"
+  - name: n8n-ops
+    system: bundle
+    deploy: "./deploy.sh                      # MANUAL, no trigger — see risks.fake_autodeploy"
+  - name: n8n-kpi-freshness-alarm
+    system: bundle
+    purpose: "guards against the silent-staleness failure mode"
+    verified_2026_08_19: "LIVE — threshold 45 min, posts to Slack C0B04MBFPKM (#n8n-ops), a CHANNEL not a DM"
+    caveat: "reports via Slack, so a dead Slack bot token silences the guard and the pipeline together"
+
+schedulers:                             # all six ENABLED, verified 2026-08-19; created/updated ONLY by n8n-ops/deploy.sh
+  - {name: n8n-ops-ingest,         cron: "*/15 * * * *", tz: UTC,            endpoint: /ingest}
+  - {name: n8n-ops-loop-alerts,    cron: "*/10 * * * *", tz: UTC,            endpoint: /loop-alerts}
+  - {name: n8n-ops-sweep-zombies,  cron: "*/30 * * * *", tz: UTC,            endpoint: /sweep-zombies}
+  - {name: n8n-ops-sync-hub,       cron: "15 6 * * *",   tz: UTC,            endpoint: /sync-hub}
+  - {name: n8n-ops-weekly-digest,  cron: "0 9 * * 1",    tz: Asia/Jerusalem, endpoint: /weekly-digest}
+  - {name: n8n-ops-kpi-rollup,     cron: "0 2 1 * *",    tz: UTC,            endpoint: /kpi-rollup}
+
+# A 7th Cloud Scheduler job that deploy.sh does NOT own — re-running deploy.sh will not recreate it.
+extra_scheduler:
+  name: n8n-kpi-freshness-cron
+  cron: "*/15 * * * *"
+  tz: Asia/Jerusalem
+  state: ENABLED
+  drives: n8n-kpi-freshness-alarm
+
+# NOT a Cloud Scheduler job at all. Lives in BigQuery. Easiest thing here to miss.
+bigquery:
+  dataset: agentic-workflows-485210.n8n_ops
+  tables: [executions, workflows, daily_workflow_stats, hermes_heartbeat]
+  health_2026_08_19: "executions = 313,115 rows; last execution 10 min before the read. HEALTHY."
+  scheduled_query:
+    name: daily_rollup
+    cron: "08:30 Asia/Jerusalem"
+    populates: daily_workflow_stats
+    consumed_by: /kpi-rollup
+    note: "if this stops, the monthly KPI reads stale stats and Cloud Scheduler still looks healthy"
+
+service_account:
+  shared: n8n-workflow-builder@agentic-workflows-485210.iam.gserviceaccount.com
+  used_by: [n8n-chat-ui, n8n-mcp-cloud, n8n-ops, hermes-agent VM, "~8 Cloud Run services total"]
+  holds: "project-wide roles/secretmanager.secretAccessor"
+  warning: "NAME IS MISLEADING. Never rotate or delete as 'the builder's SA'."
+  dedicated_alternative: n8n-ops-sa   # specified but never created — blocked on project IAM admin
+
+secrets:                                # project agentic-workflows-485210
+  - {name: n8n-api-key,                 for: "n8n Cloud REST access", departure_risk: HIGH_SILENT}
+  - {name: n8n-ops-slack-bot-token,     for: "#n8n-ops (C0B04MBFPKM)", departure_risk: MEDIUM}
+  - {name: GEMINI_API_KEY,              for: "production-readiness audit (gemini-2.5-flash)", departure_risk: MEDIUM}
+  - {name: supabase-hub-service-role,   for: "writing initiative_kpi_measurements", departure_risk: LOW}
+  - {name: supabase-hub-url,            for: "Hub connection", departure_risk: LOW}
+  - {name: supabase-hub-anon-key,       for: "Hub connection", departure_risk: LOW}
+  - {name: initiative-kpi-refresh-token, for: "KPI refresh auth", departure_risk: LOW}
+  - {name: "kpi-webhook-token-e6f47f5b-...", for: "per-KPI ingest auth", note: "EXACTLY ONE EXISTS (2026-08-19) = exactly one KPI onboarded. Missing token = KPI skipped silently."}
+  - {name: N8N_API_KEY, note: "LEGACY, uppercase, created 2026-01-23. A DIFFERENT secret from n8n-api-key. Do not confuse."}
+
+external:
+  - {name: "n8n Cloud", url: guesty.app.n8n.cloud, note: "AI Generated tag 8pUFynxIQ58Bfpba; confirm Kurt has instance admin"}
+  - {name: "Supabase (Hub DB)", note: "n8n-ops WRITES initiative_kpi_measurements; Hub READS. One writer, one reader."}
+  - {name: "Slack #n8n-ops", id: C0B04MBFPKM}
+
+hermes_dependency:                      # operated by Erik — Kurt is a consumer, not an operator
+  vm: hermes-agent (europe-west1-b)
+  profiles_serving_this_group:
+    - {name: n8n-ops,       job: n8n-weekly-report,        cron: "Mon 07:13", state: LIVE}
+    - {name: ai-innovation, job: ai-innovation-watchdog,   cron: "06:45 daily", state: LIVE}
+  removed:
+    - name: workflow-builder
+      state: "REMOVED FROM VM 2026-08-17 — fired once (2026-06-22), never again"
+      skills_kept_at: hermes-orchestrator/skills/WORKFLOW-BUILDER-SKILLS-STATUS.md
+      warning: "ROADMAP.md still advertises this profile as active. It is not."
+  github_identity: "acts as alvarocubaa — stops SILENTLY on deprovisioning"
+
+definition_of_done: "verify-access.sh exits 0 for the new owner, and they have shipped one real change to each system."
